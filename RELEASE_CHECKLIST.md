@@ -55,3 +55,12 @@ The private research repository and its history were not published.
 The C++ double and MPFR backends remain source-build options. The cavity
 example is a showcase with a documented divergence defect, not validation of
 a general Navier–Stokes solver.
+
+### Retrying a failed upload workflow
+
+If a release build fails before upload, fix CI on `main` and use the manual
+`publish to PyPI` workflow with the **existing release tag**. It checks out and
+builds that immutable tag, verifies its version, and retains the protected
+`pypi` environment. Never move a published tag or replace a PyPI version.
+The installed-package test step sets `RBFLAB_SOURCE_ROOT` to its matching
+checkout because native sources are intentionally absent from the wheel.
