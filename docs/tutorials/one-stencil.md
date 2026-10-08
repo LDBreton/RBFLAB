@@ -5,7 +5,7 @@
 
 <figure class="stencil-figure">
 <a href="../../assets/rbf_fd_stencil.svg" aria-label="Open the stencil diagram at full size"><img src="../../assets/rbf_fd_stencil.svg" alt="An irregular 121-node cloud with 20 selected neighbors around a target, followed by their signed Laplacian weights in a sparse matrix row"></a>
-<figcaption>One computed RBF-FD row on an irregular cloud. Blue nodes form the 20-point stencil; the orange star is the target. The dashed circle marks its radius R, not compact kernel support. The right panel shows RÂ² times the Laplacian weights in global node order; unselected columns are zero. The figure uses PHS5, degree-two polynomials, and a seeded 121-node cloud; the runnable one-stencil tutorial defaults to 36 nodes.</figcaption>
+<figcaption>One computed RBF-FD row on an irregular cloud. Blue nodes form the 20-point stencil; the orange star is the target. The dashed circle marks its radius R, not compact kernel support. The right panel shows R<sup>2</sup> times the Laplacian weights in global node order; unselected columns are zero. The figure uses PHS5, degree-two polynomials, and a seeded 121-node cloud; the runnable one-stencil tutorial defaults to 36 nodes.</figcaption>
 </figure>
 
 ## The local approximation
