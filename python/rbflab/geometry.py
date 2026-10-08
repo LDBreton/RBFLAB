@@ -6,6 +6,13 @@ import numpy as np
 
 @dataclass
 class PointCloud:
+    """Validated 2D or 3D coordinates with tagged boundary nodes.
+
+    Args:
+        points: Finite, unique coordinates with shape `(N, dimension)`.
+        boundary: Mapping from boundary label to arrays of point indices.
+        normals: Mapping from labels to unit-normal arrays matching their nodes.
+        triangles: Optional `(T, 3)` connectivity for visualization."""
     points: np.ndarray
     boundary: dict
     normals: dict

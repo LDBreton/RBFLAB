@@ -8,6 +8,17 @@ from .kernels import ScalarKernel, _COORDINATES
 
 @dataclass(frozen=True)
 class Kernel:
+    """Symbolic radial kernel family with runtime-bound parameters.
+
+    Args:
+        expression: SymPy formula in `radial_variable` and declared parameters.
+        radial_variable: SymPy symbol representing squared radius `r**2`.
+        parameters: Tuple of runtime SymPy parameter symbols.
+        minimum_degree: Required minimum polynomial degree, or `-1`.
+        dimension: Optional restriction to 2D or 3D.
+
+    Call the family with named parameter values to obtain a bound kernel.
+    `compile(...)` caches a validated native implementation when available."""
     expression: object
     radial_variable: object
     parameters: tuple = ()

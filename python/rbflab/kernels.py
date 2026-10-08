@@ -86,6 +86,10 @@ def IMQ(c=1.0):
 
 
 def Gaussian(c=1.0):
+    """Return the Gaussian scalar kernel `exp(-c*r**2)`.
+
+    Args:
+        c (float): Positive coefficient of squared physical distance."""
     return ScalarKernel(c, "gaussian")
 
 

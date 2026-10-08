@@ -9,6 +9,11 @@ from .kernels import ScalarKernel,PHS,Hybrid
 
 @dataclass(frozen=True)
 class ScalarSpace:
+    """Scalar radial approximation space with optional polynomials.
+
+    Args:
+        kernel: Scalar radial kernel or bound symbolic kernel.
+        polynomial_degree: Degree, `None`, or `"auto"` for the kernel minimum."""
     kernel: object
     polynomial_degree: object = 'auto'
 

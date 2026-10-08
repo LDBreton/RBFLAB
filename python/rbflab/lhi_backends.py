@@ -182,6 +182,12 @@ def _finish(method,problem,cloud,a,tasks,stencils,results,diagnostics):
 
 @dataclass(frozen=True)
 class PythonBackend:
+    """Python local-weight backend for supported divergence-free LHI Stokes.
+
+    Args:
+        workers: Number of local-assembly worker processes.
+        compute_condition: Whether to estimate each local condition number.
+        shape_rule: Shape-parameter policy for each stencil."""
     workers: int = 1
     compute_condition: bool = True
     shape_rule: str = 'fixed'
@@ -203,6 +209,17 @@ class PythonBackend:
 
 @dataclass(frozen=True)
 class CppBackend:
+    """Compiled local-weight backend for supported divergence-free LHI Stokes.
+
+    Float64 uses the native C++ executable; extended local digits select its
+    MPFR executable. Compilation is a separate optional installation step.
+
+    Args:
+        threads: OpenMP thread count for local systems.
+        compute_condition: Whether to estimate local condition numbers.
+        shape_rule: Stencil shape-parameter policy.
+        local_solver: `"lu"` or Float64-only `"svd"`.
+        svd_rcond: Optional Float64 SVD cutoff."""
     threads: int = 1
     compute_condition: bool = True
     shape_rule: str = 'fixed'

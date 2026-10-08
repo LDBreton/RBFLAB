@@ -15,6 +15,10 @@ from .methods import _query
 
 @dataclass(frozen=True)
 class StokesProblem:
+    """Steady 2D Stokes data with divergence-free velocity approximation.
+
+    Represents `-viscosity*Laplacian(u) + grad(p) = forcing` and velocity
+    Dirichlet data. A pressure value at one point fixes its constant gauge."""
     forcing: tuple
     boundary_velocity: tuple
     viscosity: object = 1
@@ -68,6 +72,11 @@ def _blocks(a,x,left,y,right,length_scale=None):
 
 @dataclass
 class GlobalStokes:
+    """Assemble dense steady 2D Stokes collocation.
+
+    The supplied smooth scalar potential generates a divergence-free velocity
+    kernel. This legacy entry point supports IMQ and Gaussian kernels; use
+    explicit spaces for other supported coupled formulations."""
     kernel: object
     precision: Precision = field(default_factory=Precision)
 

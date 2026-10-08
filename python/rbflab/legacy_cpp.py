@@ -37,6 +37,9 @@ class _LazyFactor:
 
 @dataclass(frozen=True)
 class LegacyCppLHIBackend:
+    """Historical C++ LHI adapter retained for reproducibility experiments.
+
+    Prefer `CppBackend` for the current compiled local-weight path."""
     binary_directory: str
     shape_rule: str = 'fixed'
     threads: int = 1

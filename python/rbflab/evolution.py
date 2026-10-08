@@ -178,6 +178,10 @@ def assemble_evolution(method,problem,cloud):
 
 
 class EvolutionSystem:
+    """Assembled semidiscrete scalar evolution system.
+
+    Holds spatial and mass matrices and exposes time-stepping operations.
+    Create it with `method.assemble(problem, cloud)`."""
     def __init__(self,problem,cloud,arithmetic,spatial,mass,boundary_map,kind):
         self.problem,self.cloud,self.arithmetic=problem,cloud,arithmetic
         self.spatial,self.mass,self.boundary_map=spatial,mass,boundary_map
@@ -370,6 +374,9 @@ class EvolutionState:
 
 @dataclass
 class EvolutionTrajectory:
+    """Initial state, saved time states, and diagnostics of an evolution solve.
+
+    The `final` property returns the last saved state."""
     initial: object
     states: list
     diagnostics: dict

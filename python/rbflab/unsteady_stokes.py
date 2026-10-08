@@ -17,6 +17,10 @@ from .time_data import TimeData, at_time as _at
 
 @dataclass(frozen=True)
 class UnsteadyStokesProblem:
+    """Time-dependent 2D Stokes data and an initial velocity field.
+
+    Uses a point pressure gauge and full velocity Dirichlet boundary data.
+    Forcing and boundary values may depend on time."""
     forcing: tuple
     boundary_velocity: tuple
     initial_velocity: tuple
@@ -42,6 +46,7 @@ class _InitialVelocity:
 
 @dataclass
 class GlobalUnsteadyStokes:
+    """Assemble fixed-basis global unsteady Stokes with a velocity mass matrix."""
     kernel: object
     precision: Precision = field(default_factory=Precision)
 

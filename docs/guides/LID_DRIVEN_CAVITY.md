@@ -1,6 +1,6 @@
 # Re=100 lid-driven cavity
 
-Run the [standalone example](../../examples/navier_stokes_cavity.py) from a
+Run the [standalone example](https://github.com/LDBreton/RBFLAB/blob/main/examples/navier_stokes_cavity.py) from a
 source checkout after installing the plotting extra:
 
 ```sh

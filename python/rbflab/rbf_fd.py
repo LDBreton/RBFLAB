@@ -14,6 +14,23 @@ from .sparse_precision import MPSparseMatrix,MPSparseLU
 
 @dataclass
 class RBFFD:
+    """Polynomial-augmented local finite differences on a point cloud.
+
+    The standard scheme uses value-based local ansatz functions. Alternative
+    schemes and supported backends can be selected through constructor fields.
+
+    Args:
+        kernel: Radial basis function used for stencil weights.
+        stencil_size: Number of points in each local stencil.
+        polynomial_degree: Highest total polynomial degree.
+        precision: Local-weight and sparse-solve arithmetic policy.
+        stencil_policy: Selection and scaling of local points.
+        scheme: Local ansatz scheme; `"standard"` is the default.
+        local_backend: Optional local-weight implementation.
+        spaces: Optional source/target approximation-space mapping.
+
+    Use `operators(...)` for reusable discrete matrices or `assemble(...)`
+    for a scalar PDE system."""
     kernel: object = None
     stencil_size: int = 15
     polynomial_degree: int = 2
@@ -25,6 +42,7 @@ class RBFFD:
     spaces: object = None
 
     def operators(self, *, source, targets=None, operators, space=None):
+        """Build named sparse discrete operators between source and target clouds."""
         from .discrete_operators import build_operators
         return build_operators(self, source=source, targets=targets, operators=operators, space=space)
 
@@ -39,6 +57,7 @@ class RBFFD:
         return prepare_method(self,problem,dimension,cache_dir)
 
     def assemble(self,problem,cloud):
+        """Build the sparse RBF-FD PDE and boundary system."""
         if self.spaces is not None:
             from .discrete_operators import scalar_method
             return scalar_method(self).assemble(problem,cloud)

@@ -1,0 +1,39 @@
+site_name: RBFLAB
+site_description: Radial basis functions for interpolation and PDEs
+site_url: https://ldbreton.github.io/RBFLAB/
+repo_url: https://github.com/LDBreton/RBFLAB
+repo_name: LDBreton/RBFLAB
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.indexes
+    - content.code.copy
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [python]
+          options:
+            docstring_style: google
+            show_source: false
+            show_root_heading: true
+            show_if_no_docstring: false
+            members_order: source
+            filters: ["!^_"]
+nav:
+  - Home: index.md
+  - Getting started: getting-started.md
+  - Installation: INSTALL.md
+  - Guides:
+      - Visualization: VISUALIZATION.md
+      - Lid-driven cavity: guides/LID_DRIVEN_CAVITY.md
+  - API reference:
+      - Kernels and geometry: api/kernels-geometry.md
+      - Equations and spaces: api/equations-spaces.md
+      - Discretizations: api/discretizations.md
+      - Precision and backends: api/precision-backends.md
+      - Diagnostics and visualization: api/diagnostics-viz.md
+  - Capabilities: CAPABILITIES.md
+  - Maintaining docs: MAINTAINING_DOCS.md

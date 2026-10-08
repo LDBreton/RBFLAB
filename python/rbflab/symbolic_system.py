@@ -29,6 +29,10 @@ class PointConstraint:
 
 @dataclass(frozen=True)
 class BlockPDE:
+    """Compiled coupled stationary linear PDE with block boundary rows.
+
+    Produced by `SymbolicSystem.stationary`. Field order determines block
+    ordering; point constraints can fix a scalar nullspace such as pressure."""
     fields: tuple
     dimension: int
     equations: tuple

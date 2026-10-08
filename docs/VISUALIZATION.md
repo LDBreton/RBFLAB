@@ -43,6 +43,6 @@ checks that the heat peak decreases without significant negative undershoot,
 then writes `docs/assets/heat_diffusion.png`, `heat_diffusion.gif`, and
 `stokes_velocity.png`.
 
-From a source checkout, the [Re=100 cavity example](../examples/navier_stokes_cavity.py)
+From a source checkout, the [Re=100 cavity example](https://github.com/LDBreton/RBFLAB/blob/main/examples/navier_stokes_cavity.py)
 makes the README's flow GIF and PNG with `python -m examples.navier_stokes_cavity`.
 Its default backend is Python; `--backend cpp` uses the optional native backend.

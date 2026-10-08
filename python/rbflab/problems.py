@@ -19,6 +19,12 @@ def values(data, points):
 
 @dataclass(frozen=True)
 class BoundaryCondition:
+    """A linear boundary row attached to a cloud label or boundary selection.
+
+    Args:
+        on: Boundary label or selection understood by the cloud.
+        operator: Boundary functional applied to the unknown.
+        rhs: Prescribed scalar values or a callable evaluated at boundary points."""
     on: object
     operator: object
     rhs: object
@@ -27,6 +33,10 @@ class BoundaryCondition:
 
 @dataclass(frozen=True)
 class LinearPDE:
+    """Stationary scalar problem `operator(u) = rhs` with boundary rows.
+
+    Call `solve(cloud, method)` or assemble with a selected numerical method
+    to inspect the matrix before solving."""
     operator: Operator
     rhs: object
     boundary: tuple
@@ -42,6 +52,7 @@ class LinearPDE:
 
 
 def Dirichlet(value=0.0, on="boundary"):
+    """Create a value boundary condition `u = value` on a label."""
     return BoundaryCondition(on, Identity(), value, _value_condition=True)
 
 

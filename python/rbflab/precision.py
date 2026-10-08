@@ -12,6 +12,12 @@ from .kernels import _X, _Y, _C, _COORDINATES, _base_expression, PHS, Hybrid
 
 @dataclass(frozen=True)
 class Precision:
+    """Select arithmetic used by the numerical methods.
+
+    Args:
+        local_digits: Decimal digits for local weights; `None` uses Float64.
+        global_dtype: `"float64"` or `"mpmath"` for supported sparse solves.
+        global_digits: Decimal digits for supported dense global solves."""
     local_digits: int | None = None
     global_dtype: str = "float64"
     global_digits: int | None = None

@@ -13,9 +13,9 @@ backend choice does not automatically change a separate global sparse solve.
 | Custom symbolic kernel evaluation | Yes | Compilation from source checkout | Compilation from source checkout | Supported where the local backend accepts the kernel |
 | Full MPFR global sparse solve | Supported by selected Python methods | Separate from local C++ backend | Separate setting | — |
 
-The curated [3D operator example](../examples/operators_3d.py) ran with Python,
+The curated [3D operator example](https://github.com/LDBreton/RBFLAB/blob/main/examples/operators_3d.py) ran with Python,
 C++ double, and PyTorch Float64 on Windows/WSL. The
-[Stokes example](../examples/stokes_spaces.py) ran with Python, C++ double,
+[Stokes example](https://github.com/LDBreton/RBFLAB/blob/main/examples/stokes_spaces.py) ran with Python, C++ double,
 and C++ MPFR local weights.
 The six default Python examples ran from an installed wheel and source archive
 outside the checkout.

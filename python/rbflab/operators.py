@@ -87,11 +87,17 @@ def _dimension(dimension):
 
 
 def Identity(dimension=2):
+    """Return the value functional in the selected spatial dimension."""
     _dimension(dimension)
     return Operator((((0,) * dimension, 1.0),))
 
 
 def Derivative(axis, dimension=2):
+    """Return a first Cartesian derivative operator.
+
+    Args:
+        axis (int): Zero-based coordinate axis.
+        dimension (int): Number of spatial coordinates."""
     _dimension(dimension)
     if type(axis) is not int or not 0 <= axis < dimension:
         raise ValueError("Derivative axis must lie within the spatial dimension")
@@ -99,6 +105,7 @@ def Derivative(axis, dimension=2):
 
 
 def Laplacian(dimension=2):
+    """Return the sum of second Cartesian derivatives."""
     _dimension(dimension)
     return sum((Derivative(i, dimension) @ Derivative(i, dimension)
                 for i in range(dimension)), 0 * Identity(dimension))
@@ -114,6 +121,10 @@ class NormalDerivative:
 
 @dataclass(frozen=True)
 class Robin:
+    """Boundary functional `alpha*u + beta*normal_derivative(u)`.
+
+    The geometric unit normal is supplied when the functional is bound to a
+    boundary point."""
     alpha: float = 1.0
     beta: float = 1.0
 

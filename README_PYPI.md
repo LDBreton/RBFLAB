@@ -46,4 +46,8 @@ validate a general Navier–Stokes solver. LHI off-node reconstruction has its
 own accuracy limitations, and MPFR local weights do not automatically make a
 global sparse solve extended precision.
 
+The [documentation site](https://ldbreton.github.io/RBFLAB/) includes a
+[getting-started guide](https://ldbreton.github.io/RBFLAB/getting-started/)
+and generated [API reference](https://ldbreton.github.io/RBFLAB/api/discretizations/).
+
 RBFLAB is licensed under MIT.

@@ -14,6 +14,17 @@ from .assembly import functional_matrix, Factor, relative_residual
 
 @dataclass
 class GlobalCollocation:
+    """Dense scalar collocation using a radial kernel.
+
+    Args:
+        kernel: Scalar radial kernel or bound symbolic kernel.
+        precision: Arithmetic policy for assembly and solve.
+        scheme: `"symmetric"` Hermite or `"asymmetric"` nodal collocation.
+        polynomial_degree: Optional polynomial augmentation degree.
+        spaces: Optional field-to-space mapping for coupled Stokes problems.
+
+    Use `assemble(problem, cloud)` to obtain a system with a matrix and RHS;
+    then call `system.solve()`."""
     kernel: object = None
     precision: Precision = field(default_factory=Precision)
     scheme: str = "symmetric"
@@ -25,6 +36,7 @@ class GlobalCollocation:
         return prepare_method(self,problem,dimension,cache_dir)
 
     def assemble(self, problem, cloud):
+        """Assemble the selected global scheme for a problem and point cloud."""
         if self.spaces is not None:
             from .space_stokes import assemble_spaces
             return assemble_spaces(self,problem,cloud)
@@ -104,6 +116,21 @@ class Stencil:
 
 @dataclass
 class LHI:
+    """Sparse local Hermite interpolation for scalar PDEs or Stokes spaces.
+
+    Local systems mix solution, boundary, and PDE functionals. A stencil's
+    PDE centers exclude its solution center. The sparse solve returns nodal
+    values; off-node evaluation uses a nearby local stencil.
+
+    Args:
+        kernel: Radial kernel used in each local Hermite system.
+        stencil_size: Number of nearby solution/boundary candidates.
+        precision: Local and sparse-solve arithmetic policy.
+        pde_stencil_size: Optional number of additional PDE centers.
+        polynomial_degree: Optional polynomial reproduction degree.
+        stencil_policy: Neighbor selection and local scaling policy.
+        spaces: Optional field-to-space mapping for divergence-free Stokes.
+        local_backend: Optional supported local-weight backend."""
     kernel: object = None
     stencil_size: int = 15
     precision: Precision = field(default_factory=Precision)
@@ -120,6 +147,7 @@ class LHI:
         return prepare_method(self,problem,dimension,cache_dir)
 
     def assemble(self, problem, cloud):
+        """Construct local Hermite weights and the global sparse PDE system."""
         if self.spaces is not None:
             from .space_stokes import assemble_spaces
             return assemble_spaces(self,problem,cloud)

@@ -32,6 +32,7 @@ fast = ["gmpy2>=2.2"]
 mesh = ["gmsh>=4.12"]
 test = ["pytest>=8"]
 examples = ["matplotlib>=3.8", "pillow>=10"]
+docs = ["mkdocs>=1.6,<2", "mkdocs-material>=9", "mkdocstrings[python]>=0.30"]
 
 [tool.setuptools.packages.find]
 where = ["python"]

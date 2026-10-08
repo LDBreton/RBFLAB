@@ -125,5 +125,7 @@ and PDE residual separately.
 
 The cavity showcase is not validation of a general Navier–Stokes solver.
 
-See [installation](docs/INSTALL.md), [capabilities](docs/CAPABILITIES.md),
+See the [documentation site](https://ldbreton.github.io/RBFLAB/),
+[getting-started guide](docs/getting-started.md), [API reference](docs/api/discretizations.md),
+[installation](docs/INSTALL.md), [capabilities](docs/CAPABILITIES.md),
 the [MIT license](LICENSE), and the [release checklist](RELEASE_CHECKLIST.md).

@@ -51,13 +51,13 @@ when a plotting function runs.
 The C++ double and MPFR backends are currently **source-build options**, not
 part of the Python wheel. Built-in Stokes executables and custom symbolic
 kernel compilation need GCC, OpenMP, Eigen, and (for MPFR) MPFR/GMP. On Windows,
-the verified path uses WSL Ubuntu. Follow [the native build guide](../cpp/README.md)
+the verified path uses WSL Ubuntu. Follow [the native build guide](https://github.com/LDBreton/RBFLAB/blob/main/cpp/README.md)
 from a source checkout or source archive. Use `r.CppBackend(...)` after building
 the executables.
 
 For custom kernels, the first compilation creates a content-addressed artifact
 in a user cache; parameter values can change without recompilation. The
-`--compile` option in [the kernel example](../examples/custom_kernel.py)
+`--compile` option in [the kernel example](https://github.com/LDBreton/RBFLAB/blob/main/examples/custom_kernel.py)
 demonstrates cache reuse. A compiler is needed for that option.
 
 `Precision(local_digits=80)` requests MPFR local weights in supported C++
