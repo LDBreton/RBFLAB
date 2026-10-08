@@ -16,15 +16,15 @@ only samples the computed solution.*
 
 ## Install
 
-From this source checkout:
+Install the Python core from PyPI:
 
 ```sh
-python -m pip install .
+python -m pip install rbflab
 ```
 
 The default installation does not require Gmsh, a compiler, or PyTorch. See
-[the installation guide](docs/INSTALL.md) for optional features. A PyPI
-release will add `python -m pip install rbflab`.
+[the installation guide](docs/INSTALL.md) for optional features. From a source
+checkout, use `python -m pip install .` instead.
 
 ## A symbolic PDE in a few lines
 

@@ -3,15 +3,15 @@
 RBFLAB requires Python 3.11 or newer. The Python core needs no compiler or
 mesh generator.
 
-Create an environment if desired, then install the package:
+Install the package from PyPI:
 
 ```sh
-python -m venv .venv
-python -m pip install .
+python -m pip install rbflab
 python -c "import rbflab; print(rbflab.__file__)"
 ```
 
-Run these commands from this source checkout. To build an installable wheel:
+To install from a source checkout instead, run `python -m pip install .` at
+the repository root. To build an installable wheel from that checkout:
 
 ```sh
 python -m pip install build
@@ -42,9 +42,9 @@ local methods; selecting it does not imply GPU execution.
 
 After `python -m pip install "rbflab[examples]"`, use
 `from rbflab import viz` for `plot_scalar`, `plot_velocity`, and
-`animate_scalar` or `animate_velocity_samples`. Before PyPI publication, use
-`python -m pip install ".[examples]"` from the checkout. The plotting packages are loaded only when a
-plotting function runs.
+`animate_scalar` or `animate_velocity_samples`. From a source checkout, use
+`python -m pip install ".[examples]"`. The plotting packages are loaded only
+when a plotting function runs.
 
 ## Native C++ backend
 
