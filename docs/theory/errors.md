@@ -14,3 +14,11 @@ The **algebraic residual** \(r=A U-b\) checks whether an assembled linear system
 An **off-node PDE residual** evaluates the PDE operator on a reconstructed field at points not used as collocation rows. It depends on how that field is reconstructed; a nearest-stencil choice can create jumps. Do not interpret it as a norm of the nodal sparse-system residual. For Stokes, report velocity, pressure or pressure-gradient errors, and divergence separately, with gauge and sample locations stated.
 
 The [heat tutorial](../tutorials/heat-equation.md) isolates spatial and time errors with a semidiscrete reference. The [global/LHI tutorial](../tutorials/global-lhi.md) distinguishes nodal and off-node evaluations.
+
+## Reading and mathematical context
+
+The approximation tests of [Flyer et al. (2016)](references.md#flyer-2016)
+and elliptic PDE experiments of [Bayona et al. (2017)](references.md#bayona-2017)
+provide useful models for refinement studies with known solutions. Match their
+sampling and norm definitions before comparing numbers; the definitions above
+specify the quantities reported by this manual.

@@ -32,6 +32,8 @@ theme:
 extra_css:
   - stylesheets/manual.css
 copyright: Copyright &copy; 2026 Louis Breton · MIT License
+hooks:
+  - scripts/docs_hooks.py
 plugins:
   - search
   - mkdocstrings:
@@ -85,6 +87,7 @@ nav:
       - Time discretization: theory/time-discretization.md
       - Conditioning and precision: theory/conditioning.md
       - Errors and residuals: theory/errors.md
+      - Papers and further reading: theory/references.md
   - Practical guides:
       - Visualization: VISUALIZATION.md
       - Lid-driven cavity: guides/LID_DRIVEN_CAVITY.md

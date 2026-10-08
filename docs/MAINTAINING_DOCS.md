@@ -69,3 +69,22 @@ and dark themes, mobile chapter navigation, search, and equation rendering
 in a browser after changing the theme or MathJax configuration.
 MathJax uses full-page startup typesetting, including the boldsymbol extension;
 enabling instant navigation would also require a navigation-aware callback.
+
+## Assets, references, and browser caches
+
+The MkDocs hook in scripts/docs_hooks.py adds content hashes to custom CSS and
+MathJax configuration URLs on every page, including nested tutorials. This
+makes browsers request updated assets when their content changes. Previously
+opened HTML pages may still need a reload after a deployment. The generated-site
+check verifies shared styling and local links across all navigation pages.
+
+Regenerate the original stencil figures with
+`python -m examples.make_stencil_figures` after installing the examples extra.
+The RBF-FD figure computes actual weights and checks constant and quadratic
+reproduction; the LHI figure is explicitly a schematic. SVGs remain sharp
+when zoomed, and PNG copies are available for reuse. Do not copy figures from
+papers without appropriate permission.
+
+Keep paper metadata and DOI links in theory/references.md, and explain each
+citation's relevance on the corresponding theory page. Distinguish mathematical
+background from algorithms that the public package actually implements.

@@ -24,3 +24,11 @@ $$
 A backward Euler startup step supplies \(U^1\). The [heat tutorial](../tutorials/heat-equation.md) shows the \(M=I\), \(A=-\kappa L_{II}\) case, including the boundary term in \(b(t)\).
 
 If the coefficients and time step are fixed, factor each distinct left matrix once and reuse it. A time-implicit formula does not ensure that the spatial discretization has no growing modes: inspect the relevant generalized operator or a measured energy response. See [conditioning](conditioning.md).
+
+## Reading and mathematical context
+
+[Hairer & Wanner (1996)](references.md#hairer-wanner-1996), chapters V–VI,
+covers multistep stability and differential-algebraic systems.
+The spatial RBF context is surveyed in
+[Fornberg & Flyer (2015)](references.md#fornberg-flyer-2015).
+Temporal order and spatial convergence should be measured separately.

@@ -4,6 +4,14 @@
 
 Solve \(-\Delta u=2\pi^2\sin(\pi x)\sin(\pi y)\) with zero Dirichlet data on the unit square. Symmetric global collocation applies PDE/boundary functionals to both kernel arguments. Asymmetric global collocation uses ordinary kernel translates as its trial basis. LHI forms local Hermite weight systems with solution, boundary, and PDE centers. RBF-FD uses local value-interpolation weights. See the [derivation](../theory/global-lhi.md) before interpreting their matrices.
 
+
+<figure class="stencil-figure">
+<a href="../../assets/lhi_centers.svg" aria-label="Open the LHI center diagram at full size"><img src="../../assets/lhi_centers.svg" alt="LHI schematic with blue circles for solution values, teal triangles for PDE data, orange squares on the boundary, and a target that has no PDE-data triangle"></a>
+<figcaption>An illustrative LHI neighborhood. A circle and triangle can occupy the same location while representing different functionals. The target belongs to the solution centers and is excluded from the PDE-data centers. Marker counts are schematic, not a recommended stencil size.</figcaption>
+</figure>
+
+## What each matrix represents
+
 If \(F_i\) is a PDE or boundary row, asymmetric global
 collocation uses \(A_{ij}=F_i^xK(x_i,x_j)\), while symmetric Hermite
 collocation uses \(G_{ij}=F_i^xF_j^yK(x_i,x_j)\). Their solved vectors
@@ -13,6 +21,8 @@ only solution-center weights in its sparse global row. RBF-FD keeps
 weights obtained from local value interpolation. The script uses one
 PDE and cloud, constructs each method object, solves its system, and
 samples all four results at the same seeded off-node points.
+
+## Run the comparison
 
 ??? example "Complete runnable script"
 

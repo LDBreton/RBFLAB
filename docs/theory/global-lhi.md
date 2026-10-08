@@ -1,5 +1,10 @@
 # Global collocation and local Hermite interpolation
 
+<figure class="stencil-figure">
+<a href="../../assets/lhi_centers.svg" aria-label="Open the LHI center diagram at full size"><img src="../../assets/lhi_centers.svg" alt="LHI schematic with blue circles for solution values, teal triangles for PDE data, orange squares on the boundary, and a target that has no PDE-data triangle"></a>
+<figcaption>An illustrative LHI neighborhood. A circle and triangle can occupy the same location while representing different functionals. The target belongs to the solution centers and is excluded from the PDE-data centers. Marker counts are schematic, not a recommended stencil size.</figcaption>
+</figure>
+
 For \(\mathcal Lu=f\) inside \(\Omega\) and \(\mathcal Bu=g\) on its boundary, let \(F_i\) denote the PDE or boundary functional applied at row \(i\).
 
 **Asymmetric global collocation** uses
@@ -26,3 +31,11 @@ $$
 Thus the global LHI solve uses interior solution values, while each local weight system contains more functionals. For time-dependent LHI, the resulting mass matrix need not be identity. An off-node value is reconstructed from a local stencil and should be assessed separately from nodal error.
 
 The [global/LHI tutorial](../tutorials/global-lhi.md) builds the three methods. [Error measures](errors.md) distinguishes the relevant diagnostics.
+
+## Reading and mathematical context
+
+[Stevens et al. (2009)](references.md#stevens-2009) is a useful application-oriented
+reference for local Hermite interpolation. The generalized functional-kernel
+framework is developed by [Narcowich & Ward (1994)](references.md#narcowich-ward-1994).
+For a wider comparison with global methods, see
+[Fornberg & Flyer (2015)](references.md#fornberg-flyer-2015).

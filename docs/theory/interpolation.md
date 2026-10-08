@@ -19,3 +19,10 @@ The lower row is the polynomial side condition \(P^{\mathsf T}a=0\). The coeffic
 RBFLAB's signed PHS convention for odd order \(m\) is \(\phi(r)=(-1)^{(m+1)/2}r^m\); thus PHS5 is \(-r^5\). The IMQ kernel used in these examples is \((1+c r^2)^{-1/2}\). Parameter \(c\), stencil radius, and polynomial degree must be recorded with accuracy results. Kernel derivatives at \(r=0\) are handled by the kernel's origin limits; replacing \(r=0\) with an arbitrary small number changes the mathematics.
 
 The [interpolation tutorial](../tutorials/interpolation.md) compares IMQ and polynomially augmented PHS. See [conditioning](conditioning.md) before changing kernel shape or precision.
+
+## Reading and mathematical context
+
+The global/local RBF overview in [Fornberg & Flyer (2015)](references.md#fornberg-flyer-2015)
+provides the broader setting. [Flyer et al. (2016)](references.md#flyer-2016)
+explains the role of supplementary polynomials in local accuracy.
+For compactly supported kernels, see [Wendland (1995)](references.md#wendland-1995).

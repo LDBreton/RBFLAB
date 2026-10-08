@@ -2,6 +2,14 @@
 
 **You will learn:** to turn local kernel interpolation into one sparse Laplacian row, inspect its weights, and check polynomial reproduction. Prerequisite: basic NumPy.
 
+
+<figure class="stencil-figure">
+<a href="../../assets/rbf_fd_stencil.svg" aria-label="Open the stencil diagram at full size"><img src="../../assets/rbf_fd_stencil.svg" alt="An irregular 121-node cloud with 20 selected neighbors around a target, followed by their signed Laplacian weights in a sparse matrix row"></a>
+<figcaption>One computed RBF-FD row on an irregular cloud. Blue nodes form the 20-point stencil; the orange star is the target. The dashed circle marks its radius R, not compact kernel support. The right panel shows RÂ² times the Laplacian weights in global node order; unselected columns are zero. The figure uses PHS5, degree-two polynomials, and a seeded 121-node cloud; the runnable one-stencil tutorial defaults to 36 nodes.</figcaption>
+</figure>
+
+## The local approximation
+
 For a target \(\boldsymbol{x}_i\) and nearby nodes \(S_i\), RBF-FD approximates
 
 $$
@@ -18,6 +26,8 @@ $$
 
 Here \(\Phi_{jk}=\phi(\lVert x_j-x_k\rVert)\). Polynomial multipliers \(\lambda\) enforce reproduction and are not nodal solution values. The transpose records the functional convention even when this scalar matrix is symmetric.
 
+## Compute and inspect the row
+
 Run `python -m examples.tutorials.one_stencil`. The full script is included below:
 
 ??? example "Complete runnable script"
@@ -27,6 +37,8 @@ Run `python -m examples.tutorials.one_stencil`. The full script is included belo
     ```
 
 [Download the runnable script](https://raw.githubusercontent.com/LDBreton/RBFLAB/main/examples/tutorials/one_stencil.py).
+
+## Verify consistency
 
 `op.local(0)` gives selected indices, weights, multipliers, and diagnostics. `op.reconstruct_local(0)` rebuilds the local matrix and right-hand side on demand. `op.matrix` is the assembled sparse differentiation row. With 36 cloud nodes, the example forms a \(26\times26\) local matrix (20 values and 6 polynomial constraints) and a \(1\times36\) global row. It reports \(\sum_jw_{ij}\approx0\), \(\sum_jw_{ij}(x_j^2+y_j^2)\approx4\), and a local equation residual near \(6.1\times10^{-14}\).
 
