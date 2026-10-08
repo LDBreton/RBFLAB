@@ -1,4 +1,4 @@
-include README.md CHANGELOG.md LICENSE RELEASE_CHECKLIST.md
+include README.md README_PYPI.md CHANGELOG.md LICENSE RELEASE_CHECKLIST.md
 include docs/INSTALL.md docs/CAPABILITIES.md docs/VISUALIZATION.md docs/guides/LID_DRIVEN_CAVITY.md
 recursive-include docs/assets *.png *.gif
 recursive-include examples *.py

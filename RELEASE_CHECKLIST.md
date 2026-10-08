@@ -9,17 +9,36 @@ included examples.
 
 - MIT text in `LICENSE` and SPDX metadata in `pyproject.toml`.
 - Core package, optional C++ source, focused examples/tests, and README media.
-- Source archive and wheel should be built and tested from this directory.
+- Separate text-only `README_PYPI.md` keeps local image paths out of PyPI
+  metadata while the repository URL is not yet known.
+- `.github/workflows/publish-pypi.yml` builds, tests, checks metadata, and
+  publishes a matching non-prerelease GitHub release through PyPI Trusted
+  Publishing. It has no API token in the repository.
+- Windows Python 3.12: fresh install, source archive and wheel builds, and
+  focused tests passed (60 passed; 29 optional checks skipped).
+- WSL Ubuntu Python 3.12: editable install and focused tests passed (60 passed;
+  29 optional checks skipped). Both final distributions passed `twine check`;
+  the PyPI README example ran successfully. A fresh Linux wheel install ran
+  symbolic Poisson, divergence-free Stokes, and 3D operator examples.
+- The selected source has one Git author in the private working history and no
+  embedded third-party license notices; that is evidence, not a legal rights
+  determination for any material adapted from older projects.
+- PyPI's `rbflab` JSON endpoint returned HTTP 404 on 2026-10-08. This is not a
+  reservation or guarantee of availability.
 
 ## Before a public GitHub repository or PyPI upload
 
 - Confirm that all contributors to copied or adapted code and artwork permit
-  release under MIT; update the copyright line if a different holder is needed.
-- Review the final tracked-file list and run the Windows/Linux release workflow.
+  release under MIT. The copyright holder in `LICENSE` is Louis Breton.
+- Run the GitHub Windows/Linux release smoke workflow after creating the remote.
 - Confirm the `rbflab` name remains available on PyPI.
-- Set the public repository URL, then replace relative README image paths in
-  package metadata with hosted URLs, or supply a separate PyPI description.
+- Add the public repository URL to package metadata once it exists. GitHub
+  displays `README.md` with local images; PyPI uses `README_PYPI.md`.
 - Create the public remote from this fresh repository only; do not push the
   private research repository or its history.
-- Publish the package only after the wheel and source archive from this folder
-  pass installation smoke checks on supported Python versions.
+- In GitHub, create a `pypi` environment with a required reviewer. In PyPI,
+  configure a Trusted Publisher with the exact owner/repository, workflow
+  filename `publish-pypi.yml`, and environment `pypi`.
+- After checks pass, tag the commit `v0.1.0` and publish a GitHub Release for
+  that tag. Publishing that release triggers the PyPI workflow. Do not create
+  the release before the Trusted Publisher is configured.
