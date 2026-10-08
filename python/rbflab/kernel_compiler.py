@@ -94,6 +94,13 @@ SET_PRECISION='\n#ifndef RBFLAB_DOUBLE\nReal::bits=static_cast<mpfr_prec_t>(std:
 
 @dataclass(frozen=True)
 class CompiledKernel:
+    """Prepared native evaluator for a symbolic radial-kernel family.
+
+    The compiled family records dimension, derivative multi-indices,
+    arithmetic, and cache directory. Numeric parameter values are bound
+    later through __call__, so a supported family can reuse compiled
+    derivative code at different parameter values.
+    """
     family: object
     dimension: int
     alpha: tuple

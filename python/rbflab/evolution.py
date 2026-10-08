@@ -178,10 +178,13 @@ def assemble_evolution(method,problem,cloud):
 
 
 class EvolutionSystem:
-    """Assembled semidiscrete scalar evolution system.
+    """Assembled system M z_dot + A z = forcing(t) + C g(t).
 
-    Holds spatial and mass matrices and exposes time-stepping operations.
-    Create it with `method.assemble(problem, cloud)`."""
+    spatial is A, mass is M, and boundary_map is C. Global unknowns
+    differ by method. In LHI, M = I - SL, where SL contains weights of
+    nearby PDE centers; it is not the identity mass of nodal RBF-FD.
+    Create with method.assemble(problem, cloud).
+    """
     def __init__(self,problem,cloud,arithmetic,spatial,mass,boundary_map,kind):
         self.problem,self.cloud,self.arithmetic=problem,cloud,arithmetic
         self.spatial,self.mass,self.boundary_map=spatial,mass,boundary_map
@@ -242,8 +245,20 @@ class EvolutionSystem:
             self.initial_constraint_residual=None
         return z,initial
 
-    def solve(self,dt,steps,*,scheme="bdf2",start_time=0):
-        """Fixed dt, backward Euler or BDF2 with one backward-Euler startup step."""
+    def solve(self,dt,steps,*,scheme="bdf2",start_time=0) -> "EvolutionTrajectory":
+        """Advance at fixed dt with backward Euler or BE-started BDF2.
+
+        Args:
+            dt (float, str, or Fraction): Positive time step; exact inputs retain decimal
+                intent on conversion to the selected arithmetic.
+            steps (int): Positive number of steps.
+            scheme (str): "backward_euler" or "bdf2".
+            start_time (float, str, or Fraction): Time of the supplied initial field.
+
+        Returns:
+            EvolutionTrajectory: Initial field, saved states, and diagnostics.
+                A + alpha*M is factored once per distinct alpha.
+        """
         dt=Fraction(dt);start_time=Fraction(start_time)
         if dt<=0 or type(steps) is not int or steps<1:raise ValueError("Positive dt and integer steps required")
         if scheme not in ("backward_euler","bdf2"):raise ValueError("Unknown time scheme")
@@ -258,6 +273,8 @@ class EvolutionSystem:
             history=a.number(weights[0])*previous
             if second:history+=a.number(weights[1])*previous2
             rhs,f,g=self.data(time)
+            # History acts on global unknowns through M. Using identity
+            # here would change the LHI semidiscrete method.
             rhs=rhs+_mv(self.mass,history)
             if alpha not in self._factors:
                 matrix=_shift(self.spatial,self.mass,a.number(alpha),a)
@@ -345,6 +362,12 @@ class _LHIField:
 
 
 class EvolutionState:
+    """One time level and its reconstructable spatial field.
+
+    unknown_derivative is the BE/BDF2 difference quotient, not the
+    continuous time derivative. evaluate() delegates to the method's
+    spatial reconstruction.
+    """
     def __init__(self,system,spatial,unknowns,derivative,time,alpha,history,weights,diagnostics):
         self.system,self._spatial,self.unknowns,self.unknown_derivative=system,spatial,unknowns,derivative
         self.time,self.alpha,self.history,self.history_weights=time,alpha,history,weights
@@ -374,9 +397,11 @@ class EvolutionState:
 
 @dataclass
 class EvolutionTrajectory:
-    """Initial state, saved time states, and diagnostics of an evolution solve.
+    """Initial field, saved time states, and evolution diagnostics.
 
-    The `final` property returns the last saved state."""
+    final returns the last saved state; states excludes the initial field.
+    Diagnostics include scheme, step count, and factorization reuse.
+    """
     initial: object
     states: list
     diagnostics: dict

@@ -182,7 +182,11 @@ def _finish(method,problem,cloud,a,tasks,stencils,results,diagnostics):
 
 @dataclass(frozen=True)
 class PythonBackend:
-    """Python local-weight backend for supported divergence-free LHI Stokes.
+    """Python local-weight backend for supported scalar and vector stencils.
+
+    Used by divergence-free LHI Stokes and reusable RBF-FD operators.
+    Supported pathways depend on the calling method; this backend alone
+    does not imply support for every coupled PDE.
 
     Args:
         workers: Number of local-assembly worker processes.
@@ -209,7 +213,10 @@ class PythonBackend:
 
 @dataclass(frozen=True)
 class CppBackend:
-    """Compiled local-weight backend for supported divergence-free LHI Stokes.
+    """Compiled local-weight backend for supported scalar and vector stencils.
+
+    Used by supported LHI Stokes and reusable RBF-FD operator paths.
+    Native compilation is optional and not included by default pip install.
 
     Float64 uses the native C++ executable; extended local digits select its
     MPFR executable. Compilation is a separate optional installation step.

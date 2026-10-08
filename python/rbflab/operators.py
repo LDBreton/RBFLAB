@@ -26,7 +26,12 @@ def _coefficient(value):
 
 @dataclass(frozen=True)
 class Operator:
-    """Constant coefficients times Cartesian multi-index derivatives; @ composes."""
+    """Constant-coefficient Cartesian differential functional.
+
+    terms contains (multi-index, coefficient) pairs. Addition combines
+    terms and @ composes differential operators; it is not matrix
+    multiplication here. Dimensions are 2 or 3 and must agree.
+    """
     terms: tuple
     dimension: int | None = None
 
@@ -113,7 +118,12 @@ def Laplacian(dimension=2):
 
 @dataclass(frozen=True)
 class NormalDerivative:
-    """Expanded with the supplied geometric normal, not differentiated."""
+    """Outward normal derivative, bound to a supplied geometric normal.
+
+    The normal vector is data at a boundary point, not a quantity to
+    differentiate. At a corner, boundary tag priority determines which
+    normal applies to the enforced row.
+    """
     def at(self, normal):
         return sum((value * Derivative(i, len(normal)) for i, value in enumerate(normal)),
                    0 * Identity(len(normal)))

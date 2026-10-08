@@ -18,8 +18,9 @@ jobs:
         with:
           python-version: '3.12'
       - run: python -m pip install -e '.[docs,test]'
-      - run: python -m pytest tests/test_public_docs.py -q
+      - run: python -m pytest tests/test_public_docs.py tests/test_tutorials.py -q
       - run: python -m mkdocs build --strict
+      - run: python tests/check_docs_render.py
       - name: Configure Pages
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         uses: actions/configure-pages@v5

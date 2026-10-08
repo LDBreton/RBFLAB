@@ -38,6 +38,13 @@ def _derivative(family, *alpha):
 
 @dataclass(frozen=True)
 class ScalarKernel:
+    """IMQ or Gaussian kernel using squared-distance parameter c.
+
+    IMQ is (1 + c*r*r)^(-1/2); Gaussian is exp(-c*r*r). The parameter
+    c is positive and acts on physical squared distance unless a stencil
+    policy explicitly rescales coordinates. Derivatives are available
+    through total Cartesian order six in 2D and 3D.
+    """
     c: float = 1.0
     family: str = "imq"
 
@@ -60,7 +67,13 @@ class ScalarKernel:
         return np.broadcast_to(value, z.shape[:-1])
 
     def matrix(self, x, y, left=None, right=None):
-        """left acts on x; right acts on source y (odd derivatives change sign)."""
+        """Evaluate two-sided kernel functionals on target and source arrays.
+
+        x and y have matching coordinate dimension. left differentiates
+        the target argument x; right differentiates source y. Since the
+        kernel depends on x-y, every odd source derivative changes sign.
+        The result has shape (len(x), len(y)).
+        """
         x, y = np.asarray(x, dtype=float), np.asarray(y, dtype=float)
         if x.ndim != 2 or y.ndim != 2 or x.shape[1] not in (2, 3) or y.shape[1] != x.shape[1]:
             raise ValueError("Points must have matching shapes (N, dimension), dimension 2 or 3")

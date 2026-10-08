@@ -12,12 +12,18 @@ from .kernels import _X, _Y, _C, _COORDINATES, _base_expression, PHS, Hybrid
 
 @dataclass(frozen=True)
 class Precision:
-    """Select arithmetic used by the numerical methods.
+    """Select local-weight and global-solve arithmetic independently.
 
     Args:
-        local_digits: Decimal digits for local weights; `None` uses Float64.
-        global_dtype: `"float64"` or `"mpmath"` for supported sparse solves.
-        global_digits: Decimal digits for supported dense global solves."""
+        local_digits: Decimal digits for local weights; None uses Float64.
+            Extended weights may be rounded for a Float64 global system.
+        global_dtype: "float64" or "mpmath" for supported sparse systems.
+            Full mpmath sparse assembly also requires local_digits.
+        global_digits: Decimal digits for supported dense global solves.
+
+    A Float64 global solve remains Float64 when only local_digits is set.
+    Check the method's supported precision combination.
+    """
     local_digits: int | None = None
     global_dtype: str = "float64"
     global_digits: int | None = None

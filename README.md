@@ -4,6 +4,8 @@ RBFLAB solves interpolation and linear PDE problems on point clouds with radial
 basis functions. Write an equation with SymPy, choose global collocation,
 local Hermite interpolation (LHI), or RBF-FD, then inspect the result.
 
+Learn the methods in the [user manual](https://ldbreton.github.io/RBFLAB/): build [one RBF-FD stencil](https://ldbreton.github.io/RBFLAB/tutorials/one-stencil/), derive the [heat equation matrices](https://ldbreton.github.io/RBFLAB/tutorials/heat-equation/), then explore [Stokes spaces](https://ldbreton.github.io/RBFLAB/tutorials/stokes/).
+
 The default installation uses Python, NumPy, and SciPy. C++ and PyTorch are
 optional numerical backends for supported local methods. The package supports
 2D and 3D scalar methods and divergence-free approximation spaces.

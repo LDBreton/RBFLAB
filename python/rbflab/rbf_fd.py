@@ -41,12 +41,29 @@ class RBFFD:
     local_backend: object = None
     spaces: object = None
 
-    def operators(self, *, source, targets=None, operators, space=None):
-        """Build named sparse discrete operators between source and target clouds."""
+    def operators(self, *, source, targets=None, operators, space=None) -> "OperatorSet":
+        """Return reusable named sparse differentiation operators.
+
+        Args:
+            source (PointCloud or ndarray): Finite (N, 2) or (N, 3) nodes.
+            targets (PointCloud or ndarray, optional): Targets; defaults to source.
+            operators (Mapping[str, Operator]): Named differential operators.
+            space (str, optional): Field when multiple spaces are declared.
+
+        Returns:
+            OperatorSet: Entries expose matrix, local(i), and
+                reconstruct_local(i). Only standard nodal RBF-FD is supported.
+        """
         from .discrete_operators import build_operators
         return build_operators(self, source=source, targets=targets, operators=operators, space=space)
 
     def prepare(self,problem,*,dimension=2,cache_dir=None):
+        """Prepare supported symbolic kernel derivatives for a problem.
+
+        May compile and cache native derivative code when the selected
+        backend and kernel require it. Numeric kernel parameters remain
+        runtime inputs; compilation is an optional source workflow.
+        """
         if self.spaces is not None:
             from .discrete_operators import scalar_method
             return scalar_method(self).prepare(problem,dimension=dimension,cache_dir=cache_dir)
@@ -57,7 +74,13 @@ class RBFFD:
         return prepare_method(self,problem,dimension,cache_dir)
 
     def assemble(self,problem,cloud):
-        """Build the sparse RBF-FD PDE and boundary system."""
+        """Assemble scalar PDE/boundary rows or dispatch an evolution system.
+
+        Stationary scalar rows apply PDE or boundary functionals to local
+        value-interpolation bases and form a sparse nodal FDSystem.
+        Evolution, space-based, and optional-backend configurations dispatch
+        to their corresponding assemblers.
+        """
         if self.spaces is not None:
             from .discrete_operators import scalar_method
             return scalar_method(self).assemble(problem,cloud)
@@ -101,12 +124,22 @@ class RBFFD:
 
 
 class FDSystem:
+    """Assembled scalar RBF-FD linear system.
+
+    matrix maps nodal unknowns to PDE and boundary row values; rhs holds
+    sampled forcing and boundary data. solve() returns FDSolution.
+    """
     def __init__(self,cloud,arithmetic,matrix,rhs,stencils,indices,tree):
         self.cloud,self.arithmetic,self.matrix,self.rhs=cloud,arithmetic,matrix,rhs
         self.stencils,self.indices,self.tree=stencils,indices,tree
         self.factor=None
 
     def solve(self):
+        """Solve and report the sparse-system residual.
+
+        The factorization is reused on later calls. Float64 uses SciPy
+        sparse LU; configured extended arithmetic uses MPSparseLU.
+        """
         a=self.arithmetic
         if self.factor is None:
             self.factor=MPSparseLU(self.matrix) if a.ctx else splu(self.matrix)
@@ -121,6 +154,12 @@ class FDSystem:
 
 
 class FDSolution:
+    """Nodal result with nearest-stencil off-node reconstruction.
+
+    dof_values are global solved degrees of freedom. evaluate(points,
+    operator) samples values or derivatives in Float64; evaluate_mp
+    retains extended local results when available.
+    """
     def __init__(self,system,nodal,diagnostics):
         self.system,self.dof_values,self.diagnostics=system,nodal,diagnostics
         self._coefficients=[]
@@ -157,7 +196,11 @@ class FDSolution:
         return out
 
     def evaluate(self,points,operator=None):
-        """Nearest-stencil interpolation; no continuity guarantee between patches."""
+        """Evaluate at finite (N, dimension) query points.
+
+        Uses the nearest local stencil. The patchwise field is not
+        guaranteed continuous across stencil-owner changes.
+        """
         return np.array([float(v) for v in self._evaluate(points,operator)])
 
     def evaluate_mp(self,points,operator=None):

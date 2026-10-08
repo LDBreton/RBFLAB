@@ -250,6 +250,13 @@ class SymbolicScalar:
         return self._operator([(alpha,c) for alpha,_,c in terms])
 
     def stationary(self,equation,*,boundary,parameters=None):
+        """Compile one linear stationary scalar equation and boundary list.
+
+        equation is a SymPy equality or zero residual in the declared
+        field. boundary supplies tagged equations; parameters replace
+        symbolic constants before coefficient extraction. Returns a
+        LinearPDE accepted by global, LHI, or RBF-FD assembly.
+        """
         if self.time is not None:raise ValueError("Use a non-transient model for stationary equations")
         mapping=self._parameters(parameters)
         terms,rhs=self._linear(self._residual(equation,mapping))
@@ -258,6 +265,13 @@ class SymbolicScalar:
         return LinearPDE(operator,self._data(rhs),self._boundaries(boundary,mapping,timed=False))
 
     def evolution(self,equation,*,initial,boundary,parameters=None):
+        """Compile a first-order-in-time linear scalar evolution problem.
+
+        The nonzero time-derivative coefficient is normalized to one.
+        initial is a field expression at start_time. Spatial and boundary
+        functionals remain fixed; forcing and boundary values may depend
+        on time. Returns EvolutionPDE.
+        """
         if self.time is None:raise ValueError("Evolution needs SymbolicScalar(transient=True)")
         mapping=self._parameters(parameters)
         terms,rhs=self._linear(self._residual(equation,mapping))

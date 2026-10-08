@@ -114,6 +114,12 @@ def assemble_spaces(method,problem,cloud):
 
 
 class GlobalFlowSystem:
+    """Dense divergence-free Stokes system for velocity/pressure coefficients.
+
+    matrix contains momentum and boundary rows plus polynomial constraints;
+    mass contains velocity-evaluation rows for transient solves and is not
+    identity. A transient solve returns a StokesTrajectory.
+    """
     def __init__(self,problem,cloud,a,vd,pd):
         self.problem,self.cloud,self.arithmetic=problem,cloud,a
         d=problem.dimension;ii=cloud.interior_indices;bi=cloud.boundary_indices
@@ -198,6 +204,12 @@ class InitialFlow:
 
 
 class GlobalFlowSolution:
+    """Global divergence-free velocity and pressure representative.
+
+    velocity, pressure_gradient, divergence, and momentum residuals can
+    be sampled at query points. pressure is defined modulo constants;
+    pass a reference point/value to obtain a chosen gauge.
+    """
     def __init__(self,system,z,time,alpha=0,history=(),weights=(),diagnostics=None):
         self.system,self.coefficients,self.time=system,z,time
         self.alpha,self.history,self.weights=alpha,history,weights
@@ -274,6 +286,12 @@ class TaggedComponent:
 
 
 class LocalFlowSystem:
+    """Two-dimensional divergence-free LHI Stokes wrapper.
+
+    Its global sparse unknowns are local solution-center velocity values.
+    Supported pressure output is local pressure gradients; there is no
+    globally reconciled pressure scalar field.
+    """
     def __init__(self,method,problem,cloud,velocity,pressure,vd,pd):
         from .lhi_stokes import LHIUnsteadyStokes
         if cloud.dimension!=2:raise NotImplementedError("Divergence-free LHI space assembly currently supports 2D; global supports 2D/3D")
@@ -315,6 +333,11 @@ class LocalFlowSystem:
 
 
 class LocalFlowSolution:
+    """LHI velocity and pressure-gradient reconstruction at one time.
+
+    Off-node evaluation is patchwise. pressure() is unavailable because
+    local gradients have not been integrated into a global gauge field.
+    """
     def __init__(self,state):self.state=state;self.time=state.time;self.diagnostics=state.diagnostics
     def velocity(self,points,*,extended=False):return self.state.evaluate_velocity(points,extended=extended)
     def pressure_gradient(self,points,*,extended=False):return self.state.pressure_gradient(points,extended=extended)

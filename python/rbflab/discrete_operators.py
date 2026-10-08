@@ -124,7 +124,12 @@ class _Basis:
 
 
 class OperatorSet(Mapping):
-    """Named discrete operators with item and attribute access."""
+    """Named operators assembled with shared local factorizations.
+
+    Access an operator by item (ops["lap"]) or attribute (ops.lap).
+    diagnostics reports backend, factorization count, component ordering,
+    and assembled matrix arithmetic.
+    """
     def __init__(self,operators,diagnostics):self._operators=operators;self.diagnostics=diagnostics
     def __getitem__(self,name):return self._operators[name]
     def __iter__(self):return iter(self._operators)
@@ -135,7 +140,14 @@ class OperatorSet(Mapping):
 
 
 class DiscreteOperator:
-    """Sparse weights; vector spaces use node-major component ordering."""
+    """Sparse map from source values to target operator values.
+
+    The matrix has one row per scalar target or per target component.
+    Vector degrees of freedom are node-major: components of source node
+    zero precede those of source node one. The @ operator accepts either a
+    flattened vector or an (N, dimension) array for vector spaces. Local
+    interpolation matrices are reconstructed only when requested.
+    """
     def __init__(self,matrix,owner,column):
         self.matrix=matrix;self._owner=owner;self._column=column
         self.shape=matrix.shape;self.components=owner.components
@@ -154,6 +166,12 @@ class DiscreteOperator:
             if shaped:return result.reshape(-1,c)
         return result
     def local(self,i):
+        """Return indices, weights, multipliers, and diagnostics for target i.
+
+        Weight shape is (stencil DOFs, output components). Polynomial
+        multipliers enforce local reproduction and do not enter the global
+        sparse matrix. Raises IndexError for an invalid target index.
+        """
         o=self._owner
         if type(i) is not int or not 0<=i<len(o.targets):raise IndexError('Target index out of range')
         w=o.weights[i];c=o.components;k=self._column*c;n=len(o.ids[i])*c
@@ -161,6 +179,13 @@ class DiscreteOperator:
             weights=w[:n,k:k+c].copy(),multipliers=w[n:,k:k+c].copy(),
             diagnostics=copy.deepcopy(o.diagnostics[i]),ordering='node-major',global_dtype=o.precision.global_dtype)
     def reconstruct_local(self,i):
+        """Rebuild the augmented local weight system at target i.
+
+        Returns a namespace with matrix, rhs, scaled_matrix, scaled_rhs,
+        scale, backend, and local_digits. Append the multipliers from
+        local(i) to its nodal weights to check matrix.T @ weights = rhs.
+        Scaling equilibrates the same local equation.
+        """
         self.local(i) # validate index
         o=self._owner;G,Q=o.reconstruct(i);a=o.arithmetic;c=o.components;k=self._column*c
         if a.ctx:
@@ -175,7 +200,13 @@ class DiscreteOperator:
 
 
 def build_operators(method,*,source,targets=None,operators,space=None):
-    """Build all requested componentwise differential operators in one local solve."""
+    """Build named differentiation matrices with shared local stencils.
+
+    source and targets are (N, 2) or (N, 3) point arrays or clouds;
+    omitted targets reuse source. operators maps names to differential
+    functionals. One local factorization supplies every named operator
+    at a target. Returns an OperatorSet.
+    """
     from .operator_backends import execute,reconstruct
     from .lhi_backends import PythonBackend
     from .precision import Precision

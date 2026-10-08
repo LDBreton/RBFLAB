@@ -22,10 +22,39 @@ plugins:
             show_if_no_docstring: false
             members_order: source
             filters: ["!^_"]
+markdown_extensions:
+  - pymdownx.superfences
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.snippets:
+      base_path: .
+      check_paths: true
+extra_javascript:
+  - javascripts/mathjax.js
+  - https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js
+
 nav:
   - Home: index.md
   - Getting started: getting-started.md
   - Installation: INSTALL.md
+  - Learning through examples:
+      - Interpolation and derivatives: tutorials/interpolation.md
+      - One RBF-FD stencil: tutorials/one-stencil.md
+      - Heat equation from matrices: tutorials/heat-equation.md
+      - Mixed-boundary Poisson: tutorials/mixed-boundary.md
+      - Global collocation and LHI: tutorials/global-lhi.md
+      - Symbolic custom kernels: tutorials/custom-kernel.md
+      - Steady and unsteady Stokes: tutorials/stokes.md
+      - A 3D scalar problem: tutorials/scalar-3d.md
+      - Navier-Stokes cavity: tutorials/cavity.md
+  - Mathematical foundations:
+      - Interpolation and kernels: theory/interpolation.md
+      - RBF-FD weights: theory/rbf-fd.md
+      - Global collocation and LHI: theory/global-lhi.md
+      - Divergence-free kernels: theory/divergence-free.md
+      - Time discretization: theory/time-discretization.md
+      - Conditioning and precision: theory/conditioning.md
+      - Errors and residuals: theory/errors.md
   - Guides:
       - Visualization: VISUALIZATION.md
       - Lid-driven cavity: guides/LID_DRIVEN_CAVITY.md
@@ -36,4 +65,5 @@ nav:
       - Precision and backends: api/precision-backends.md
       - Diagnostics and visualization: api/diagnostics-viz.md
   - Capabilities: CAPABILITIES.md
-  - Maintaining docs: MAINTAINING_DOCS.md
+  - Contributing:
+      - Maintaining docs: MAINTAINING_DOCS.md

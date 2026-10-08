@@ -32,11 +32,22 @@ class GlobalCollocation:
     spaces: dict | None = None
 
     def prepare(self,problem,*,dimension=2,cache_dir=None):
+        """Prepare and cache required derivatives of a symbolic kernel.
+
+        Returns a method using the prepared kernel. Native compilation
+        needs an optional source build and is not part of core pip install.
+        """
         from .kernel_compiler import prepare_method
         return prepare_method(self,problem,dimension,cache_dir)
 
     def assemble(self, problem, cloud):
-        """Assemble the selected global scheme for a problem and point cloud."""
+        """Build a dense global collocation system.
+
+        Symmetric assembly applies functionals to both kernel arguments;
+        asymmetric assembly uses ordinary kernel translates as its trial
+        basis. Both solve for expansion coefficients, not nodal values.
+        Coupled spaces and evolution problems dispatch to their systems.
+        """
         if self.spaces is not None:
             from .space_stokes import assemble_spaces
             return assemble_spaces(self,problem,cloud)
@@ -70,6 +81,11 @@ class GlobalCollocation:
 
 
 class GlobalSystem:
+    """Dense collocation matrix and sampled PDE/boundary right side.
+
+    Rows and columns correspond to the stored functional centers.
+    solve() returns expansion coefficients and algebraic diagnostics.
+    """
     def __init__(self, kernel, centers, ops, matrix, rhs):
         self.kernel, self.centers, self.operators = kernel, centers, ops
         self.matrix, self.rhs = matrix, rhs
@@ -86,6 +102,11 @@ class GlobalSystem:
 
 
 class GlobalSolution:
+    """Global kernel expansion determined by solved coefficients.
+
+    evaluate(points, operator) applies a value or differential functional
+    to the expansion at finite query points of matching dimension.
+    """
     def __init__(self, system, coefficients, diagnostics):
         self.system, self.coefficients, self.diagnostics = system, coefficients, diagnostics
 
@@ -143,6 +164,11 @@ class LHI:
     local_backend: object = None
 
     def prepare(self,problem,*,dimension=2,cache_dir=None):
+        """Prepare and cache required derivatives of a symbolic kernel.
+
+        Returns a method using the prepared kernel. Native compilation
+        needs an optional source build and is not part of core pip install.
+        """
         from .kernel_compiler import prepare_method
         return prepare_method(self,problem,dimension,cache_dir)
 
@@ -234,6 +260,9 @@ class LHI:
                 cols.append(interior_map[int(j)])
                 data.append(weight)
             known = np.r_[[bd[int(j)][1] for j in fc], forcing[pc]]
+            # Boundary and PDE-center data are prescribed. Move their
+            # contribution right; only solution-center weights become
+            # columns of the global interior matrix.
             rhs[row] -= w[len(sc):] @ known
             stencils.append(Stencil(int(center), sc, fc, pc, points, ops, factor, w,
                                     residual, wmp, pd, basis, quality))
@@ -245,6 +274,12 @@ class LHI:
 
 
 class LHISystem:
+    """Sparse system for interior solution-center values.
+
+    Each stencil holds solution, boundary, and PDE center indices and a
+    local Hermite factorization. Known boundary and forcing contributions
+    have already been moved into rhs.
+    """
     def __init__(self, kernel, cloud, problem, bd, stencils, matrix, rhs):
         self.kernel, self.cloud, self.problem = kernel, cloud, problem
         self.boundary_data, self.stencils = bd, stencils
@@ -256,6 +291,11 @@ class LHISystem:
         return solve_lhi_reference(self, **kwargs)
 
     def solve(self):
+        """Factor and solve the interior sparse system.
+
+        Returns an LHISolution with local/rounded-weight diagnostics and
+        an algebraic sparse-system residual. Reuses the sparse factor.
+        """
         if self.factor is None:
             self.factor = splu(self.matrix)
         u = self.factor.solve(self.rhs)
@@ -278,6 +318,12 @@ class LHISystem:
 
 
 class LHISolution:
+    """Interior LHI nodal values and local Hermite reconstructions.
+
+    evaluate(points, operator) selects the nearest interior stencil for
+    each off-node point; the patchwise field can jump across boundaries
+    between stencil owners.
+    """
     def __init__(self, system, interior_values, diagnostics):
         self.system, self.interior_values, self.diagnostics = system, interior_values, diagnostics
         self._tree = cKDTree(system.cloud.interior)

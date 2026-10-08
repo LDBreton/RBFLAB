@@ -23,8 +23,9 @@ From a source checkout:
 
 ```sh
 python -m pip install -e ".[docs,test]"
-python -m pytest tests/test_public_docs.py -q
+python -m pytest tests/test_public_docs.py tests/test_tutorials.py -q
 python -m mkdocs build --strict
+python tests/check_docs_render.py
 python -m mkdocs serve
 ```
 
@@ -34,3 +35,23 @@ The documentation workflow runs the checks on pull requests and on `main`.
 
 Documentation dependencies are optional and are not installed by
 `pip install rbflab`.
+
+## Keep examples and equations synchronized
+
+Tutorial pages embed their complete source from examples/tutorials with the
+snippets extension. Edit the Python script first, run it, and then update the
+explanation and recorded result. Add a small numerical assertion to
+tests/test_tutorials.py for a meaningful invariant. Keep expensive refinement
+runs behind an explicit script option.
+
+Use inline math delimiters for symbols and display math blocks with a blank
+line before and after each pair of dollar-sign delimiters. Inspect the built
+HTML when changing math syntax or snippets. The post-build check catches
+unexpanded snippets and several broken-math patterns.
+
+For numerical results state cloud and node count, kernel and shape parameter,
+polynomial degree, stencil size, boundary treatment, time scheme and step,
+precision/backend, and whether an error is nodal, sampled off-node, or
+semidiscrete. Report sampled RMS as RMS, not as a continuous L2 norm without
+quadrature. Prefer links to reproducible script commands over screenshots
+of numbers.
