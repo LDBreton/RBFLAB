@@ -70,7 +70,7 @@ body, input { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-s
 .md-copyright a { color: var(--md-typeset-a-color) !important; }
 @media (min-width: 76.25em) {
   .md-sidebar--primary { width: 12.8rem; background: var(--rbf-surface); border-right: 1px solid var(--rbf-line); padding: 1.4rem .45rem; }
-  .md-sidebar--primary .md-nav__title { background: transparent; box-shadow: none; padding-bottom: .8rem; border-bottom: 1px solid var(--rbf-line); margin-bottom: .5rem; }
+  .md-sidebar--primary .md-nav__title { background: var(--rbf-surface); box-shadow: none; padding-bottom: .8rem; border-bottom: 1px solid var(--rbf-line); margin-bottom: .5rem; }
   .md-sidebar--primary > .md-sidebar__scrollwrap > .md-sidebar__inner > .md-nav > .md-nav__list > .md-nav__item { padding-top: .2rem; padding-bottom: .2rem; }
   .md-sidebar--primary .md-nav__link--active { border-left: 2px solid var(--rbf-accent); padding-left: .4rem; margin-left: -.5rem; }
   .md-sidebar--secondary { width: 10.5rem; padding-top: 2rem; }
