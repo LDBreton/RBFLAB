@@ -21,6 +21,11 @@ classifiers = [
 ]
 dependencies = ["numpy>=1.26", "scipy>=1.11", "sympy>=1.12", "mpmath>=1.3", "threadpoolctl>=3.5"]
 
+[project.urls]
+Homepage = "https://github.com/LDBreton/RBFLAB"
+Repository = "https://github.com/LDBreton/RBFLAB"
+Issues = "https://github.com/LDBreton/RBFLAB/issues"
+
 [project.optional-dependencies]
 torch = ["torch>=2.2"]
 fast = ["gmpy2>=2.2"]

@@ -5,6 +5,8 @@ point clouds. It supports global collocation, local Hermite interpolation
 (LHI), RBF-FD, symbolic linear operators and boundary conditions, and
 divergence-free velocity spaces. Scalar operators work in 2D and 3D.
 
+Source and examples: https://github.com/LDBreton/RBFLAB
+
 Install the Python core with:
 
 ```sh

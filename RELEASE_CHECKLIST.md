@@ -25,20 +25,30 @@ included examples.
   determination for any material adapted from older projects.
 - PyPI's `rbflab` JSON endpoint returned HTTP 404 on 2026-10-08. This is not a
   reservation or guarantee of availability.
+- A private staging repository exists at `https://github.com/LDBreton/RBFLAB`;
+  package metadata points to that stable URL. The repository has not been made
+  public.
+- Its [first GitHub release smoke run](https://github.com/LDBreton/RBFLAB/actions/runs/37827256816)
+  passed all six jobs: Python 3.11/3.12
+  installed-wheel examples on Windows and Ubuntu, native C++ local operators,
+  and gallery generation. The workflows were then updated to current
+  Node 24-based actions and a pinned Ubuntu 24.04 runner. The new push run is
+  the release gate.
 
 ## Before a public GitHub repository or PyPI upload
 
 - Confirm that all contributors to copied or adapted code and artwork permit
   release under MIT. The copyright holder in `LICENSE` is Louis Breton.
-- Run the GitHub Windows/Linux release smoke workflow after creating the remote.
+- Review the GitHub Windows/Linux release smoke workflow on the private remote.
 - Confirm the `rbflab` name remains available on PyPI.
-- Add the public repository URL to package metadata once it exists. GitHub
-  displays `README.md` with local images; PyPI uses `README_PYPI.md`.
-- Create the public remote from this fresh repository only; do not push the
-  private research repository or its history.
+- Make the staging repository public only after the rights check. GitHub
+  displays `README.md` with local images; PyPI uses `README_PYPI.md`. The remote
+  contains only the fresh snapshot, not the private research repository history.
 - In GitHub, create a `pypi` environment with a required reviewer. In PyPI,
   configure a Trusted Publisher with the exact owner/repository, workflow
-  filename `publish-pypi.yml`, and environment `pypi`.
+  filename `publish-pypi.yml`, and environment `pypi`. GitHub's required-reviewer
+  rule is available on public repositories on current Free/Pro/Team plans, so
+  set it after making this repository public.
 - After checks pass, tag the commit `v0.1.0` and publish a GitHub Release for
   that tag. Publishing that release triggers the PyPI workflow. Do not create
   the release before the Trusted Publisher is configured.
