@@ -1,0 +1,37 @@
+{
+  "repository": "https://github.com/LDBreton/RBFMeshGen",
+  "base_commit": "8df4022e0b64189436a63cfd6e3c2d1810ab1c32",
+  "note": "Imported 2026-10-08 from the working tree, including uncommitted staggered.py and surface3d.py. Source checkout preserved. Hashes describe original bytes before import rewrites.",
+  "files": [
+    {
+      "source": "RBFMeshGen/geometry_utils.py",
+      "destination": "python/rbflab/geometry/_borders.py",
+      "source_sha256": "3ee865fb21b1a9222863d80eddad21cf31134fa0a17d92aa506aab5753f46946"
+    },
+    {
+      "source": "RBFMeshGen/geometry3d.py",
+      "destination": "python/rbflab/geometry/_regions3d.py",
+      "source_sha256": "7cd9095187a5fcfefde1ee143a6fc58bccfaf1b456b06df0dfaf1b49f6eea486"
+    },
+    {
+      "source": "RBFMeshGen/staggered.py",
+      "destination": "python/rbflab/geometry/staggered.py",
+      "source_sha256": "2babfb2048db1637add8cf29e91f0eec2f0fafbe661f732f6512966e0a962051"
+    },
+    {
+      "source": "RBFMeshGen/mesh_generation.py",
+      "destination": "python/rbflab/meshgen/polygons.py",
+      "source_sha256": "c4316d8b0ecc7b524415c39980998217c0f375bb68a10e4efde4e38680e9bb58"
+    },
+    {
+      "source": "RBFMeshGen/mesh_generation3d.py",
+      "destination": "python/rbflab/meshgen/volumes.py",
+      "source_sha256": "0d8fddb0a0dcbf8ade364c9e667bd3a55f6c6de0256d3876722e8178cba1b932"
+    },
+    {
+      "source": "RBFMeshGen/surface3d.py",
+      "destination": "python/rbflab/meshgen/surfaces.py",
+      "source_sha256": "a6627f01856d5875b7e731ddcc4936bc7660cfecf5a09945380bcbaa3b172eaf"
+    }
+  ]
+}

@@ -5,6 +5,7 @@ backend computes smooth/hybrid stencils with MPFR/OpenMP. Global assembly stays 
 """
 from dataclasses import dataclass, replace
 from pathlib import Path
+from .native_paths import source_root
 from concurrent.futures import ProcessPoolExecutor
 import multiprocessing,os,subprocess,tempfile,time,json,hashlib
 import numpy as np
@@ -258,11 +259,11 @@ class CppBackend:
         if custom:
             from .kernel_compiler import compile_stokes
             custom_executable=compile_stokes(method.kernel,pk,'float64' if native else 'mpfr',self.cache_dir)
-        executable=custom_executable or (Path(self.executable) if self.executable else Path(__file__).resolve().parents[2]/'cpp'/('lhi_double' if native else 'lhi_mpfr'))
+        executable=custom_executable or (Path(self.executable) if self.executable else source_root()/'cpp'/('lhi_double' if native else 'lhi_mpfr'))
         if not executable.is_file():raise FileNotFoundError('Build the C++ backend first: python examples/build_cpp_backend.py')
         build_info=None
         if self.executable is None and not custom:
-            repository=Path(__file__).resolve().parents[2];manifest=executable.parent/('build_manifest_double.json' if native else 'build_manifest.json')
+            repository=source_root();manifest=executable.parent/('build_manifest_double.json' if native else 'build_manifest.json')
             if not manifest.is_file():raise RuntimeError('Build manifest missing; rerun examples/build_cpp_backend.py')
             build_info=json.loads(manifest.read_text())
             if build_info.get('protocol')!=2:raise RuntimeError('Unsupported C++ build protocol')

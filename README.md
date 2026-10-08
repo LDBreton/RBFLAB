@@ -10,11 +10,10 @@ The default installation uses Python, NumPy, and SciPy. C++ and PyTorch are
 optional numerical backends for supported local methods. The package supports
 2D and 3D scalar methods and divergence-free approximation spaces.
 
-![Three snapshots of a numerical heat pulse evolving on a point cloud](docs/assets/heat_diffusion.png)
+![Curved domains, annular Stokes flow and a 3D solution computed with RBFLAB](docs/assets/curved_domains.png)
 
-*The heat pulse comes from a symbolic PDE solved with global RBF collocation;
-the faint dots in the first panel are the collocation nodes. The display grid
-only samples the computed solution.*
+*Generate a curved domain, write an equation, and solve it. The gallery combines
+a flower-shaped cloud, annular Laplace and Stokes solutions, and a 3D Poisson slice.*
 
 ## Install
 
@@ -27,6 +26,21 @@ python -m pip install rbflab
 The default installation does not require Gmsh, a compiler, or PyTorch. See
 [the installation guide](docs/INSTALL.md) for optional features. From a source
 checkout, use `python -m pip install .` instead.
+
+## Geometry is now part of RBFLAB
+
+RBFMeshGen is integrated: one package for labeled 2D/3D clouds and numerical PDEs.
+
+```python
+from rbflab import geometry, meshgen
+
+domain = geometry.Annulus(inner_radius=.4, outer_radius=1.)
+cloud = meshgen.generate(domain, interior=240,
+                         boundary={"inner": 48, "outer": 96}, seed=42)
+```
+
+[Geometry guide](https://ldbreton.github.io/RBFLAB/geometry/) ·
+[Migration guide](https://ldbreton.github.io/RBFLAB/geometry/migration/)
 
 ## A symbolic PDE in a few lines
 
@@ -52,6 +66,34 @@ Change the last method to `rbf.LHI(rbf.PHS(5), 20, polynomial_degree=2)`
 or `rbf.RBFFD(rbf.PHS(5), 20, polynomial_degree=2)` to compare methods on
 the same equation and cloud. The complete example reports errors against the
 known solution.
+
+## Curved-domain examples
+
+Run these from a source checkout after installing the package. Keep the examples
+folder together: shared backend selection and error reporting live in `_curved.py`.
+
+| Example | What it demonstrates |
+|---|---|
+| [Annulus](examples/annulus.py) | Exact harmonic field; global, LHI and RBF-FD |
+| [Flower heat](examples/heat_flower.py) | Symbolic forcing, BDF2 and animation |
+| [Mixed ellipse](examples/ellipse_boundary.py) | Curved Dirichlet, Neumann and Robin boundaries |
+| [Annular Stokes](examples/stokes_annulus.py) | Divergence-free flow between rotating cylinders |
+| [3D ball](examples/ball_poisson.py) | Nonpolynomial Poisson verification and slice plotting |
+| [Perforated plate](examples/perforated_plate.py) | Optional Gmsh geometry and staggered clouds |
+
+```sh
+python -m examples.annulus --backend python
+python -m examples.annulus --backend cpp     # optional source toolchain
+python -m examples.ball_poisson --backend torch
+python -m examples.heat_flower --animation flower.gif
+```
+
+C++/PyTorch select local Float64 numerical work; the sparse solve remains on CPU.
+See [setup and timing guidance](docs/guides/curved-backends.md) and
+[measured validation](docs/guides/curved-validation.md). These small examples do
+not promise acceleration on every machine.
+
+![Computed heat diffusion on a flower-shaped domain](docs/assets/flower_heat.gif)
 
 ## Six starting examples
 

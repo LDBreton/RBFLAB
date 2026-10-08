@@ -1,0 +1,54 @@
+[
+  {
+    "example": "annulus/rbffd/cpp",
+    "nodes": 384,
+    "precision": "float64",
+    "prepare_s": 2.48125539999819,
+    "assembly_s": 2.198239500001364,
+    "solve_s": 1.4354716000016197,
+    "nodal_max": 0.0027792523764063326,
+    "off_node_max": 0.003060506971154786
+  },
+  {
+    "example": "mixed ellipse/cpp",
+    "nodes": 360,
+    "precision": "float64",
+    "prepare_s": 0.09224950000134413,
+    "assembly_s": 1.8467302999997628,
+    "solve_s": 1.286357599998155,
+    "nodal_max": 0.0002752683184447102,
+    "off_node_max": 0.0002706089789322741
+  },
+  {
+    "example": "flower heat/cpp",
+    "nodes": 370,
+    "precision": "float64",
+    "prepare_s": 0.0955221000003803,
+    "assembly_s": 2.0568468999990728,
+    "solve_s": 1.4198312000007718,
+    "nodal_max": 0.0010827170935986397,
+    "off_node_max": 0.0010761307921693386
+  },
+  {
+    "example": "3D ball/cpp",
+    "nodes": 480,
+    "precision": "float64",
+    "prepare_s": 0.09460780000154045,
+    "assembly_s": 6.384168299999146,
+    "solve_s": 5.515389799998957,
+    "nodal_max": 0.0001657073984602242,
+    "off_node_max": 0.00019780743847386262
+  },
+  {
+    "example": "Stokes annulus/global/python",
+    "nodes": 150,
+    "precision": "float64",
+    "prepare_s": 1.4999968698248267e-06,
+    "assembly_s": 0.5228870999999344,
+    "solve_s": 0.020402600002853433,
+    "nodal_velocity_max": 0.0026030481218354273,
+    "off_node_velocity_max": 0.004016890916816007,
+    "pressure_gradient_max": 0.04571073492645322,
+    "divergence_max": 0.0
+  }
+]

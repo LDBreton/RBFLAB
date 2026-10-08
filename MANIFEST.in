@@ -1,7 +1,13 @@
 include README.md README_PYPI.md CHANGELOG.md LICENSE RELEASE_CHECKLIST.md
 include docs/INSTALL.md docs/CAPABILITIES.md docs/VISUALIZATION.md docs/guides/LID_DRIVEN_CAVITY.md
-recursive-include docs/assets *.png *.gif
+recursive-include docs/assets *.png *.gif *.svg *.json
 recursive-include examples *.py
+recursive-include docs/provenance *.txt *.json
 recursive-include cpp *.cpp *.hpp *.cu *.sh *.md
 prune tests
 global-exclude __pycache__ *.py[cod] *.exe
+
+recursive-include docs *.md *.css *.js
+include mkdocs.yml
+recursive-include scripts *.py
+prune cpp/deps

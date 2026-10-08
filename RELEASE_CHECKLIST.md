@@ -1,3 +1,30 @@
+# RBFLAB 0.2.0 integration validation
+
+The RBFMeshGen integration was validated on 2026-10-08 before publication.
+
+- Standard suite: 158 passed, 20 opt-in native skips, 42 unittest subtests.
+- Native-enabled targeted suite: 49 passed initially; three stale private-fixture
+  imports were replaced with the public Stokes tutorial and all three reruns passed.
+  Coverage includes C++ Float64/MPFR symbolic compilation, 3D vector operators,
+  and matched-cloud C++/PyTorch scalar results.
+- Both owned Eigen/OpenMP executables built successfully on Ubuntu WSL.
+- All four curved scalar examples ran with Python, C++ Float64 and PyTorch CPU
+  Float64 using identical clouds and numerical settings.
+- Annulus refinement improved across seeds 17, 42 and 73 with fixed stencil/kernel
+  settings. Recorded errors and timings are in docs/assets/curved_validation.json.
+- Strict MkDocs build and local-link/style checks passed on 42 pages. Browser
+  preview confirmed the new homepage and rendered annulus mathematics.
+- Wheel and sdist passed twine checks. An isolated Windows Python 3.12 environment
+  installed the wheel with core dependencies only and ran the curved PDE examples,
+  existing Poisson/Stokes checks, and pip check. Optional imports remain lazy.
+- The wheel includes both MIT license notices. All six imported source-file hashes
+  still match the original RBFMeshGen checkout; its local files were not modified.
+
+Release CI additionally checks Windows/Linux wheels, geometry/Gmsh, optional
+C++ and PyTorch, generated figures, and the documentation deployment.
+
+---
+
 # RBFLAB 0.1.0 release record
 
 RBFLAB 0.1.0 was published on 2026-10-08 from a fresh public source snapshot.

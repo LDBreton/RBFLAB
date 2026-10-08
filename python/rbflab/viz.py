@@ -43,16 +43,18 @@ def _axes(ax, title):
     return fig, ax
 
 
-def plot_scalar(solution, *, bounds=((0, 1), (0, 1)), resolution=100,
+def plot_scalar(solution, *, bounds=None, domain=None, resolution=100,
                 ax=None, title="Scalar field", cmap="magma", vmin=None,
                 vmax=None, colorbar=True, cloud=None):
     """Plot a 2D solution using its ``evaluate(points)`` method.
 
     Return ``(figure, axes)``. Pass ``cloud`` to show collocation nodes.
     Sampling here is exclusively for display, independent of PDE assembly.
+    Pass domain to mask holes/exterior points and use its bounds. Only interior
+    display points are evaluated; no triangulation is inferred.
     """
-    x, y, points = _grid(bounds, resolution)
-    values = np.asarray(solution.evaluate(points), dtype=float).reshape(resolution, resolution)
+    x, y, points = _grid(bounds if bounds is not None else (domain.bounds if domain is not None else ((0, 1), (0, 1))), resolution)
+    values = _sample_domain(solution.evaluate, points, domain).reshape(resolution, resolution)
     if not np.isfinite(values).all():
         raise ValueError("Cannot plot nonfinite solution values")
     fig, ax = _axes(ax, title)
@@ -70,11 +72,11 @@ def plot_scalar(solution, *, bounds=((0, 1), (0, 1)), resolution=100,
     return fig, ax
 
 
-def plot_velocity(solution, *, bounds=((0, 1), (0, 1)), resolution=70,
+def plot_velocity(solution, *, bounds=None, domain=None, resolution=70,
                   ax=None, title="Divergence-free velocity", cmap="viridis"):
-    """Plot speed and streamlines using ``solution.velocity(points)``."""
-    x, y, points = _grid(bounds, resolution)
-    velocity = np.asarray(solution.velocity(points), dtype=float)
+    """Plot speed and streamlines, optionally masked by a 2D domain."""
+    x, y, points = _grid(bounds if bounds is not None else (domain.bounds if domain is not None else ((0, 1), (0, 1))), resolution)
+    velocity = _sample_domain(solution.velocity, points, domain, components=2)
     if velocity.shape != (len(points), 2) or not np.isfinite(velocity).all():
         raise ValueError("velocity must be finite with shape (N, 2)")
     u = velocity[:, 0].reshape(resolution, resolution)
@@ -93,9 +95,9 @@ def plot_velocity(solution, *, bounds=((0, 1), (0, 1)), resolution=70,
     return fig, ax
 
 
-def animate_scalar(trajectory, path, *, bounds=((0, 1), (0, 1)),
+def animate_scalar(trajectory, path, *, bounds=None, domain=None,
                    resolution=90, fps=12, every=1, title="Heat diffusion"):
-    """Save a 2D evolution trajectory as a GIF with one short call."""
+    """Save a 2D trajectory with fixed color limits and optional domain mask."""
     from matplotlib.animation import FuncAnimation, PillowWriter
     import matplotlib.pyplot as plt
 
@@ -104,20 +106,20 @@ def animate_scalar(trajectory, path, *, bounds=((0, 1), (0, 1)),
         raise ValueError("animation path must end in .gif")
     if type(every) is not int or every < 1 or fps <= 0:
         raise ValueError("every and fps must be positive")
-    x, y, points = _grid(bounds, resolution)
+    x, y, points = _grid(bounds if bounds is not None else (domain.bounds if domain is not None else ((0, 1), (0, 1))), resolution)
     states = [trajectory.initial, *trajectory.states[::every]]
     if states[-1] is not trajectory.final:
         states.append(trajectory.final)
     frames = []
     for state in states:
-        values = np.asarray(state.evaluate(points), dtype=float).reshape(resolution, resolution)
+        values = _sample_domain(state.evaluate, points, domain).reshape(resolution, resolution)
         if not np.isfinite(values).all():
             raise ValueError("Cannot animate nonfinite solution values")
         frames.append(values)
     fig, ax = _axes(None, title)
     image = ax.imshow(frames[0], extent=(x[0], x[-1], y[0], y[-1]), origin="lower",
                       interpolation="bicubic", cmap="magma",
-                      vmin=float(np.min(frames)), vmax=float(np.max(frames)))
+                      vmin=float(min(v.min() for v in frames)), vmax=float(max(v.max() for v in frames)))
     bar = fig.colorbar(image, ax=ax, shrink=.8, pad=.025)
     bar.ax.tick_params(colors=_MUTED, labelsize=8)
     bar.outline.set_edgecolor("#394c68")
@@ -214,3 +216,79 @@ def animate_velocity_samples(points, times, velocities, path, *,
         fig.savefig(poster, dpi=170, facecolor=fig.get_facecolor())
     plt.close(fig)
     return path
+
+
+def _sample_domain(evaluate, points, domain, components=None):
+    """Evaluate only physical points; mask holes before rendering/interpolation."""
+    inside = np.ones(len(points), dtype=bool) if domain is None else domain.contains_points(points)
+    if not np.any(inside):
+        raise ValueError("Display grid does not intersect the domain")
+    shape = (len(points),) if components is None else (len(points), components)
+    result = np.ma.masked_all(shape, dtype=float)
+    values = np.asarray(evaluate(points[inside]), dtype=float)
+    expected = (int(inside.sum()),) if components is None else (int(inside.sum()), components)
+    if values.shape != expected or not np.isfinite(values).all():
+        raise ValueError("Display evaluator must return finite values with matching shape")
+    result[inside] = values
+    return result
+
+
+def plot_cloud(cloud, *, ax=None, title="Nodes and boundary groups", normals=False, stencil=None):
+    """Plot a 2D/3D cloud with boundary labels and optional normals/stencil IDs.
+
+    Connectivity is never fabricated. For 3D, pass a Matplotlib 3D axes or
+    leave ax unset. Returns (figure, axes); does not call show().
+    """
+    import matplotlib.pyplot as plt
+    if cloud.dimension == 3:
+        if ax is None:
+            fig = plt.figure(figsize=(6, 5), layout="constrained")
+            ax = fig.add_subplot(projection="3d")
+        else:
+            fig = ax.figure
+        fig.patch.set_facecolor(_BACKGROUND); ax.set_facecolor(_BACKGROUND)
+        ax.set(xlabel="x", ylabel="y", zlabel="z", title=title)
+        ax.set_box_aspect(np.ptp(cloud.points, axis=0))
+        ax.tick_params(colors=_MUTED)
+        for axis in (ax.xaxis, ax.yaxis, ax.zaxis): axis.label.set_color(_MUTED)
+        ax.title.set_color(_TEXT)
+    else:
+        fig, ax = _axes(ax, title)
+    p = cloud.points
+    ax.scatter(*p[cloud.interior_indices].T, s=5, color="#748aa5", alpha=.55, label="interior")
+    colors = ["#53d7cc", "#ffbc6e", "#af9bff", "#f487b5", "#8cdf89"]
+    for k, (label, ids) in enumerate(cloud.boundary.items()):
+        color=colors[k % len(colors)]
+        ax.scatter(*p[ids].T, s=13, color=color, label=str(label))
+        if normals and label in cloud.normals:
+            take = slice(None, None, max(1, len(ids)//18))
+            v = cloud.normals[label][take]; q=p[ids][take]
+            if cloud.dimension == 2:
+                ax.quiver(*q.T, *v.T, color=color, scale=20, width=.003)
+            else:
+                ax.quiver(*q.T, *v.T, color=color, length=.12)
+    if stencil is not None:
+        ax.scatter(*p[np.asarray(stencil, dtype=int)].T, s=42, facecolors="none", edgecolors="white", label="stencil")
+    ax.legend(facecolor=_BACKGROUND, edgecolor="#394c68", labelcolor=_TEXT, fontsize=8)
+    return fig, ax
+
+
+def plot_slice(solution, domain, *, axis=2, coordinate=0., resolution=85,
+               ax=None, title="3D solution / cross-section", cmap="magma"):
+    """Plot a scalar 3D evaluator on one Cartesian slice, masked by domain.
+
+    axis is the fixed coordinate (0, 1 or 2); coordinate is its physical value.
+    The slice samples the numerical reconstruction, not an extra PDE grid.
+    """
+    if axis not in (0, 1, 2) or not np.isfinite(coordinate):
+        raise ValueError("axis must be 0, 1 or 2 and coordinate finite")
+    free = [i for i in range(3) if i != axis]
+    bounds = np.asarray(domain.bounds)[free]
+    x, y, flat = _grid(bounds, resolution)
+    points = np.empty((len(flat),3)); points[:,free] = flat; points[:,axis] = coordinate
+    values = _sample_domain(solution.evaluate, points, domain).reshape(resolution,resolution)
+    fig, ax = _axes(ax, title)
+    image=ax.imshow(values, extent=(x[0],x[-1],y[0],y[-1]), origin="lower", cmap=cmap)
+    ax.set_xlabel("xyz"[free[0]], color=_MUTED);ax.set_ylabel("xyz"[free[1]], color=_MUTED)
+    bar=fig.colorbar(image, ax=ax, shrink=.8, pad=.025);bar.ax.tick_params(colors=_MUTED)
+    return fig, ax

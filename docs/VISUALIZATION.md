@@ -46,3 +46,24 @@ then writes `docs/assets/heat_diffusion.png`, `heat_diffusion.gif`, and
 From a source checkout, the [Re=100 cavity example](https://github.com/LDBreton/RBFLAB/blob/main/examples/navier_stokes_cavity.py)
 makes the README's flow GIF and PNG with `python -m examples.navier_stokes_cavity`.
 Its default backend is Python; `--backend cpp` uses the optional native backend.
+
+
+## Curved domains, holes and 3D slices
+
+```python
+fig, ax = viz.plot_cloud(cloud, normals=True)
+fig, ax = viz.plot_scalar(solution, domain=domain)
+fig, ax = viz.plot_velocity(flow_solution, domain=domain)
+viz.animate_scalar(trajectory, "heat.gif", domain=domain)
+# For a scalar 3D solution:
+fig, ax = viz.plot_slice(solution_3d, ball_domain, axis=2, coordinate=0)
+```
+
+The field helpers mask the exterior and holes **before evaluation**. They sample
+the numerical reconstruction without inventing triangulation. The older
+`animate_velocity_samples` helper interpolates nodal arrays over a rectangular
+window; use it only when that display domain is appropriate (such as the cavity).
+It is not a hole-aware curved-domain renderer.
+
+Regenerate the curved gallery with `python -m examples.make_geometry_gallery`;
+add `--backend cpp` or `--backend torch` after installing the relevant backend.

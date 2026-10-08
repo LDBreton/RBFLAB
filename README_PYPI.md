@@ -17,6 +17,19 @@ Optional extras include `rbflab[examples]` for Matplotlib plots and GIFs,
 `rbflab[mesh]` for Gmsh, and `rbflab[torch]` for the documented CPU Float64
 tensor backend. The C++ double/MPFR backends are source-build options.
 
+RBFMeshGen is integrated in version 0.2: labeled planar domains, holes, 3D
+regions and explicit 2D staggered layouts share the solver PointCloud contract.
+Shapely is a core dependency; Matplotlib, Gmsh and PyTorch remain optional.
+
+```python
+from rbflab import geometry, meshgen
+cloud = meshgen.generate(geometry.Annulus(), interior=240, boundary=144, seed=42)
+```
+
+Explore [curved-domain tutorials](https://ldbreton.github.io/RBFLAB/geometry/)
+for annular Laplace and Stokes, flower-shaped heat diffusion, mixed ellipse
+boundaries and Poisson inside a 3D ball.
+
 Here is a symbolic Poisson problem:
 
 ```python

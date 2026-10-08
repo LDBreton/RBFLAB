@@ -88,3 +88,13 @@ papers without appropriate permission.
 Keep paper metadata and DOI links in theory/references.md, and explain each
 citation's relevance on the corresponding theory page. Distinguish mathematical
 background from algorithms that the public package actually implements.
+
+
+## Geometry integration
+
+The submodules `geometry` and `meshgen` expose their own `__all__` lists. Document
+those names in api/mesh-generation.md; test_public_docs checks them. Run the
+ported geometry regression suite in tests/meshgen and the new geometry/PDE tests.
+Generate assets with `python -m examples.make_geometry_gallery --backend cpp`.
+Curved examples embed their source directly; common measurement/backend helpers
+live in examples/_curved.py. Keep claims synchronized with curved_validation.py.

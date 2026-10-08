@@ -8,6 +8,9 @@ for relative in (
     "tutorials/heat-equation/index.html",
     "tutorials/stokes/index.html",
     "theory/rbf-fd/index.html",
+    "tutorials/annulus/index.html",
+    "tutorials/flower-heat/index.html",
+    "tutorials/ball/index.html",
 ):
     html = (root / "site" / relative).read_text(encoding="utf-8")
     assert "--8<--" not in html, relative

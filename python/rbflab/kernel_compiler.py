@@ -6,6 +6,7 @@ Parameter values never participate in generated source or cache identity.
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
+from .native_paths import source_root
 import hashlib,json,os,subprocess,tempfile,itertools
 import numpy as np
 import sympy as sp
@@ -15,7 +16,7 @@ from .kernels import _COORDINATES
 from .legacy_cpp import _linux_path
 from .eigen_build import eigen_dependency
 
-ROOT=Path(__file__).resolve().parents[2]
+ROOT=source_root()
 
 class Printer(C99CodePrinter):
     def _print_Integer(self,e):return 'Real("'+str(e)+'")'

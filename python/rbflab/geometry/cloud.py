@@ -10,13 +10,18 @@ class PointCloud:
 
     Args:
         points: Finite, unique coordinates with shape `(N, dimension)`.
-        boundary: Mapping from boundary label to arrays of point indices.
+        boundary (dict): Mapping from boundary label to arrays of point indices.
         normals: Mapping from labels to unit-normal arrays matching their nodes.
-        triangles: Optional `(T, 3)` connectivity for visualization."""
+        triangles: Optional `(T, 3)` connectivity for visualization.
+        interfaces: Named internal-interface node indices (remain interior).
+        regions: Named region node indices, which may overlap."""
     points: np.ndarray
     boundary: dict
     normals: dict
     triangles: np.ndarray = field(default_factory=lambda: np.empty((0, 3), dtype=int))
+
+    interfaces: dict = field(default_factory=dict)
+    regions: dict = field(default_factory=dict)
 
     def __post_init__(self):
         self.points = np.array(self.points, dtype=float, copy=True)
@@ -25,19 +30,27 @@ class PointCloud:
             raise ValueError("Expected nonempty finite (N, 2) or (N, 3) points")
         if len(np.unique(p, axis=0)) != len(p):
             raise ValueError("Duplicate points are not supported")
-        self.boundary = {k: np.asarray(v, dtype=int).copy() for k, v in self.boundary.items()}
-        for label, indices in self.boundary.items():
-            if indices.ndim != 1 or np.any(indices < 0) or np.any(indices >= len(p)):
-                raise ValueError("Invalid boundary indices")
-            if len(np.unique(indices)) != len(indices):
-                raise ValueError("Repeated boundary indices")
+        for name in ("boundary", "interfaces", "regions"):
+            groups = {}
+            for label, values in getattr(self, name).items():
+                raw = np.asarray(values)
+                if raw.ndim != 1 or (raw.size and (raw.dtype.kind not in "iu" or np.any(raw < 0) or np.any(raw >= len(p)))):
+                    raise ValueError(f"Invalid {name} indices")
+                indices = raw.astype(int, copy=True)
+                if len(np.unique(indices)) != len(indices):
+                    raise ValueError(f"Repeated {name} indices")
+                groups[label] = indices
+            setattr(self, name, groups)
         self.normals = {k: np.asarray(v, dtype=float).copy() for k, v in self.normals.items()}
         for label, normals in self.normals.items():
             if label not in self.boundary or normals.shape != (len(self.boundary[label]), self.dimension):
                 raise ValueError("Boundary normals must match (N_boundary, dimension)")
             if not np.isfinite(normals).all() or not np.allclose(np.linalg.norm(normals, axis=1), 1):
                 raise ValueError("Normals must be finite unit vectors")
-        self.triangles = np.asarray(self.triangles, dtype=int)
+        triangles = np.asarray(self.triangles)
+        if triangles.size and triangles.dtype.kind not in "iu":
+            raise ValueError("Triangle connectivity must contain integers")
+        self.triangles = np.array(triangles, dtype=int, copy=True)
         if self.triangles.ndim != 2 or self.triangles.shape[1] != 3:
             raise ValueError("Triangles must have shape (N, 3)")
         if np.any(self.triangles < 0) or np.any(self.triangles >= len(p)):

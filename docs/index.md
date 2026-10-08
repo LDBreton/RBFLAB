@@ -13,12 +13,12 @@ hide:
 <a class="rbf-button rbf-button--primary" href="getting-started/">Solve your first PDE <span aria-hidden="true">→</span></a>
 <a class="rbf-button" href="tutorials/heat-equation/">Learn through the heat equation</a>
 </div>
-<div class="rbf-install"><code>pip install rbflab</code><span>Python 3.11+ · Open source · Version 0.1.0</span></div>
+<div class="rbf-install"><code>pip install rbflab</code><span>Python 3.11+ · Open source · Version 0.2.0</span></div>
 </section>
 
 <figure class="rbf-feature">
-<a href="tutorials/heat-equation/" aria-label="Read the heat equation tutorial"><img src="assets/heat_diffusion.png" alt="Three computed temperature snapshots of a heat pulse, with collocation nodes visible in the first panel" width="2176" height="731"></a>
-<figcaption class="rbf-caption">A symbolic heat equation, evolved numerically. Dots mark the collocation nodes; the display grid samples the computed field. <a href="tutorials/heat-equation/">Explore the calculation →</a></figcaption>
+<a href="geometry/" aria-label="Explore curved domains"><img src="assets/curved_domains.png" alt="Flower-shaped cloud, annular harmonic field, rotating Stokes flow and a 3D Poisson section" width="1920" height="1440"></a>
+<figcaption class="rbf-caption">Generate your geometry, write the equation, inspect the solution. Every field shown comes from a numerical solve. <a href="geometry/">Explore curved domains →</a></figcaption>
 </figure>
 
 <h2 id="explore">Explore the manual</h2>
@@ -54,6 +54,12 @@ hide:
 </tbody>
 </table>
 
+<h2 id="curved">Beyond the square</h2>
+<div class="rbf-examples">
+<article class="rbf-example"><a href="tutorials/flower-heat/"><img src="assets/flower_heat.gif" alt="Computed heat diffusion on a flower-shaped domain" loading="lazy"></a><div class="rbf-example-body"><h3><a href="tutorials/flower-heat/">Heat on a flower</a></h3><p>Symbolic forcing, evolving boundary data and a reusable animation call.</p></div></article>
+<article class="rbf-example"><a href="tutorials/ellipse/"><img src="assets/ellipse_boundary.png" alt="Mixed ellipse boundaries and numerical field" loading="lazy"></a><div class="rbf-example-body"><h3><a href="tutorials/ellipse/">Curved boundary conditions</a></h3><p>Dirichlet, Neumann and Robin conditions on one labeled ellipse.</p></div></article>
+<article class="rbf-example"><a href="tutorials/ball/"><img src="assets/ball_poisson.png" alt="3D cloud and numerical cross-section" loading="lazy"></a><div class="rbf-example-body"><h3><a href="tutorials/ball/">Into three dimensions</a></h3><p>A nonpolynomial manufactured solution inside a ball.</p></div></article>
+</div>
 <h2 id="examples">See the methods at work</h2>
 <div class="rbf-examples">
 <article class="rbf-example">
@@ -71,5 +77,5 @@ hide:
 </div>
 
 <aside class="rbf-note"><p><strong>Designed for exploration.</strong> The core runs with Python, NumPy, and SciPy. Optional C++ and PyTorch backends accelerate supported local methods. Check the <a href="CAPABILITIES/">capability table</a> for dimensions, precision, and method support, or follow the <a href="INSTALL/">installation guide</a>.</p></aside>
-<p class="rbf-caption">Tutorial module commands run from a source checkout. Downloaded standalone scripts also run with the installed package; the cavity wrapper additionally uses the maintained solver in the examples folder.</p>
+<p class="rbf-caption">Tutorial module commands run from a source checkout. The curved tutorials use a shared helper in the examples folder; keep that folder together. The cavity wrapper also uses its maintained example solver.</p>
 </div>

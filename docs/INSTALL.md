@@ -16,7 +16,7 @@ the repository root. To build an installable wheel from that checkout:
 ```sh
 python -m pip install build
 python -m build --wheel
-python -m pip install dist/rbflab-0.1.0-py3-none-any.whl
+python -m pip install dist/rbflab-0.2.0-py3-none-any.whl
 ```
 
 Copy the symbolic Poisson example from the README, or run
@@ -27,7 +27,7 @@ example uses only core dependencies and prints a numerical error.
 
 | Install route | Packages or tools | Purpose |
 |---|---|---|
-| `rbflab` | NumPy, SciPy, SymPy, mpmath, threadpoolctl | Core array, sparse, symbolic, extended precision, and thread support |
+| `rbflab` | NumPy, SciPy, SymPy, mpmath, threadpoolctl, Shapely | Core arrays, sparse/symbolic calculations, extended precision, threads, and geometry |
 | `rbflab[torch]` | PyTorch | Optional CPU Float64 tensor backend |
 | `rbflab[mesh]` | Gmsh | Optional Gmsh cloud generation |
 | `rbflab[examples]` | Matplotlib, Pillow | Optional plots and GIF animations |
@@ -63,6 +63,19 @@ demonstrates cache reuse. A compiler is needed for that option.
 `Precision(local_digits=80)` requests MPFR local weights in supported C++
 methods. The sparse global solve remains Float64 unless `global_dtype="mpmath"`
 is chosen and supported. Always state both stages when reporting precision.
+
+## Geometry in the core install
+
+RBFMeshGen is integrated: no separate installation is needed for 2D/3D sampling.
+
+```python
+from rbflab import geometry, meshgen
+cloud = meshgen.generate(geometry.Annulus(), interior=100, boundary=60, seed=42)
+print(cloud.points.shape)
+```
+
+See [curved-domain backends](guides/curved-backends.md) for the C++ and PyTorch
+example commands. Matplotlib, Gmsh and PyTorch remain optional imports.
 
 ## Troubleshooting
 

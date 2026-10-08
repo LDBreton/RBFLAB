@@ -41,8 +41,8 @@ def test_compiled_scalar_runtime_and_3d(tmp_path,arithmetic):
 @pytest.mark.skipif(os.environ.get('RBFLAB_CPP_TESTS')!='1',reason='GCC/WSL opt-in')
 @pytest.mark.parametrize('digits',[None,45])
 def test_space_compiler_matches_builtin(tmp_path,digits):
-    from tests.test_space_stokes import problem_for
-    m,problem,_,_=problem_for(transient=True);U,p=m.fields;cloud=r.gmsh_square(3)
+    from examples.tutorials.stokes_spaces import make_problem
+    problem,spaces=make_problem(True);U,p=tuple(spaces);cloud=r.unit_box_grid(3)
     family=r.Kernel((1+c*s)**sp.Rational(-1,2),s,(c,))
     outputs=[];weights=[]
     for custom in (False,True):
@@ -76,8 +76,8 @@ def test_compiled_interpolation_fd_and_symmetric(tmp_path,monkeypatch):
 
 @pytest.mark.skipif(os.environ.get('RBFLAB_CPP_TESTS')!='1',reason='GCC/WSL opt-in')
 def test_nonbuiltin_space_kernel(tmp_path):
-    from tests.test_space_stokes import problem_for
-    m,problem,_,_=problem_for(transient=False);U,p=m.fields;cloud=r.gmsh_square(3)
+    from examples.tutorials.stokes_spaces import make_problem
+    problem,spaces=make_problem(False);U,p=tuple(spaces);cloud=r.unit_box_grid(3)
     family=r.Kernel(sp.exp(-c*s)*(1+g*s),s,(c,g))
     outputs=[]
     for backend in (r.PythonBackend(compute_condition=False),r.CppBackend(threads=4,compute_condition=False,cache_dir=str(tmp_path))):

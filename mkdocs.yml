@@ -69,6 +69,17 @@ nav:
   - Introduction:
       - First problem: getting-started.md
       - Installation: INSTALL.md
+  - Geometry and nodes:
+      - Geometry to PDE: geometry/index.md
+      - Custom domains and 3D: geometry/custom-domains.md
+      - Gmsh and staggered clouds: geometry/staggered.md
+      - Migrating from RBFMeshGen: geometry/migration.md
+  - Curved-domain examples:
+      - Laplace on an annulus: tutorials/annulus.md
+      - Heat on a flower: tutorials/flower-heat.md
+      - Mixed conditions on an ellipse: tutorials/ellipse.md
+      - Annular Stokes flow: tutorials/annular-stokes.md
+      - Poisson inside a ball: tutorials/ball.md
   - Learning by examples:
       - Interpolation and derivatives: tutorials/interpolation.md
       - One RBF-FD stencil: tutorials/one-stencil.md
@@ -90,9 +101,12 @@ nav:
       - Papers and further reading: theory/references.md
   - Practical guides:
       - Visualization: VISUALIZATION.md
+      - Curved-domain backends: guides/curved-backends.md
+      - Curved-domain validation: guides/curved-validation.md
       - Lid-driven cavity: guides/LID_DRIVEN_CAVITY.md
   - API reference:
       - Kernels and geometry: api/kernels-geometry.md
+      - Geometry and generation: api/mesh-generation.md
       - Equations and spaces: api/equations-spaces.md
       - Discretizations: api/discretizations.md
       - Precision and backends: api/precision-backends.md

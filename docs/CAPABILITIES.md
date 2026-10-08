@@ -1,4 +1,4 @@
-# Verified capabilities for RBFLAB 0.1.0
+# Verified capabilities for RBFLAB 0.2.0
 
 The method and backend combinations below are intentionally precise. A local
 backend choice does not automatically change a separate global sparse solve.
@@ -20,5 +20,11 @@ and C++ MPFR local weights.
 The six default Python examples ran from an installed wheel and source archive
 outside the checkout.
 
-Gmsh and RBFMeshGen are optional geometry providers. The built-in
+RBFMeshGen generation is integrated into `rbflab.geometry` and `rbflab.meshgen`; Gmsh remains optional. The built-in
 `unit_box_grid` supplies a small 2D/3D deterministic cloud for tutorials.
+
+
+Curved-domain scalar examples were compared on identical clouds with Python,
+C++ Float64 and PyTorch CPU Float64. See [the validation record](guides/curved-validation.md).
+Core geometry includes 2D parametric domains/holes, 3D implicit regions and
+parametric surfaces. Staggering remains explicit 2D triangle-based geometry.
