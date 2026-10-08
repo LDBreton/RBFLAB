@@ -1,0 +1,148 @@
+"""Polynomial-augmented RBF-FD with shared nodal stencils and sparse solvers."""
+from dataclasses import dataclass,field
+import numpy as np
+from scipy.spatial import cKDTree
+from scipy.sparse import coo_matrix
+from scipy.sparse.linalg import splu
+from .precision import Precision
+from .operators import Identity
+from .assembly import relative_residual
+from .nodal import Arithmetic,LocalNodalStencil,collocation_data
+from .stencils import StencilPolicy, geometry_quality
+from .sparse_precision import MPSparseMatrix,MPSparseLU
+
+
+@dataclass
+class RBFFD:
+    kernel: object = None
+    stencil_size: int = 15
+    polynomial_degree: int = 2
+    precision: Precision = field(default_factory=Precision)
+    stencil_policy: StencilPolicy = field(default_factory=StencilPolicy)
+
+    scheme: str = 'standard'
+    local_backend: object = None
+    spaces: object = None
+
+    def operators(self, *, source, targets=None, operators, space=None):
+        from .discrete_operators import build_operators
+        return build_operators(self, source=source, targets=targets, operators=operators, space=space)
+
+    def prepare(self,problem,*,dimension=2,cache_dir=None):
+        if self.spaces is not None:
+            from .discrete_operators import scalar_method
+            return scalar_method(self).prepare(problem,dimension=dimension,cache_dir=cache_dir)
+        if self.local_backend is not None or self.scheme!='standard':
+            from .scalar_backends import prepare_scalar_method
+            return prepare_scalar_method(self,problem,dimension,cache_dir)
+        from .kernel_compiler import prepare_method
+        return prepare_method(self,problem,dimension,cache_dir)
+
+    def assemble(self,problem,cloud):
+        if self.spaces is not None:
+            from .discrete_operators import scalar_method
+            return scalar_method(self).assemble(problem,cloud)
+        from .evolution import EvolutionPDE, assemble_evolution
+        if isinstance(problem, EvolutionPDE):
+            return assemble_evolution(self, problem, cloud)
+        if self.scheme!='standard' or self.local_backend is not None:
+            from .scalar_fd import assemble_scalar_fd
+            return assemble_scalar_fd(self,problem,cloud)
+        if not isinstance(self.precision,Precision):
+            raise TypeError("precision must be Precision")
+        if self.precision.global_digits is not None:
+            raise ValueError("RBF-FD uses local_digits and global_dtype")
+        if not isinstance(self.stencil_policy,StencilPolicy):
+            raise TypeError("stencil_policy must be StencilPolicy")
+        local=Arithmetic(self.kernel,self.precision.local_digits)
+        full=self.precision.global_dtype=="mpmath"
+        global_arithmetic=local if full else Arithmetic(self.kernel)
+        a=global_arithmetic
+        operators,targets=collocation_data(problem,cloud,a)
+        tree=cKDTree(cloud.points)
+        rows=[];rhs=[];stencils=[];ids=[]
+        for i,point in enumerate(cloud.points):
+            selected=self.stencil_policy.select(tree,point,self.stencil_size,self.polynomial_degree)
+            stencil=LocalNodalStencil(local,cloud.points[selected],self.polynomial_degree,self.stencil_policy.scaling)
+            stencil.geometry_diagnostics=geometry_quality(cloud.points[selected],point,
+                self.polynomial_degree if self.polynomial_degree is not None else 1)
+            op,target=operators[i],targets[i]
+            w=stencil.weights(point,op)
+            rows.append({int(j):a.number(v) for j,v in zip(selected,w)})
+            rhs.append(target)
+            stencils.append(stencil);ids.append(selected)
+        if full:
+            matrix=MPSparseMatrix(a.ctx,rows)
+        else:
+            entries=[(i,j,v) for i,row in enumerate(rows) for j,v in row.items()]
+            matrix=coo_matrix(([v for i,j,v in entries],
+                ([i for i,j,v in entries],[j for i,j,v in entries])),
+                shape=(len(rows),len(rows))).tocsc()
+        return FDSystem(cloud,a,matrix,a.vector(rhs),stencils,ids,tree)
+
+
+class FDSystem:
+    def __init__(self,cloud,arithmetic,matrix,rhs,stencils,indices,tree):
+        self.cloud,self.arithmetic,self.matrix,self.rhs=cloud,arithmetic,matrix,rhs
+        self.stencils,self.indices,self.tree=stencils,indices,tree
+        self.factor=None
+
+    def solve(self):
+        a=self.arithmetic
+        if self.factor is None:
+            self.factor=MPSparseLU(self.matrix) if a.ctx else splu(self.matrix)
+        nodal=self.factor.solve(self.rhs)
+        residual=self.factor.residual(nodal,self.rhs) if a.ctx else relative_residual(self.matrix,nodal,self.rhs)
+        return FDSolution(self,nodal,{"relative_residual":float(residual),
+            "unknowns":len(nodal),"nnz":self.matrix.nnz,
+            "global_digits":a.ctx.dps if a.ctx else None,
+            "max_scaled_local_condition":max((s.factor.condition for s in self.stencils if s.factor.condition is not None),default=None),
+            "local_condition_norm":getattr(self,"backend_diagnostics",{}).get("local_condition_norm","infinity" if self.stencils[0].basis.arithmetic.ctx else "2"),
+            "local_digits":self.stencils[0].basis.arithmetic.ctx.dps if self.stencils[0].basis.arithmetic.ctx else None})
+
+
+class FDSolution:
+    def __init__(self,system,nodal,diagnostics):
+        self.system,self.dof_values,self.diagnostics=system,nodal,diagnostics
+        self._coefficients=[]
+        if hasattr(system,'executor'):
+            data=[[system.stencils[i].basis.arithmetic.number(nodal[int(j)]) for j in ids]+[0]*len(system.stencils[i].basis.powers) for i,ids in enumerate(system.indices)]
+            results=system.executor.solve(data)
+            self._coefficients=[s.basis.arithmetic.vector(row['weights']) for s,row in zip(system.stencils,results)]
+            return
+        for stencil,ids in zip(system.stencils,system.indices):
+            self._coefficients.append(stencil.factor.solve(
+                stencil.basis.padded([nodal[int(i)] for i in ids])))
+
+    @property
+    def nodal_values(self):
+        if getattr(self.system,'scheme','standard')=='boundary_hermite':
+            values=self._evaluate(self.system.cloud.points)
+            return self.system.arithmetic.vector(values)
+        return self.dof_values
+
+    def _evaluate(self,points,operator=None):
+        from .methods import _query
+        points=_query(points, self.system.cloud.dimension)
+        if not len(points):
+            return []
+        _,owners=self.system.tree.query(points)
+        out=[]
+        for point,owner in zip(points,owners):
+            stencil=self.system.stencils[int(owner)]
+            a=stencil.basis.arithmetic
+            row=stencil.basis.evaluation(point.reshape(1,-1),[operator or Identity(points.shape[1])])
+            coefficients=self._coefficients[int(owner)]
+            v=row*coefficients if a.ctx else row@coefficients
+            out.append(v[0])
+        return out
+
+    def evaluate(self,points,operator=None):
+        """Nearest-stencil interpolation; no continuity guarantee between patches."""
+        return np.array([float(v) for v in self._evaluate(points,operator)])
+
+    def evaluate_mp(self,points,operator=None):
+        a=self.system.stencils[0].basis.arithmetic
+        if not a.ctx:
+            raise ValueError("evaluate_mp requires extended local precision")
+        return a.ctx.matrix(self._evaluate(points,operator))

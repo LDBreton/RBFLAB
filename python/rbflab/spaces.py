@@ -1,0 +1,126 @@
+"""Explicit approximation spaces and symbolic divergence-free Stokes problems."""
+from .symbolic_kernel import BoundKernel
+from dataclasses import dataclass,replace
+import sympy as sp
+from sympy.core.function import AppliedUndef
+from .symbolic import SymbolicScalar,_expr,_number
+from .kernels import ScalarKernel,PHS,Hybrid
+
+
+@dataclass(frozen=True)
+class ScalarSpace:
+    kernel: object
+    polynomial_degree: object = 'auto'
+
+    def degree(self, *, legacy_unaugmented_hybrid=False):
+        if not isinstance(self.kernel,(ScalarKernel,PHS,Hybrid,BoundKernel)):raise TypeError("Expected a scalar radial kernel")
+        minimum=getattr(self.kernel,'minimum_degree',-1)
+        if isinstance(self,DivergenceFreeSpace):minimum=max(-1,minimum-1)
+        degree=(minimum if minimum>=0 else None) if self.polynomial_degree=='auto' else self.polynomial_degree
+        if degree is not None and (type(degree) is not int or degree<0):raise ValueError("Invalid polynomial degree")
+        legacy = legacy_unaugmented_hybrid and isinstance(self.kernel,Hybrid) and self.polynomial_degree is None
+        if minimum>=0 and not legacy and (degree is None or degree<minimum):raise ValueError(f"This space requires polynomial degree >= {minimum}")
+        order=6 if isinstance(self,DivergenceFreeSpace) else 2
+        phs=self.kernel.phs if isinstance(self.kernel,Hybrid) else self.kernel if isinstance(self.kernel,PHS) else None
+        if phs and phs.power-1<order:raise ValueError(f"This space requires continuous kernel derivatives through order {order}")
+        return degree
+
+
+@dataclass(frozen=True)
+class DivergenceFreeSpace(ScalarSpace):
+    """Velocity kernel (Hessian - I*Laplacian) phi, with solenoidal polynomials."""
+
+
+@dataclass(frozen=True)
+class PressureSpace(ScalarSpace):
+    """Pressure modulo constants: no independent constant polynomial or gauge row."""
+
+
+@dataclass(frozen=True)
+class SpaceStokesProblem:
+    model: object
+    viscosity: object
+    forcing: tuple
+    boundary: tuple
+    initial: object = None
+
+    @property
+    def dimension(self):return self.model.dimension
+    @property
+    def transient(self):return self.initial is not None
+    def solve(self,cloud,method,**kwargs):return method.assemble(self,cloud).solve(**kwargs)
+
+
+class SymbolicFlow:
+    """Vector/scalar declarations for steady or evolutionary constant-viscosity Stokes.
+
+    Incompressibility is supplied by the selected DivergenceFreeSpace. The scalar
+    SymbolicSystem branch remains available for general stationary coupled PDEs.
+    """
+    def __init__(self,dimension=2,*,vector_fields=None,scalar_fields=None,transient=False):
+        if vector_fields is None or scalar_fields is None or len(vector_fields)!=1 or len(scalar_fields)!=1:
+            raise NotImplementedError("The vector space compiler currently accepts one velocity and one pressure field")
+        names=tuple(vector_fields)+tuple(scalar_fields)
+        if len(set(names))!=2 or any(not isinstance(n,str) or not n for n in names):raise ValueError("Expected distinct field names")
+        self._scalar=SymbolicScalar(dimension,transient=transient)
+        self.dimension=dimension;self.coordinates=self._scalar.coordinates;self.time=self._scalar.time
+        self.normal=self._scalar.normal
+        args=self.coordinates+((self.time,) if transient else ())
+        self.velocity=sp.ImmutableMatrix([sp.Function(f'{names[0]}_{j}')(*args) for j in range(dimension)])
+        self.pressure=sp.Function(names[1])(*args)
+        self.fields=(self.velocity,self.pressure)
+
+    def laplacian(self,expr):
+        if isinstance(expr,sp.MatrixBase):return sp.ImmutableMatrix([self._scalar.laplacian(e) for e in expr])
+        return self._scalar.laplacian(expr)
+    def gradient(self,expr):return sp.ImmutableMatrix([sp.diff(expr,x) for x in self.coordinates])
+    def divergence(self,expr):
+        if len(expr)!=self.dimension:raise ValueError("Vector dimension mismatch")
+        return sum(sp.diff(v,x) for v,x in zip(expr,self.coordinates))
+    def bc(self,on,equation):return (on,equation)
+    def data(self,expression,**kwargs):return self._scalar.data(expression,**kwargs)
+
+    def stationary(self,equations,*,boundary,parameters=None):
+        if self.time is not None:raise ValueError("Use a non-transient model for stationary Stokes")
+        return self._compile(equations,boundary,None,parameters)
+
+    def evolution(self,equations,*,initial,boundary,parameters=None):
+        if self.time is None:raise ValueError("Evolution requires transient=True")
+        if not isinstance(initial,dict) or set(initial)!={self.velocity}:raise ValueError("Specify initial={velocity: vector_expression}; no initial pressure")
+        return self._compile(equations,boundary,initial[self.velocity],parameters)
+
+    def _compile(self,equations,boundary,initial,parameters):
+        helper=self._scalar;mapping=helper._parameters(parameters)
+        if isinstance(equations,sp.Equality):equations=[equations]
+        rows=[]
+        for eq in equations:
+            expr=eq.lhs-eq.rhs if isinstance(eq,sp.Equality) else eq
+            if isinstance(expr,sp.MatrixBase):rows.extend(expr)
+            else:rows.append(_expr(expr))
+        if len(rows)!=self.dimension:
+            raise ValueError("Supply only the momentum vector equation; divergence is supplied by DivergenceFreeSpace")
+        rows=[sp.expand(e.xreplace(mapping).doit()) for e in rows]
+        nu=sp.simplify(-rows[0].coeff(sp.diff(self.velocity[0],self.coordinates[0],2)))
+        _number(nu)
+        if nu<=0:raise ValueError("Stokes viscosity must be a positive constant")
+        forcing=[]
+        for j,row in enumerate(rows):
+            expected=-nu*self.laplacian(self.velocity[j])+sp.diff(self.pressure,self.coordinates[j])
+            if initial is not None:expected+=sp.diff(self.velocity[j],self.time)
+            rhs=sp.simplify(expected-row)
+            if rhs.atoms(AppliedUndef) or rhs.has(sp.Derivative):
+                raise NotImplementedError("Expected U_t - nu*Delta(U) + grad(p) = f (or steady form), with constant nu")
+            forcing.append(helper._data(rhs,timed=initial is not None))
+        bcs=[]
+        for on,eq in boundary:
+            if not isinstance(eq,sp.Equality) or eq.lhs!=self.velocity:
+                raise NotImplementedError("Space Stokes currently supports prescribed velocity Eq(U, g) boundaries")
+            if not isinstance(eq.rhs,sp.MatrixBase) or eq.rhs.shape!=(self.dimension,1):raise ValueError("Boundary velocity must be a column vector")
+            bcs.append((on,tuple(helper._data(e.xreplace(mapping).doit(),timed=initial is not None) for e in eq.rhs)))
+        init=None
+        if initial is not None:
+            initial=sp.ImmutableMatrix(initial).xreplace(mapping)
+            if initial.shape!=(self.dimension,1):raise ValueError("Initial velocity dimension mismatch")
+            if sp.simplify(self.divergence(initial))!=0:raise ValueError("Initial velocity must be divergence-free")
+            init=tuple(helper._data(e.doit()) for e in initial)
+        return SpaceStokesProblem(self,nu,tuple(forcing),tuple(bcs),init)

@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rbflab"
+version = "0.1.0"
+description = "RBFLAB: radial basis functions for interpolation and PDEs"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.11"
+dependencies = ["numpy>=1.26", "scipy>=1.11", "sympy>=1.12", "mpmath>=1.3", "threadpoolctl>=3.5"]
+
+[project.optional-dependencies]
+torch = ["torch>=2.2"]
+fast = ["gmpy2>=2.2"]
+mesh = ["gmsh>=4.12"]
+test = ["pytest>=8"]
+examples = ["matplotlib>=3.8", "pillow>=10"]
+
+[tool.setuptools.packages.find]
+where = ["python"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"

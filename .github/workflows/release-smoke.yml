@@ -1,0 +1,71 @@
+name: release smoke
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  installed-wheel:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python-version: ['3.11', '3.12']
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: python -m pip install build
+      - run: python -m build --wheel
+      - name: Install wheel
+        shell: bash
+        run: python -m pip install dist/*.whl
+      - name: Run tutorials outside checkout
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/rbflab-smoke"
+          cp examples/symbolic_poisson.py examples/symbolic_boundary.py examples/symbolic_heat.py examples/stokes_spaces.py examples/operators_3d.py examples/custom_kernel.py "$RUNNER_TEMP/rbflab-smoke/"
+          cd "$RUNNER_TEMP/rbflab-smoke"
+          python symbolic_poisson.py
+          python symbolic_poisson.py --method lhi
+          python symbolic_poisson.py --method rbffd
+          python symbolic_boundary.py
+          python symbolic_heat.py
+          python stokes_spaces.py
+          python operators_3d.py
+          python custom_kernel.py
+          python -c 'from symbolic_poisson import run; assert run("global") < 0.05; assert run("lhi") < 0.05; assert run("rbffd") < 0.05'
+          python -c 'from symbolic_boundary import run; assert run() < 0.1'
+          python -c 'from symbolic_heat import run; assert run() < 0.02'
+          python -c 'from stokes_spaces import run; assert max(run()) < 1e-6; assert max(run("lhi")) < 1e-6'
+          python -c 'from operators_3d import run; assert max(run()) < 1e-8'
+          python -c 'from custom_kernel import run; assert run() < 0.05'
+
+  native-ubuntu:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -e '.[test]'
+      - run: bash cpp/prepare_dependencies.sh
+      - run: python -m examples.build_cpp_backend
+      - name: Verify native local operators
+        run: RBFLAB_CPP_TESTS=1 python -m pytest tests/test_discrete_operators.py -q
+
+  gallery-ubuntu:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -e '.[examples,test]'
+      - run: python -m examples.make_gallery
+      - run: python -m pytest tests/test_cavity_example.py -q
+      - run: python -m examples.navier_stokes_cavity --cells 6 --end .005 --output docs/assets/cavity_smoke.gif
+      - name: Verify generated images
+        run: |
+          python -c 'from pathlib import Path; from PIL import Image; p=Path("docs/assets"); assert Image.open(p/"heat_diffusion.gif").n_frames >= 10; assert Image.open(p/"cavity_smoke.gif").n_frames >= 2; assert all((p/name).stat().st_size > 10000 for name in ("heat_diffusion.png", "stokes_velocity.png", "navier_stokes_cavity.png"))'

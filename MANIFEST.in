@@ -1,0 +1,7 @@
+include README.md CHANGELOG.md LICENSE RELEASE_CHECKLIST.md
+include docs/INSTALL.md docs/CAPABILITIES.md docs/VISUALIZATION.md docs/guides/LID_DRIVEN_CAVITY.md
+recursive-include docs/assets *.png *.gif
+recursive-include examples *.py
+recursive-include cpp *.cpp *.hpp *.cu *.sh *.md
+prune tests
+global-exclude __pycache__ *.py[cod] *.exe
