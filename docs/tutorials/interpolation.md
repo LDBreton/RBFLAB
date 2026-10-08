@@ -13,9 +13,11 @@ It queries a seeded set of 30 off-node points, and constructs an explicit
 starts from. The polynomial target is \(1+x+y^2\), so degree two should
 reproduce it up to roundoff.
 
-```python
---8<-- "examples/tutorials/interpolation.py"
-```
+??? example "Complete runnable script"
+
+    ```python
+    --8<-- "examples/tutorials/interpolation.py"
+    ```
 
 [Download the runnable script](https://raw.githubusercontent.com/LDBreton/RBFLAB/main/examples/tutorials/interpolation.py).
 

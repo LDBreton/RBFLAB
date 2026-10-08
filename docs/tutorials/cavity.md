@@ -4,9 +4,11 @@
 
 The example advances a small lid-driven cavity using the maintained solver in `examples/navier_stokes_cavity.py`. The tutorial wrapper chooses cloud resolution, Reynolds number, final time, and an optional animation path; it then records velocity, pressure, and discrete divergence. The full solver shows the intermediate velocity and pressure-correction steps. This is a **numerical showcase**, not a validated general-purpose Navier–Stokes solver or a reproduction of a published high-Reynolds benchmark.
 
-```python
---8<-- "examples/tutorials/cavity.py"
-```
+??? example "Complete runnable script"
+
+    ```python
+    --8<-- "examples/tutorials/cavity.py"
+    ```
 
 [Download the runnable script](https://raw.githubusercontent.com/LDBreton/RBFLAB/main/examples/tutorials/cavity.py).
 

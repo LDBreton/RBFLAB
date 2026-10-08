@@ -14,9 +14,11 @@ weights obtained from local value interpolation. The script uses one
 PDE and cloud, constructs each method object, solves its system, and
 samples all four results at the same seeded off-node points.
 
-```python
---8<-- "examples/tutorials/compare_methods.py"
-```
+??? example "Complete runnable script"
+
+    ```python
+    --8<-- "examples/tutorials/compare_methods.py"
+    ```
 
 [Download the runnable script](https://raw.githubusercontent.com/LDBreton/RBFLAB/main/examples/tutorials/compare_methods.py).
 

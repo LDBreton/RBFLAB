@@ -55,3 +55,17 @@ precision/backend, and whether an error is nodal, sampled off-node, or
 semidiscrete. Report sampled RMS as RMS, not as a continuous L2 norm without
 quadrature. Prefer links to reproducible script commands over screenshots
 of numbers.
+
+## Manual design
+
+The chapter navigation is configured in mkdocs.yml. The visual design lives
+in docs/stylesheets/manual.css, and the radial-node mark is an original SVG
+in docs/assets/rbflab-mark.svg. Keep layout changes in that stylesheet so
+theme upgrades remain simple. The home page uses relative site links.
+
+Complete tutorial scripts are embedded in expandable example panels. Keep
+short teaching fragments and equations visible in the main text. Test light
+and dark themes, mobile chapter navigation, search, and equation rendering
+in a browser after changing the theme or MathJax configuration.
+MathJax uses full-page startup typesetting, including the boldsymbol extension;
+enabling instant navigation would also require a navigation-aware callback.

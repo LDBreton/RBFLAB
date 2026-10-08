@@ -10,9 +10,11 @@ $$
 
 Unsteady momentum adds \(\partial_t\boldsymbol u\). The manufactured example uses \(\mu=1\), \(\boldsymbol u=(e^{-t}y(1-y),0)\), and \(p=-2x\); the steady version omits the exponential. Boundary values and forcing are derived from these fields.
 
-```python
---8<-- "examples/tutorials/stokes_spaces.py"
-```
+??? example "Complete runnable script"
+
+    ```python
+    --8<-- "examples/tutorials/stokes_spaces.py"
+    ```
 
 [Download the runnable script](https://raw.githubusercontent.com/LDBreton/RBFLAB/main/examples/tutorials/stokes_spaces.py).
 

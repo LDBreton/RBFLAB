@@ -12,9 +12,11 @@ enough nodes to represent them. The script solves the scalar PDE and
 separately builds a 3D Laplacian matrix at interior targets; applying
 it to exact nodal quadratic values should produce six.
 
-```python
---8<-- "examples/tutorials/scalar_3d.py"
-```
+??? example "Complete runnable script"
+
+    ```python
+    --8<-- "examples/tutorials/scalar_3d.py"
+    ```
 
 [Download the runnable script](https://raw.githubusercontent.com/LDBreton/RBFLAB/main/examples/tutorials/scalar_3d.py).
 

@@ -13,9 +13,11 @@ the sparse system approximate \(-\Delta\); top boundary rows approximate
 declares these rows symbolically, assembles them on one cloud, solves,
 and checks the returned field at every node.
 
-```python
---8<-- "examples/tutorials/mixed_boundary.py"
-```
+??? example "Complete runnable script"
+
+    ```python
+    --8<-- "examples/tutorials/mixed_boundary.py"
+    ```
 
 [Download the runnable script](https://raw.githubusercontent.com/LDBreton/RBFLAB/main/examples/tutorials/mixed_boundary.py).
 

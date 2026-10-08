@@ -11,9 +11,11 @@ limit rather than by substituting an artificial radius. The script
 declares the expression and parameter with SymPy, binds \(c=2\), solves
 an interpolation problem, and checks the kernel origin value.
 
-```python
---8<-- "examples/tutorials/custom_kernel.py"
-```
+??? example "Complete runnable script"
+
+    ```python
+    --8<-- "examples/tutorials/custom_kernel.py"
+    ```
 
 [Download the runnable script](https://raw.githubusercontent.com/LDBreton/RBFLAB/main/examples/tutorials/custom_kernel.py).
 

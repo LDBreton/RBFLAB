@@ -66,9 +66,11 @@ python -m examples.tutorials.heat_matrices --plot outputs/heat_tutorial.gif
 python -m examples.tutorials.heat_matrices --figure outputs/heat_matrices.png
 ```
 
-```python
---8<-- "examples/tutorials/heat_matrices.py"
-```
+??? example "Complete runnable script"
+
+    ```python
+    --8<-- "examples/tutorials/heat_matrices.py"
+    ```
 
 [Download the runnable script](https://raw.githubusercontent.com/LDBreton/RBFLAB/main/examples/tutorials/heat_matrices.py).
 

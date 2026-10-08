@@ -1,5 +1,7 @@
 window.MathJax = {
+  loader: {load: ["[tex]/boldsymbol"]},
   tex: {
+    packages: {"[+]": ["boldsymbol"]},
     inlineMath: [["\\(", "\\)"]],
     displayMath: [["\\[", "\\]"]],
     processEscapes: true,
@@ -10,9 +12,4 @@ window.MathJax = {
     processHtmlClass: "arithmatex"
   }
 };
-document$.subscribe(() => {
-  MathJax.startup.output.clearCache();
-  MathJax.typesetClear();
-  MathJax.texReset();
-  MathJax.typesetPromise();
-});
+// Full-page navigation uses MathJax startup typesetting.

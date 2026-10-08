@@ -20,9 +20,11 @@ Here \(\Phi_{jk}=\phi(\lVert x_j-x_k\rVert)\). Polynomial multipliers \(\lambda\
 
 Run `python -m examples.tutorials.one_stencil`. The full script is included below:
 
-```python
---8<-- "examples/tutorials/one_stencil.py"
-```
+??? example "Complete runnable script"
+
+    ```python
+    --8<-- "examples/tutorials/one_stencil.py"
+    ```
 
 [Download the runnable script](https://raw.githubusercontent.com/LDBreton/RBFLAB/main/examples/tutorials/one_stencil.py).
 
