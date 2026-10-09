@@ -90,7 +90,7 @@ $$
 \partial_x^\alpha=R_i^{-s}\partial_{\widehat x}^\alpha,\qquad |\alpha|=s.
 $$
 
-A mixed-order operator must scale each term separately. After mapping back to physical coordinates, weights must reproduce the physical polynomial derivatives. The [conditioning chapter](conditioning.md) explains why coordinate scaling helps numerical representation without guaranteeing PDE stability.
+A mixed-order operator must scale each term separately. After mapping back to physical coordinates, weights must reproduce the physical polynomial derivatives. The [local stencil scaling section](conditioning.md#local-stencil-scaling) explains why coordinate scaling helps numerical representation without guaranteeing PDE stability.
 
 **Work through:** [one stencil](../tutorials/one-stencil.md) → [heat matrices](../tutorials/heat-equation.md).
 **Background:** [Fornberg & Flyer](references.md#fornberg-flyer-2015), [Flyer et al.](references.md#flyer-2016), [Bayona et al.](references.md#bayona-2017).

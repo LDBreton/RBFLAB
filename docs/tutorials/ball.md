@@ -17,7 +17,7 @@ model = rbf.SymbolicScalar(3)
 ```
 
 All subsequent operators use dimension three. The default method uses 55-node
-RBF-FD stencils, PHS5, all degree-three polynomials (20 terms), local scaling and
+RBF-FD stencils, PHS5, all degree-three polynomials (20 terms), [local scaling](../theory/conditioning.md#local-stencil-scaling) (kernel distances divided by the stencil radius) and
 Float64. The independent sampled maximum error is about $2.0\times10^{-4}$.
 
 ![The 3D ball cloud and a numerical cross-section](../assets/ball_poisson.png)

@@ -7,7 +7,7 @@ continuous $L^2$ norms nor the sparse-system residual. The Stokes example uses
 separately.
 
 Default scalar examples use Float64, Halton seed 42, PHS5 plus degree-three
-polynomials, local coordinate scaling, and 35-node stencils (55 in 3D).
+polynomials, [local coordinate scaling](../theory/conditioning.md#local-stencil-scaling), and 35-node stencils (55 in 3D).
 
 | Example | Total nodes | Sampled off-node maximum error |
 |---|---:|---:|

@@ -6,6 +6,9 @@ Extended precision can be selected for local weight construction, global dense s
 
 ::: rbflab.PrecisionData
 
+For a worked explanation of `scaling="local"`, its default, and its effect on
+shape parameters, see [local stencil scaling](../theory/conditioning.md#local-stencil-scaling).
+
 ::: rbflab.StencilPolicy
 
 ::: rbflab.PythonBackend

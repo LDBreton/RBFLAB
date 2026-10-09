@@ -40,11 +40,29 @@ def geometry_quality(points, target, degree):
 
 @dataclass(frozen=True)
 class StencilPolicy:
-    """Opt-in geometric screening. This does not certify PDE stability.
+    """Choose neighborhood selection and kernel distance scaling.
 
-    local scaling means K((x-y)/h), with h the maximum distance from
-    the first source center. Kernel parameters are then dimensionless.
-    The legacy nearest/physical behavior remains the default.
+    Args:
+        scaling: ``"physical"`` (default) evaluates the kernel at physical
+            displacements. ``"local"`` evaluates K((x-y)/h), where h is the
+            maximum Euclidean distance from the first source center (one if
+            zero). Physical derivative factors h**(-order) are included
+            automatically; do not rescale returned weights. Shape parameters
+            then refer to dimensionless distances, so switching policy with
+            the same numeric parameter can change the approximation.
+        selection: ``"nearest"`` keeps the requested stencil size.
+            ``"quality"`` grows a nearest-neighbor set until polynomial-rank
+            and node-separation thresholds are met, or raises an error.
+        max_size: Largest stencil considered by quality selection. If None,
+            use min(number of source points, 2 * stencil_size).
+        min_polynomial_ratio: Minimum singular-value ratio of the normalized,
+            column-scaled polynomial matrix in quality selection.
+        min_separation_ratio: Minimum node separation divided by the radius
+            measured from the target, used only in quality selection.
+
+    Local scaling alone does not enable quality selection, move nodes, or
+    change precision. Polynomials are normalized under both scaling policies.
+    These options do not certify conditioning, accuracy, or PDE stability.
     """
     scaling: str = "physical"
     selection: str = "nearest"

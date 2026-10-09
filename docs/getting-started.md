@@ -60,8 +60,20 @@ the boundary equation to the nodes generated in step 1.
 ```
 
 `PHS(5)` selects a polyharmonic spline kernel. Each local stencil uses 35 nodes
-and polynomials through degree three. Local coordinate scaling normalizes each
-stencil before its weights are computed. The global matrix is sparse.
+and polynomials through degree three. The global matrix is sparse.
+
+!!! note "What does `scaling="local"` do?"
+
+    It uses each stencil's radius as the distance unit for the kernel. For example,
+    a distance of 0.006 in a stencil of radius 0.02 becomes 0.3. The nodes stay in
+    their physical positions, and RBFLAB automatically converts derivatives back
+    to physical units when computing weights.
+
+    This is a numerical scaling choice; it does not select more neighbors or
+    increase precision. With this pure PHS kernel, the exact RBF-FD weights are
+    unchanged, while roundoff can differ. Shape-dependent kernels such as IMQ
+    need more care: [local scaling and kernel parameters](theory/conditioning.md#local-stencil-scaling).
+    Omitting the policy uses `scaling="physical"`.
 
 - **`problem`** describes the PDE and boundary equations.
 - **`method`** chooses the approximation and its numerical settings.

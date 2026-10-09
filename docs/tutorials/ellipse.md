@@ -36,7 +36,7 @@ python -m examples.ellipse_boundary --backend torch
 ```
 
 The default 360-node calculation uses PHS5, degree-three polynomials, 35-node
-RBF-FD stencils, local scaling and Float64. Its independent sampled maximum error
+RBF-FD stencils, [local scaling](../theory/conditioning.md#local-stencil-scaling) (kernel distances divided by the stencil radius) and Float64. Its independent sampled maximum error
 is approximately $2.7\times10^{-4}$. Arc junctions are assigned to the arc that
 starts there; no duplicate boundary rows are introduced.
 

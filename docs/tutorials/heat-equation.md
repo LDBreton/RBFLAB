@@ -43,7 +43,10 @@ trajectory = problem.solve(cloud, method, "0.025", 20, scheme="bdf2")
 ```
 
 The 370-node recipe uses PHS5, degree-three polynomials, 35-node stencils and
-Float64. Backward Euler starts BDF2. To animate the computed solution:
+Float64. Here `scaling="local"` divides kernel distances by each stencil's
+radius; RBFLAB includes the inverse-square factor for the physical Laplacian.
+See [local stencil scaling](../theory/conditioning.md#local-stencil-scaling).
+Backward Euler starts BDF2. To animate the computed solution:
 
 ```python
 from rbflab import viz

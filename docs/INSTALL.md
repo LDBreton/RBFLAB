@@ -182,6 +182,8 @@ solution = method.assemble(problem, cloud).solve()
 ```
 
 This fragment follows the equation/cloud definitions in the [first problem](getting-started.md).
+`scaling="local"` sets the kernel's distance unit to the stencil radius; it is
+independent of choosing C++. See [local stencil scaling](theory/conditioning.md#local-stencil-scaling).
 `prepare` performs kernel/operator preparation and compilation; assembly computes
 local weights. The final sparse solve still uses SciPy Float64. Substitute
 `PythonBackend(...)` or `TorchBackend(...)` on a supported method; PyTorch needs its

@@ -62,9 +62,10 @@ solution = problem.solve(cloud, method)
 ```
 
 Each Laplacian row comes from a 35-node local approximation augmented with all
-2D polynomials of total degree at most three. The local coordinates are scaled
-before constructing weights; physical derivative scaling is restored during
-assembly. See [the weight derivation](../theory/local-weights.md).
+2D polynomials of total degree at most three. `scaling="local"` divides kernel
+distances by each stencil's radius; the weights include the inverse-square factor
+needed to approximate the physical Laplacian. See [local stencil scaling](../theory/conditioning.md#local-stencil-scaling)
+and [the weight derivation](../theory/local-weights.md).
 `compute_condition=False` skips a diagnostic calculation, not a regularization
 step. Use condition estimates when investigating a problematic cloud.
 

@@ -33,8 +33,12 @@ solution = problem.solve(cloud, method)
 
 Use `PythonBackend(compute_condition=False)` for a compiler-free run, or
 `TorchBackend(threads=4, compute_condition=False)` with the optional tensor package.
-See [backend setup](../guides/curved-backends.md). PHS uses $\phi(r)=r^5$ with all
-polynomials through degree three; the fixed 35-node stencil policy is shared.
+See [backend setup](../guides/curved-backends.md). The signed PHS5 kernel is
+augmented with all polynomials through degree three; the fixed 35-node stencil
+policy is shared. `scaling="local"` divides kernel distances by the stencil radius
+and includes the physical derivative factors automatically. Read
+[local stencil scaling](../theory/conditioning.md#local-stencil-scaling) before
+reusing this setting with an IMQ or hybrid kernel.
 
 ![Annular boundary normals and absolute numerical error](../assets/annulus_error.png)
 
