@@ -1,5 +1,9 @@
 # Custom curves, holes and 3D regions
 
+For labeled polygons, rectangles and named holes, start with the
+[geometry cookbook](cookbook.md). This page explains the lower-level curve
+and implicit-region interfaces.
+
 ## A domain from a curve
 
 Supply coordinates **and their analytic tangent**. This avoids noisy finite

@@ -50,6 +50,12 @@ See [the hands-on geometry guide](../geometry/index.md) before the reference.
 
 ::: rbflab.geometry.Flower
 
+::: rbflab.geometry.Polygon
+
+::: rbflab.geometry.Rectangle
+
+::: rbflab.geometry.with_holes
+
 ::: rbflab.meshgen.generate
 
 ::: rbflab.meshgen.quality

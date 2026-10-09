@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.0
+
+- Add labeled `geometry.Polygon`, rotated `Rectangle`, and validated `with_holes` composition.
+- Add a geometry cookbook, generated node gallery, and a symbolic Poisson example on an ellipse with two holes.
+- Redesign the README around geometry, equations, numerical results and backend choices.
+- Remove the RBFMeshGen migration entry from primary navigation; retain its historical URL.
+- Serialize documentation deployments to avoid overlapping GitHub Pages jobs.
+
+
 ## 0.2.0
 
 - Integrated RBFMeshGen geometry, random/Halton/Sobol generation, 3D implicit

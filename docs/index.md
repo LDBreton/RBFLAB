@@ -13,12 +13,12 @@ hide:
 <a class="rbf-button rbf-button--primary" href="getting-started/">Solve your first PDE <span aria-hidden="true">→</span></a>
 <a class="rbf-button" href="tutorials/heat-equation/">Learn through the heat equation</a>
 </div>
-<div class="rbf-install"><code>pip install rbflab</code><span>Python 3.11+ · Open source · Version 0.2.0</span></div>
+<div class="rbf-install"><code>pip install rbflab</code><span>Python 3.11+ · Open source · Version 0.3.0</span></div>
 </section>
 
 <figure class="rbf-feature">
-<a href="geometry/" aria-label="Explore curved domains"><img src="assets/curved_domains.png" alt="Flower-shaped cloud, annular harmonic field, rotating Stokes flow and a 3D Poisson section" width="1920" height="1440"></a>
-<figcaption class="rbf-caption">Generate your geometry, write the equation, inspect the solution. Every field shown comes from a numerical solve. <a href="geometry/">Explore curved domains →</a></figcaption>
+<a href="geometry/" aria-label="Explore curved domains"><img src="assets/geometry_gallery.png" alt="Generated nodes on domains with obstacles, curved holes, concave edges and a 3D volume" width="2145" height="1402"></a>
+<figcaption class="rbf-caption">Named boundaries, curved holes, concave polygons and 3D volumes. <a href="geometry/cookbook/">Build your geometry →</a></figcaption>
 </figure>
 
 <h2 id="explore">Explore the manual</h2>

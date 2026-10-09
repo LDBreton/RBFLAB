@@ -1,10 +1,10 @@
 # Geometry and node generation
 
-RBFLAB 0.2 brings RBFMeshGen into the same package. Define a domain, generate
-labeled nodes, and pass the resulting `PointCloud` directly to a PDE method.
-Gmsh is optional. The original array-based solver API remains available.
+Define the shape, name its boundaries, and generate the nodes on which your
+PDE will be solved. Geometry and numerical methods share the same `PointCloud`:
+no conversion step and no mandatory mesh generator.
 
-![Curved domains, numerical fields, Stokes flow and a 3D section](../assets/curved_domains.png)
+![Generated clouds on a channel with obstacles, a perforated flower, a concave polygon and a cutaway sphere](../assets/geometry_gallery.png)
 
 ## Start with a domain
 
@@ -40,13 +40,17 @@ explicitly in your discretization.
 ## Choose a geometry
 
 - `geometry.Disk`, `Ellipse`, `Annulus`, and `Flower`: smooth planar domains.
+- `geometry.Polygon` and `Rectangle`: labeled straight edges, including concave shapes.
+- `geometry.with_holes`: add named circular, elliptical or polygonal holes.
 - `geometry.ParametricBoundary` and `ParametricDomain`: user-defined curves and holes.
 - `geometry.Sphere`, `Box`, `Cylinder`, and `ImplicitRegion`: 3D volumes.
 - `meshgen.ParametricSurface3D`: separately sampled parametric surfaces.
 - `geometry.TriangleMesh2D`: an explicit conforming triangular mesh for staggering.
 
-Follow [custom boundaries](custom-domains.md), [staggered clouds](staggered.md),
-or [migration from RBFMeshGen](migration.md).
+Start with the [geometry cookbook](cookbook.md), then explore
+[custom boundaries](custom-domains.md) or [staggered clouds](staggered.md).
+The [Poisson example with holes](../tutorials/perforated-poisson.md) carries one
+composed domain all the way through symbolic assembly and error measurement.
 
 ## Sampling and quality
 

@@ -1,175 +1,143 @@
 # RBFLAB
 
-RBFLAB solves interpolation and linear PDE problems on point clouds with radial
-basis functions. Write an equation with SymPy, choose global collocation,
-local Hermite interpolation (LHI), or RBF-FD, then inspect the result.
+### From geometry to equations, with radial basis functions.
 
-Learn the methods in the [user manual](https://ldbreton.github.io/RBFLAB/): build [one RBF-FD stencil](https://ldbreton.github.io/RBFLAB/tutorials/one-stencil/), derive the [heat equation matrices](https://ldbreton.github.io/RBFLAB/tutorials/heat-equation/), then explore [Stokes spaces](https://ldbreton.github.io/RBFLAB/tutorials/stokes/).
+Build labeled **2D and 3D point clouds**, write equations with **SymPy**, and choose
+**global collocation**, **local Hermite interpolation** or **RBF-FD**. Inspect local
+weights and sparse matrices when you want to go beyond the high-level API.
 
-The default installation uses Python, NumPy, and SciPy. C++ and PyTorch are
-optional numerical backends for supported local methods. The package supports
-2D and 3D scalar methods and divergence-free approximation spaces.
+[**Read the manual**](https://ldbreton.github.io/RBFLAB/) ·
+[Geometry cookbook](https://ldbreton.github.io/RBFLAB/geometry/cookbook/) ·
+[Mathematical foundations](https://ldbreton.github.io/RBFLAB/theory/) ·
+[API reference](https://ldbreton.github.io/RBFLAB/api/discretizations/)
 
-![Curved domains, annular Stokes flow and a 3D solution computed with RBFLAB](docs/assets/curved_domains.png)
+![Actual generated clouds: obstacles, curved holes, a concave polygon and a 3D volume](docs/assets/geometry_gallery.png)
 
-*Generate a curved domain, write an equation, and solve it. The gallery combines
-a flower-shaped cloud, annular Laplace and Stokes solutions, and a 3D Poisson slice.*
-
-## Install
-
-Install the Python core from PyPI:
+## Install and start
 
 ```sh
 python -m pip install rbflab
+# Optional plots and animations:
+python -m pip install "rbflab[examples]"
 ```
 
-The default installation does not require Gmsh, a compiler, or PyTorch. See
-[the installation guide](docs/INSTALL.md) for optional features. From a source
-checkout, use `python -m pip install .` instead.
+The Python core needs no compiler, Gmsh or tensor framework. Geometry generation
+is built in. See the [installation guide](https://ldbreton.github.io/RBFLAB/INSTALL/)
+for optional backends and exact dependencies. The new polygon and hole-composition
+helpers below require **RBFLAB 0.3 or newer**.
 
-## Geometry is now part of RBFLAB
+## One domain. One equation. A numerical solution.
 
-RBFMeshGen is integrated: one package for labeled 2D/3D clouds and numerical PDEs.
-
-```python
-from rbflab import geometry, meshgen
-
-domain = geometry.Annulus(inner_radius=.4, outer_radius=1.)
-cloud = meshgen.generate(domain, interior=240,
-                         boundary={"inner": 48, "outer": 96}, seed=42)
-```
-
-[Geometry guide](https://ldbreton.github.io/RBFLAB/geometry/) ·
-[Migration guide](https://ldbreton.github.io/RBFLAB/geometry/migration/)
-
-## A symbolic PDE in a few lines
+Solve Poisson's equation on an ellipse with two holes. Here a known solution,
+`sin(x)*cos(y)`, supplies boundary data and lets us check the numerical error.
 
 ```python
 import sympy as sp
 import rbflab as rbf
+from rbflab import geometry, meshgen
+
+domain = geometry.with_holes(
+    geometry.Ellipse(1.6, 1., labels=("wall",)),
+    {"round_hole": geometry.Disk(.28, center=(-.65, 0)),
+     "slot": geometry.Ellipse(.24, .43, center=(.6, 0), angle=-.3)},
+)
+cloud = meshgen.generate(domain, interior=500,
+    boundary={"wall": 120, "round_hole": 32, "slot": 40}, seed=42)
 
 model = rbf.SymbolicScalar(2)
 u = model.field
 x, y = model.coordinates
-exact = sp.sin(sp.pi*x) * sp.sin(sp.pi*y)
-lhs = -model.laplacian(u)
+exact = sp.sin(x)*sp.cos(y)
 problem = model.stationary(
-    sp.Eq(lhs, lhs.subs(u, exact).doit()),
-    boundary=[model.bc("boundary", sp.Eq(u, 0))],
+    sp.Eq(-model.laplacian(u), 2*exact),
+    boundary=[model.bc(label, sp.Eq(u, exact)) for label in domain.boundaries],
 )
-cloud = rbf.unit_box_grid(5)
-solution = problem.solve(cloud, rbf.GlobalCollocation(rbf.IMQ(2), scheme="asymmetric"))
-print(solution.evaluate([[0.3, 0.4]]))
+method = rbf.RBFFD(rbf.PHS(5), 35, polynomial_degree=3,
+    stencil_policy=rbf.StencilPolicy(scaling="local"),
+    local_backend=rbf.PythonBackend(compute_condition=False))
+solution = problem.solve(cloud, method)
+print(solution.evaluate([[0., 0.], [0., .5]]))
 ```
 
-Change the last method to `rbf.LHI(rbf.PHS(5), 20, polynomial_degree=2)`
-or `rbf.RBFFD(rbf.PHS(5), 20, polynomial_degree=2)` to compare methods on
-the same equation and cloud. The complete example reports errors against the
-known solution.
+![Generated labeled nodes and the computed solution on a perforated ellipse](docs/assets/perforated_poisson.png)
 
-## Curved-domain examples
+With this 692-node recipe, the Float64 Python run gives maximum nodal error
+**3.77 × 10⁻⁵** and independent off-node error **3.86 × 10⁻⁵**. Read the
+[step-by-step tutorial](https://ldbreton.github.io/RBFLAB/tutorials/perforated-poisson/)
+for the mathematics, plotting, and checks on independent clouds.
 
-Run these from a source checkout after installing the package. Keep the examples
-folder together: shared backend selection and error reporting live in `_curved.py`.
-
-| Example | What it demonstrates |
-|---|---|
-| [Annulus](examples/annulus.py) | Exact harmonic field; global, LHI and RBF-FD |
-| [Flower heat](examples/heat_flower.py) | Symbolic forcing, BDF2 and animation |
-| [Mixed ellipse](examples/ellipse_boundary.py) | Curved Dirichlet, Neumann and Robin boundaries |
-| [Annular Stokes](examples/stokes_annulus.py) | Divergence-free flow between rotating cylinders |
-| [3D ball](examples/ball_poisson.py) | Nonpolynomial Poisson verification and slice plotting |
-| [Perforated plate](examples/perforated_plate.py) | Optional Gmsh geometry and staggered clouds |
-
-```sh
-python -m examples.annulus --backend python
-python -m examples.annulus --backend cpp     # optional source toolchain
-python -m examples.ball_poisson --backend torch
-python -m examples.heat_flower --animation flower.gif
-```
-
-C++/PyTorch select local Float64 numerical work; the sparse solve remains on CPU.
-See [setup and timing guidance](docs/guides/curved-backends.md) and
-[measured validation](docs/guides/curved-validation.md). These small examples do
-not promise acceleration on every machine.
-
-![Computed heat diffusion on a flower-shaped domain](docs/assets/flower_heat.gif)
-
-## Six starting examples
-
-| Example | What it shows |
-|---|---|
-| [Symbolic Poisson](examples/symbolic_poisson.py) | One equation with global, LHI, and RBF-FD |
-| [Mixed boundary](examples/symbolic_boundary.py) | Variable diffusion and a Robin condition |
-| [Heat](examples/symbolic_heat.py) | Symbolic time evolution |
-| [Stokes spaces](examples/stokes_spaces.py) | Divergence-free velocity and pressure gradient |
-| [3D operators](examples/operators_3d.py) | Sparse matrices, local reconstruction, backend choice |
-| [Custom kernel](examples/custom_kernel.py) | Symbolic kernel definition and optional C++ cache |
-
-Run, for example, `python examples/symbolic_poisson.py --method lhi` after
-installing the package. The [capability table](docs/CAPABILITIES.md) identifies
-which methods and backends are supported. These small examples use deterministic
-points and do not require mesh generation.
-
-## Plot a result
-
-Install the optional plotting tools with `python -m pip install "rbflab[examples]"`.
-The plotting code is separate from the numerical solver:
+Plotting stays short:
 
 ```python
 from rbflab import viz
-
-fig, ax = viz.plot_scalar(solution, title="My solution")
-fig.savefig("solution.png", dpi=160)
-# For a time-dependent result: viz.animate_scalar(trajectory, "heat.gif")
+fig, ax = viz.plot_scalar(solution, domain=domain, title="Poisson / two holes")
+fig.savefig("solution.png", dpi=180)
 ```
 
-![Animated heat pulse solved by RBFLAB](docs/assets/heat_diffusion.gif)
+## See the methods at work
 
-The [gallery generator](examples/make_gallery.py) rebuilds this animation and
-the figures with `python -m examples.make_gallery`. It also plots the solved
-divergence-free Stokes velocity field:
+<table>
+<tr>
+<td width="50%"><a href="https://ldbreton.github.io/RBFLAB/tutorials/flower-heat/"><img src="docs/assets/flower_heat.gif" alt="Computed heat evolution on a flower-shaped domain"></a></td>
+<td width="50%"><a href="https://ldbreton.github.io/RBFLAB/tutorials/annular-stokes/"><img src="docs/assets/method_stokes.png" alt="Computed velocity streamlines between rotating cylinders"></a></td>
+</tr>
+<tr>
+<td><b>Heat on a flower</b><br>Symbolic forcing, BDF2 time stepping and animation.</td>
+<td><b>Stokes between cylinders</b><br>Divergence-free velocity spaces on a curved domain.</td>
+</tr>
+</table>
 
-![Speed and streamlines from the steady Stokes example](docs/assets/stokes_velocity.png)
+| Explore | Learn to use |
+|---|---|
+| [Geometry cookbook](https://ldbreton.github.io/RBFLAB/geometry/cookbook/) | Named walls, holes, concave polygons and 3D volumes |
+| [One local stencil](https://ldbreton.github.io/RBFLAB/tutorials/one-stencil/) | Approximation, differentiation weights and sparse rows |
+| [Heat from matrices](https://ldbreton.github.io/RBFLAB/tutorials/heat-equation/) | Finite differences, RBF-FD and time integration |
+| [Mixed conditions](https://ldbreton.github.io/RBFLAB/tutorials/ellipse/) | Dirichlet, Neumann and Robin data on curved boundaries |
+| [Compare methods](https://ldbreton.github.io/RBFLAB/tutorials/global-lhi/) | Global collocation and local Hermite interpolation |
+| [Poisson in a ball](https://ldbreton.github.io/RBFLAB/tutorials/ball/) | 3D scalar operators and independent error checks |
+| [Custom kernels](https://ldbreton.github.io/RBFLAB/tutorials/custom-kernel/) | Symbolic kernels, derivatives and optional C++ compilation |
+| [Navier–Stokes cavity](https://ldbreton.github.io/RBFLAB/tutorials/cavity/) | An experimental staggered-flow showcase with documented limitations |
 
-See the short [plotting guide](docs/VISUALIZATION.md) for the plotting calls and
-their 2D scope.
+## Choose a backend; keep the problem
 
-## A moving fluid: Navier–Stokes cavity
+| Backend | Installation | Role |
+|---|---|---|
+| Python / NumPy / SciPy | `pip install rbflab` | Default numerical implementation |
+| C++ / Eigen | [Source-build setup](https://ldbreton.github.io/RBFLAB/INSTALL/) | Supported local assembly in Float64 or MPFR |
+| PyTorch | `pip install "rbflab[torch]"` | Supported local tensor assembly; documented CPU Float64 path |
+| Gmsh (optional geometry) | `pip install "rbflab[mesh]"` | Tagged meshes and explicit staggered layouts |
 
-From a source checkout, the [cavity example](examples/navier_stokes_cavity.py)
-solves a Re=100 lid-driven flow with staggered RBF-FD and makes an animation
-in one command:
+From a source checkout, run the same example with a different local backend:
 
 ```sh
-python -m examples.navier_stokes_cavity
+python -m examples.poisson_perforated --backend python --plot solution.png
+python -m examples.poisson_perforated --backend cpp
+python -m examples.poisson_perforated --backend torch
 ```
 
-![Final Re=100 cavity velocity and streamlines](docs/assets/navier_stokes_cavity.png)
+The example prepares compiled/tensor kernels before assembly. Its global sparse
+solve uses SciPy Float64. Backend coverage and precision differ by method; see
+[capabilities](https://ldbreton.github.io/RBFLAB/CAPABILITIES/). Small problems do
+not necessarily run faster with extra threads or a tensor backend.
 
-![Re=100 lid-driven cavity startup](docs/assets/navier_stokes_cavity.gif)
+## Research tools with explicit limits
 
-It uses a unit square built directly from NumPy, PHS7 kernels with degree-three
-polynomials, and a coupled velocity–pressure time step. The
-[cavity guide](docs/guides/LID_DRIVEN_CAVITY.md) reports the refinement comparison and the
-remaining divergence defect. The animation interpolates nodal values solely
-for display. The final frame is also saved as a PNG.
+- Use `PointCloud` with your own coordinates, or generate labeled nodes in RBFLAB.
+  The sampler does not enforce minimum inter-node separation.
+- Access discrete operators, sparse matrices, local weights and reconstruction
+  diagnostics. Keep algebraic residuals separate from solution and PDE errors.
+- Divergence-free Stokes spaces build incompressibility into the velocity kernel.
+  LHI pressure-gradient reconstruction and nearest-stencil off-node evaluation
+  have their own accuracy limits.
+- Extended-precision local weights do not automatically make a global sparse
+  solve extended precision. The cavity showcase is not a validated general
+  Navier–Stokes solver.
 
-The core library lives in `python/rbflab/`; runnable examples are in
-`examples/`, and focused contributor tests are in `tests/`.
+## Contribute and reproduce
 
-## Numerical scope
+Source code lives in `python/rbflab`, runnable examples in `examples`, and focused
+regression tests in `tests`. Gallery figures are reproducible from
+[geometry_gallery.py](examples/geometry_gallery.py) and
+[make_method_gallery.py](examples/make_method_gallery.py).
 
-The Stokes example uses a divergence-free velocity kernel: incompressibility
-is built into the approximation space. LHI reconstructs pressure gradients
-locally; it does not automatically produce a globally normalized pressure.
-Off-node LHI evaluation currently uses the nearest stencil and can have a
-different error from nodal values. Report solution error, algebraic residual,
-and PDE residual separately.
-
-The cavity showcase is not validation of a general Navier–Stokes solver.
-
-See the [documentation site](https://ldbreton.github.io/RBFLAB/),
-[getting-started guide](docs/getting-started.md), [API reference](docs/api/discretizations.md),
-[installation](docs/INSTALL.md), [capabilities](docs/CAPABILITIES.md),
-the [MIT license](LICENSE), and the [release checklist](RELEASE_CHECKLIST.md).
+[Maintaining the documentation](docs/MAINTAINING_DOCS.md) · [Changelog](CHANGELOG.md) · [MIT license](LICENSE)

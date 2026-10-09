@@ -41,6 +41,7 @@ jobs:
           python custom_kernel.py
           python -c 'import sys; from rbflab import geometry, meshgen; assert len(meshgen.generate(geometry.Sphere(), interior=10, boundary=12).points) == 22; assert not any(m in sys.modules for m in ("torch", "gmsh", "matplotlib"))'
           python -c 'from examples.annulus import run; assert run()[3]["off_node_max"] < .015'
+          python -c 'from examples.poisson_perforated import run; assert run()[3]["off_node_max"] < .0002'
           python -c 'from examples.ball_poisson import run; assert run()[3]["off_node_max"] < .002'
           python -c 'from symbolic_poisson import run; assert run("global") < 0.05; assert run("lhi") < 0.05; assert run("rbffd") < 0.05'
           python -c 'from symbolic_boundary import run; assert run() < 0.1'
@@ -72,6 +73,7 @@ jobs:
       - run: python -m pip install -e '.[examples,test]'
       - run: python -m examples.make_gallery
       - run: python -m examples.make_geometry_gallery
+      - run: python -m examples.geometry_gallery
       - run: python -m pytest tests/test_domain_viz.py tests/test_curved_geometry.py -q
       - run: python -m pytest tests/test_cavity_example.py -q
       - run: python -m examples.navier_stokes_cavity --cells 6 --end .005 --output docs/assets/cavity_smoke.gif
@@ -89,7 +91,7 @@ jobs:
           python-version: '3.12'
       - run: sudo apt-get update && sudo apt-get install -y libglu1-mesa
       - run: python -m pip install -e '.[test,mesh]'
-      - run: python -m pytest tests/meshgen tests/test_curved_geometry.py -q
+      - run: python -m pytest tests/meshgen tests/test_curved_geometry.py tests/test_composed_geometry.py -q
 
   torch-ubuntu:
     runs-on: ubuntu-24.04

@@ -1,0 +1,49 @@
+{
+  "Obstacles & named walls": {
+    "nodes": 560,
+    "labels": [
+      "bottom",
+      "outlet",
+      "top",
+      "inlet",
+      "cylinder",
+      "ellipse"
+    ],
+    "seed": 42
+  },
+  "Curved contours & holes": {
+    "nodes": 560,
+    "labels": [
+      "boundary",
+      "hole"
+    ],
+    "seed": 42
+  },
+  "Concave polygons": {
+    "nodes": 560,
+    "labels": [
+      "base",
+      "exit",
+      "inner_floor",
+      "inner_wall",
+      "entry",
+      "outer_wall"
+    ],
+    "seed": 42
+  },
+  "sphere": {
+    "nodes": 1050,
+    "seed": 42,
+    "display": "front removed to reveal interior"
+  },
+  "poisson": {
+    "example": "perforated/python",
+    "nodes": 692,
+    "precision": "float64",
+    "prepare_s": 1.500004145782441e-06,
+    "assembly_s": 5.201486699996167,
+    "solve_s": 4.152498000003106,
+    "nodal_max": 3.769087741989363e-05,
+    "off_node_max": 3.85706947768627e-05
+  }
+}

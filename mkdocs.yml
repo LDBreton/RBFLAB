@@ -71,10 +71,11 @@ nav:
       - Installation: INSTALL.md
   - Geometry and nodes:
       - Geometry to PDE: geometry/index.md
+      - Geometry cookbook: geometry/cookbook.md
       - Custom domains and 3D: geometry/custom-domains.md
       - Gmsh and staggered clouds: geometry/staggered.md
-      - Migrating from RBFMeshGen: geometry/migration.md
   - Curved-domain examples:
+      - Poisson with holes: tutorials/perforated-poisson.md
       - Laplace on an annulus: tutorials/annulus.md
       - Heat on a flower: tutorials/flower-heat.md
       - Mixed conditions on an ellipse: tutorials/ellipse.md

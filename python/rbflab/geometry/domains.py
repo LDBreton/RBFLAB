@@ -5,7 +5,7 @@ ellipse, annulus and flower domains use analytic membership instead.
 """
 from dataclasses import dataclass
 import numpy as np
-from shapely.geometry import Polygon
+from shapely.geometry import Polygon as _Polygon
 from shapely import intersects_xy
 
 
@@ -108,7 +108,7 @@ class ParametricDomain:
                 if not np.allclose(tables[j][1][-1], tables[(j+1) % len(arcs)][1][0], atol=1e-10, rtol=0):
                     raise ValueError("boundary arcs must form a closed contour")
             ring = np.concatenate([v[1][:-1] for v in tables])
-            polygon = Polygon(ring)
+            polygon = _Polygon(ring)
             if not polygon.is_valid or polygon.area <= 0:
                 raise ValueError("contours must be simple and enclose positive area")
             sign = (1 if polygon.exterior.is_ccw else -1) * (1 if k == 0 else -1)
@@ -119,7 +119,7 @@ class ParametricDomain:
                 self._signs[b.label] = sign
                 self._lengths[b.label] = table[2][-1]
             rings.append(ring)
-        self.polygon = Polygon(rings[0], rings[1:])
+        self.polygon = _Polygon(rings[0], rings[1:])
         if not self.polygon.is_valid or self.polygon.area <= 0:
             raise ValueError("holes must lie inside the outer contour without intersecting")
         x0, y0, x1, y1 = self.polygon.bounds
@@ -226,3 +226,106 @@ class Flower(ParametricDomain):
     def contains_points(self, points):
         p = _points(points)-self.center
         return np.linalg.norm(p, axis=1) <= self._radius(np.arctan2(p[:, 1], p[:, 0]))+1e-14
+
+
+class Polygon(ParametricDomain):
+    """Simple planar polygon with one named straight boundary per edge.
+
+    Args:
+        vertices (array-like): At least three distinct finite (x, y) vertices in contour
+            order. A repeated closing vertex is accepted and removed.
+        labels (Sequence[str] | None): One distinct label per edge; defaults to edge_0, edge_1, ... .
+
+    Both orientations and concave polygons are supported. Self-intersections,
+    repeated vertices and zero-area contours are rejected. Edge j joins vertex
+    j to j+1 (cyclically); a corner belongs to the edge starting there. Its
+    normal is that edge's outward normal, not an averaged corner normal.
+    """
+    def __init__(self, vertices, *, labels=None):
+        vertices = _points(vertices).copy()
+        if len(vertices) > 1 and np.array_equal(vertices[0], vertices[-1]):
+            vertices = vertices[:-1]
+        if len(vertices) < 3 or len(np.unique(vertices, axis=0)) != len(vertices):
+            raise ValueError("polygon needs at least three distinct vertices")
+        shape = _Polygon(vertices)
+        if not shape.is_valid or shape.area <= 0:
+            raise ValueError("polygon must be simple and enclose positive area")
+        labels = tuple(f"edge_{i}" for i in range(len(vertices))) if labels is None else tuple(labels)
+        if len(labels) != len(vertices) or len(set(labels)) != len(labels):
+            raise ValueError("provide one unique label per polygon edge")
+        arcs = []
+        for i, label in enumerate(labels):
+            start = vertices[i].copy()
+            direction = vertices[(i+1) % len(vertices)]-start
+            arcs.append(ParametricBoundary(
+                lambda t, a=start, v=direction: a+t*v,
+                lambda t, v=direction: v.copy(), label, (0., 1.)))
+        super().__init__(arcs)
+        # Exact straight edges need no dense polygon for membership.
+        self.polygon = shape
+        self.vertices = vertices
+
+
+class Rectangle(Polygon):
+    """Rectangle with optional rotation and individually labeled sides.
+
+    Args:
+        width (float): Positive length along the local x axis.
+        height (float): Positive length along the local y axis.
+        center (tuple): Two finite center coordinates.
+        angle (float): Counterclockwise rotation in radians.
+        labels (Sequence[str]): Labels for local bottom, right, top, left sides, in that order.
+
+    Labels rotate with the rectangle. Junction ownership follows Polygon.
+    """
+    def __init__(self, width=2., height=1., *, center=(0., 0.), angle=0.,
+                 labels=("bottom", "right", "top", "left")):
+        width, height = _positive(width, "width"), _positive(height, "height")
+        center = _center(center)
+        if not np.isfinite(angle):
+            raise ValueError("angle must be finite")
+        c, s = np.cos(angle), np.sin(angle)
+        rotation = np.array([[c, -s], [s, c]])
+        vertices = np.array([[-1,-1],[1,-1],[1,1],[-1,1]])*[width/2,height/2]
+        super().__init__(vertices @ rotation.T + center, labels=labels)
+
+
+def with_holes(outer, holes) -> ParametricDomain:
+    """Cut named, disjoint holes from a planar domain without changing inputs.
+
+    Args:
+        outer (ParametricDomain): Outer domain, optionally already perforated.
+        holes (dict): Nonempty mapping from a nonempty string name to a
+            simply connected ParametricDomain such as Disk, Ellipse or Polygon.
+
+    Returns:
+        ParametricDomain: A new domain with preserved exterior labels. A
+            single-arc hole gets its mapping key as label; multi-arc holes
+            get name/edge_label. Hole normals point out of the material.
+
+    Holes must lie strictly inside the existing material, without touching or
+    overlapping each other. Existing holes are preserved. Topology and generic
+    membership use the polygon representation of curved contours (2048
+    segments per arc), while sampling retains the analytic curves/tangents.
+    This is a hole-composition helper, not a general Boolean CAD engine.
+    """
+    from dataclasses import replace
+    if not isinstance(outer, ParametricDomain):
+        raise TypeError("outer must be a planar ParametricDomain")
+    if not isinstance(holes, dict) or not holes:
+        raise ValueError("holes must be a nonempty mapping of names to domains")
+    contours, shapes = [], []
+    for name, hole in holes.items():
+        if not isinstance(name, str) or not name:
+            raise ValueError("hole names must be nonempty strings")
+        if not isinstance(hole, ParametricDomain) or len(hole.contours) != 1:
+            raise ValueError("each hole must be a simply connected planar domain")
+        if (not outer.polygon.contains(hole.polygon)
+                or not outer.polygon.boundary.disjoint(hole.polygon)):
+            raise ValueError("holes must lie strictly inside the existing material")
+        if any(not hole.polygon.disjoint(shape) for shape in shapes):
+            raise ValueError("holes must not touch or overlap")
+        arcs = hole.contours[0]
+        contours.append([replace(b, label=name if len(arcs)==1 else f"{name}/{b.label}") for b in arcs])
+        shapes.append(hole.polygon)
+    return ParametricDomain(outer.contours[0], [*outer.contours[1:], *contours])

@@ -6,6 +6,10 @@ on:
     branches: [main]
   workflow_dispatch:
 
+concurrency:
+  group: documentation-${{ github.ref }}
+  cancel-in-progress: false
+
 permissions:
   contents: read
 
