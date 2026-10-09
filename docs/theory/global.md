@@ -26,11 +26,11 @@ Applying \(\lambda_i\) yields
 
 $$
 A_{ij}=\lambda_i^xK(x,x_j),\qquad
-Q_{im}=\lambda_i p_m,\qquad P_{jm}=p_m(x_j),
+(P_\Lambda)_{im}=\lambda_i p_m,\qquad (P_X)_{jm}=p_m(x_j),
 $$
 
 $$
-\begin{bmatrix}A&Q\\P^{\mathsf T}&0\end{bmatrix}
+\begin{bmatrix}A&P_\Lambda\\P_X^{\mathsf T}&0\end{bmatrix}
 \begin{bmatrix}a\\b\end{bmatrix}
 =\begin{bmatrix}d\\0\end{bmatrix}.
 $$
@@ -50,11 +50,11 @@ $$
 Here each source functional includes evaluation at its own center. Applying the row functional gives
 
 $$
-G_{ij}=\lambda_i^x\lambda_j^yK(x,y),\qquad Q_{im}=\lambda_i p_m,
+G_{ij}=\lambda_i^x\lambda_j^yK(x,y),\qquad (P_\Lambda)_{im}=\lambda_i p_m,
 $$
 
 $$
-\begin{bmatrix}G&Q\\Q^{\mathsf T}&0\end{bmatrix}
+\begin{bmatrix}G&P_\Lambda\\P_\Lambda^{\mathsf T}&0\end{bmatrix}
 \begin{bmatrix}a\\b\end{bmatrix}
 =\begin{bmatrix}d\\0\end{bmatrix}.
 $$
@@ -71,6 +71,8 @@ G=\begin{bmatrix}
 $$
 
 The two minus signs in the interior-interior block cancel. This block needs fourth-order derivatives of the scalar kernel; ordinary asymmetric Poisson collocation needs only second-order derivatives.
+
+The PDE must also be well posed: pure Neumann Poisson, for example, requires compatible data and a treatment of the constant nullspace. A symmetric kernel cannot remove that physical nonuniqueness.
 
 ## What the global solve returns
 
