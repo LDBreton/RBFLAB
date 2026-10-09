@@ -1,5 +1,7 @@
 # Stokes flow between rotating cylinders
 
+<figure class="method-detail"><img src="../../assets/method_stokes.png" alt="Computed speed and streamlines for the annular Stokes example below. The inner wall rotates and the outer wall is fixed."><figcaption>Computed speed and streamlines for the annular Stokes example below. The inner wall rotates and the outer wall is fixed.</figcaption></figure>
+
 Consider a two-dimensional annular cross-section, inner radius $a=0.5$ and outer
 radius $b=1$. The inner cylinder rotates with angular speed one; the outer wall
 is fixed. In the **steady Stokes** model,

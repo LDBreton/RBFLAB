@@ -8,6 +8,8 @@
 <figcaption>One computed RBF-FD row on an irregular cloud. Blue nodes form the 20-point stencil; the orange star is the target. The dashed circle marks its radius R, not compact kernel support. The right panel shows R<sup>2</sup> times the Laplacian weights in global node order; unselected columns are zero. The figure uses PHS5, degree-two polynomials, and a seeded 121-node cloud; the runnable one-stencil tutorial defaults to 36 nodes.</figcaption>
 </figure>
 
+For the complete coefficient-elimination argument, read [from approximation to weights](../theory/local-weights.md).
+
 ## The local approximation
 
 For a target \(\boldsymbol{x}_i\) and nearby nodes \(S_i\), RBF-FD approximates

@@ -98,3 +98,16 @@ ported geometry regression suite in tests/meshgen and the new geometry/PDE tests
 Generate assets with `python -m examples.make_geometry_gallery --backend cpp`.
 Curved examples embed their source directly; common measurement/backend helpers
 live in examples/_curved.py. Keep claims synchronized with curved_validation.py.
+
+## Foundations and method cards
+
+Keep notation consistent with theory/notation.md. H_i denotes a local augmented
+interpolation system; A_h denotes the assembled PDE system. Global and LHI have
+separate chapters; theory/global-lhi.md remains a compatibility landing page.
+The transpose-solve derivation lives in theory/local-weights.md.
+
+Generate the homepage method cards with `python -m examples.make_method_gallery`
+(or `--backend cpp` for native cavity assembly). The images are numerical fields,
+not substitutes for validation plots. method_gallery.json records the recipes
+and diagnostics. Keep their captions and tutorial links aligned with the actual
+example; no image should imply a benchmark that has not been checked.

@@ -1,45 +1,96 @@
-# From interpolation to RBF-FD weights
+# RBF finite differences
+
+RBF-FD converts local interpolation into differentiation formulas on nodal values. The interpolation coefficients are eliminated before the PDE solve.
 
 <figure class="stencil-figure">
-<a href="../../assets/rbf_fd_stencil.svg" aria-label="Open the stencil diagram at full size"><img src="../../assets/rbf_fd_stencil.svg" alt="An irregular 121-node cloud with 20 selected neighbors around a target, followed by their signed Laplacian weights in a sparse matrix row"></a>
-<figcaption>One computed RBF-FD row on an irregular cloud. Blue nodes form the 20-point stencil; the orange star is the target. The dashed circle marks its radius R, not compact kernel support. The right panel shows R<sup>2</sup> times the Laplacian weights in global node order; unselected columns are zero. The figure uses PHS5, degree-two polynomials, and a seeded 121-node cloud; the runnable one-stencil tutorial defaults to 36 nodes.</figcaption>
+<a href="../../assets/rbf_fd_stencil.svg"><img src="../../assets/rbf_fd_stencil.svg" alt="Twenty neighbors around a target and their computed signed Laplacian weights in global column order"></a>
+<figcaption>A computed 20-node Laplacian stencil in a seeded 121-node cloud, using PHS5 and degree-two polynomials. The radius R is the stencil radius, not kernel support. The right panel displays R² times the weights.</figcaption>
 </figure>
 
-At target \(x_i\), a differential functional \(\mathcal L\) is replaced by
+## Ordinary value-based RBF-FD
+
+At target \(\xi_i\), select nodes \(X_i=\{x_j:j\in S_i\}\) and fit
 
 $$
-\mathcal L u(x_i)\approx\sum_{j\in S_i}w_{ij}u(x_j).
+s_i(x)=\sum_{j\in S_i}a_jK(x,x_j)+\sum_{m=1}^Qb_mp_m(x),
+\qquad s_i(x_j)=U_j.
 $$
 
-For kernel translates and polynomial augmentation, enforce this identity on every basis function. With \(\Phi_{jk}=\phi(\lVert x_j-x_k\rVert)\) and \(P_{jm}=p_m(x_j)\), solve
+With \((\Phi_i)_{jk}=K(x_j,x_k)\) and \((P_i)_{jm}=p_m(x_j)\), the [coefficient-elimination derivation](local-weights.md) gives
 
 $$
-\begin{bmatrix}\Phi&P\\P^{\mathsf T}&0\end{bmatrix}^{\mathsf T}
-\begin{bmatrix}w\\\lambda\end{bmatrix}
+\begin{bmatrix}\Phi_i&P_i\\P_i^{\mathsf T}&0\end{bmatrix}^{\mathsf T}
+\begin{bmatrix}w_i^{\mathcal D}\\\eta_i\end{bmatrix}
 =
 \begin{bmatrix}
-\mathcal L_x\phi(\lVert x-x_j\rVert)|_{x=x_i}\\
-\mathcal L p_m(x_i)
+[(\mathcal D_xK)(\xi_i,x_j)]_{j\in S_i}\\
+[(\mathcal Dp_m)(\xi_i)]_{m=1}^Q
 \end{bmatrix}.
 $$
 
-The upper-left block belongs to a **local interpolation system**. The first \(|S_i|\) entries of \(w\) become a row of the **assembled differentiation matrix**. Polynomial multipliers remain local; they are not PDE unknowns.
+Consequently,
 
-For a translation-invariant \(K(x,y)=\phi(x-y)\), \(\partial_{y_k}K=-\partial_{x_k}K\). This sign matters when constructing Hermite functionals at source points. `reconstruct_local(i)` exposes the augmented system and uses `matrix.T @ augmented_weights = rhs` as its check.
+$$
+(\mathcal Du)(\xi_i)\approx\sum_{j\in S_i}w_{ij}^{\mathcal D}U_j.
+$$
 
-For degree-two polynomials, a Laplacian row should annihilate \(1\) and produce \(4\) on \(x^2+y^2\). That tests consistency. The local condition number and spectrum of the assembled diffusion matrix address different questions; a tiny local solve residual alone does not guarantee stable time evolution.
+Each target has its own stencil and local coefficients. The global unknowns are the shared nodal values \(U_j\), not those coefficients.
 
-Continue with the [one-stencil calculation](../tutorials/one-stencil.md) and [heat matrices](../tutorials/heat-equation.md).
+## Assemble the sparse operator
 
-The illustration is generated with `python -m examples.make_stencil_figures`
-from a source checkout. It checks that the computed row annihilates constants
-and maps \(x^2+y^2\) to 4.
+Insert each weight into its source node's global column:
 
-## Reading and mathematical context
+$$
+(D_h)_{ij}=\begin{cases}w_{ij}^{\mathcal D},&j\in S_i,\\0,&j\notin S_i.\end{cases}
+\qquad (\mathcal Du)(Z)\approx D_hU.
+$$
 
-For the connection to finite differences, see section 5 of
-[Fornberg & Flyer (2015)](references.md#fornberg-flyer-2015).
-[Flyer et al. (2016)](references.md#flyer-2016) studies polynomial reproduction
-and accuracy; [Bayona et al. (2017)](references.md#bayona-2017) extends the
-discussion to elliptic PDEs. These papers motivate the polynomial and stencil
-choices; a particular cloud still needs its own consistency and stability checks.
+If source and target clouds differ, \(D_h\) is rectangular. This is useful for staggered operators: pressure-to-velocity gradients and velocity-to-pressure divergence need not use the same points.
+
+In the API, `ops.lap @ U` or `ops["lap"] @ U` applies an operator, `.matrix` exposes its sparse matrix, `.local(i)` exposes weights, and `.reconstruct_local(i)` reconstructs the generating local system.
+
+## Enforce PDE and boundary equations
+
+For a scalar PDE, assemble interior rows using \(\mathcal D=\mathcal L\), and boundary rows using \(\mathcal D=\mathcal B\). For Dirichlet data the boundary row simply fixes \(U_B=g_B\). For Neumann or Robin data, construct the corresponding normal-derivative or combined weights.
+
+For \(-\kappa\Delta u=f\) with Dirichlet values, partition the Laplacian matrix into interior and boundary columns:
+
+$$
+-\kappa D_{II}U_I=f_I+\kappa D_{IB}g_B.
+$$
+
+This is the matrix that the PDE solver factors. It is different from every small interpolation matrix \(H_i\).
+
+## What does “symmetric” mean here?
+
+The ordinary value-interpolation matrix is already symmetric for a symmetric kernel. Nevertheless, the assembled differentiation matrix generally is not: different targets select different neighborhoods and weights.
+
+The API's `RBFFD(scheme="symmetric")` selects a **trial basis inspired by symmetric global collocation**:
+
+$$
+\psi_j(x)=\lambda_j^yK(x,y),
+$$
+
+where \(\lambda_j\) is the PDE or boundary functional at source node \(j\). But the local data remain **values**, so the kernel block is \(C_{kj}=\psi_j(x_k)\), not \(\lambda_k^x\lambda_j^yK\). Its implemented augmented system is
+
+$$
+H_i=\begin{bmatrix}C_i&P_i\\P_i^{\mathsf T}&0\end{bmatrix},\qquad
+(P_i)_{km}=p_m(x_k).
+$$
+
+The nodal polynomial side conditions retain polynomial modes even when the PDE source functionals annihilate them. Neither this local matrix nor the assembled PDE matrix is generally symmetric. The scheme name describes the source-transformed ansatz, not a matrix-symmetry guarantee.
+
+`scheme="boundary_hermite"` instead uses value functionals in the interior and boundary functionals on the boundary for both data and trial construction. Its boundary degrees of freedom represent \(\mathcal Bu\), not always \(u\). [LHI](lhi.md) additionally includes nearby PDE data and eliminates their known contributions explicitly. The reusable `.operators(...)` interface currently supports the standard nodal scheme.
+
+## Scaling and consistency
+
+With \(\widehat x=(x-\xi_i)/R_i\), a pure derivative of order \(s\) obeys
+
+$$
+\partial_x^\alpha=R_i^{-s}\partial_{\widehat x}^\alpha,\qquad |\alpha|=s.
+$$
+
+A mixed-order operator must scale each term separately. After mapping back to physical coordinates, weights must reproduce the physical polynomial derivatives. The [conditioning chapter](conditioning.md) explains why coordinate scaling helps numerical representation without guaranteeing PDE stability.
+
+**Work through:** [one stencil](../tutorials/one-stencil.md) → [heat matrices](../tutorials/heat-equation.md).
+**Background:** [Fornberg & Flyer](references.md#fornberg-flyer-2015), [Flyer et al.](references.md#flyer-2016), [Bayona et al.](references.md#bayona-2017).

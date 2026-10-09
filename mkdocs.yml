@@ -91,10 +91,14 @@ nav:
       - A 3D scalar problem: tutorials/scalar-3d.md
       - Navier-Stokes cavity: tutorials/cavity.md
   - Mathematical foundations:
-      - Interpolation and kernels: theory/interpolation.md
-      - RBF-FD weights: theory/rbf-fd.md
-      - Global collocation and LHI: theory/global-lhi.md
-      - Divergence-free kernels: theory/divergence-free.md
+      - Reading route: theory/index.md
+      - Notation and model problem: theory/notation.md
+      - Kernel interpolation: theory/interpolation.md
+      - Global collocation: theory/global.md
+      - From approximation to weights: theory/local-weights.md
+      - RBF finite differences: theory/rbf-fd.md
+      - Local Hermite interpolation: theory/lhi.md
+      - Divergence-free spaces and Stokes: theory/divergence-free.md
       - Time discretization: theory/time-discretization.md
       - Conditioning and precision: theory/conditioning.md
       - Errors and residuals: theory/errors.md

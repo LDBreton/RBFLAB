@@ -1,0 +1,42 @@
+{
+  "heat": {
+    "method": "RBF-FD",
+    "nodes": 361,
+    "kernel": "PHS5",
+    "degree": 2,
+    "stencil": 25,
+    "time": 0.02,
+    "dt": 0.001,
+    "scheme": "BE-started BDF2",
+    "nodal_max_error": 0.0014779278239481775,
+    "rendering": "cubic display interpolation of computed nodal temperatures; no analytic replacement"
+  },
+  "stokes": {
+    "example": "Stokes annulus/global/python",
+    "nodes": 150,
+    "precision": "float64",
+    "prepare_s": 1.800006430130452e-06,
+    "assembly_s": 0.35059179999370826,
+    "solve_s": 0.015182400005869567,
+    "nodal_velocity_max": 0.0026030481218354273,
+    "off_node_velocity_max": 0.004016890916816007,
+    "pressure_gradient_max": 0.04571073492645322,
+    "divergence_max": 0.0,
+    "rendering": "computed velocity sampled inside annulus; masked hole"
+  },
+  "cavity": {
+    "velocity_nodes": 800,
+    "pressure_nodes": 289,
+    "max_divergence": 0.025021607167142135,
+    "compatibility": -0.025021607166759784,
+    "pressure_mean": -5.992899371679046e-17,
+    "max_speed": 1.0,
+    "Re": 100,
+    "cells": 16,
+    "time": 20.0,
+    "dt": 0.00125,
+    "backend": "cpp",
+    "rendering": "linear interpolation of computed nodal velocities; no extrapolation",
+    "validation": "illustrative coarse run; not a grid-converged benchmark"
+  }
+}

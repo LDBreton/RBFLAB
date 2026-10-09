@@ -1,5 +1,7 @@
 # Heat equation from matrices
 
+<figure class="method-detail"><img src="../../assets/method_heat.png" alt="RBF-FD temperature at t = 0.02, computed on 361 nodes with PHS5, degree-two polynomials, 25-node stencils, and BE-started BDF2. The surface uses cubic display interpolation of computed nodal temperatures; the contours show the same field."><figcaption>RBF-FD temperature at t = 0.02, computed on 361 nodes with PHS5, degree-two polynomials, 25-node stencils, and BE-started BDF2. The surface uses cubic display interpolation of computed nodal temperatures; the contours show the same field.</figcaption></figure>
+
 **You will learn:** to assemble a Laplacian, eliminate Dirichlet values, reuse a sparse factorization, and compare five-point FD, RBF-FD, and RBFLAB's symbolic interface. Prerequisites: sparse matrices and the [single-stencil tutorial](one-stencil.md).
 
 ## PDE, cloud, and unknowns

@@ -10,7 +10,7 @@ experiment in that paper. The tutorial pages state the actual tested recipes.
 |---|---|---|
 | RBFs for PDEs | [Fornberg & Flyer (2015)](#fornberg-flyer-2015) | [Interpolation](interpolation.md) |
 | PHS and polynomial reproduction | [Flyer et al. (2016)](#flyer-2016), [Bayona et al. (2017)](#bayona-2017) | [RBF-FD weights](rbf-fd.md) |
-| Local Hermite data | [Stevens et al. (2009)](#stevens-2009) | [Global collocation and LHI](global-lhi.md) |
+| Local Hermite data | [Stevens et al. (2009)](#stevens-2009) | [Local Hermite interpolation](lhi.md) |
 | Divergence-free spaces | [Narcowich & Ward (1994)](#narcowich-ward-1994), [Wendland (2009)](#wendland-2009) | [Divergence-free kernels](divergence-free.md) |
 | Flat kernels and numerical conditioning | [Fornberg et al. (2011)](#fornberg-2011), [Wright & Fornberg (2017)](#wright-fornberg-2017) | [Conditioning](conditioning.md) |
 | Compact support | [Wendland (1995)](#wendland-1995) | [Kernel conventions](interpolation.md) |

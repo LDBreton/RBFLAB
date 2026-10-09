@@ -2,7 +2,7 @@
 
 **You will learn:** how one Poisson PDE yields distinct ansatz functions, unknown vectors, and evaluation rules. Prerequisites: [interpolation](interpolation.md) and [RBF-FD](one-stencil.md).
 
-Solve \(-\Delta u=2\pi^2\sin(\pi x)\sin(\pi y)\) with zero Dirichlet data on the unit square. Symmetric global collocation applies PDE/boundary functionals to both kernel arguments. Asymmetric global collocation uses ordinary kernel translates as its trial basis. LHI forms local Hermite weight systems with solution, boundary, and PDE centers. RBF-FD uses local value-interpolation weights. See the [derivation](../theory/global-lhi.md) before interpreting their matrices.
+Solve \(-\Delta u=2\pi^2\sin(\pi x)\sin(\pi y)\) with zero Dirichlet data on the unit square. Symmetric global collocation applies PDE/boundary functionals to both kernel arguments. Asymmetric global collocation uses ordinary kernel translates as its trial basis. LHI forms local Hermite weight systems with solution, boundary, and PDE centers. RBF-FD uses local value-interpolation weights. See the separate [global](../theory/global.md) and [LHI](../theory/lhi.md) derivations before interpreting their matrices.
 
 
 <figure class="stencil-figure">

@@ -1,8 +1,10 @@
 # Lid-driven cavity: a custom Navier–Stokes algorithm
 
+<figure class="method-detail"><img src="../../assets/method_cavity.png" alt="A longer run of the maintained example: Re = 100, 800 velocity nodes, 289 pressure nodes, and t = 20. The displayed field interpolates computed velocities; this is not a grid-converged benchmark."><figcaption>A longer run of the maintained example: Re = 100, 800 velocity nodes, 289 pressure nodes, and t = 20. The displayed field interpolates computed velocities; the measured maximum discrete divergence is 0.0250. This is not a grid-converged benchmark.</figcaption></figure>
+
 **You will learn:** to reuse RBF-FD operators inside an algorithm that is larger than a single linear PDE solve. Prerequisites: [heat matrices](heat-equation.md), [mixed boundaries](mixed-boundary.md), and [time stepping](../theory/time-discretization.md).
 
-The example advances a small lid-driven cavity using the maintained solver in `examples/navier_stokes_cavity.py`. The tutorial wrapper chooses cloud resolution, Reynolds number, final time, and an optional animation path; it then records velocity, pressure, and discrete divergence. The full solver shows the intermediate velocity and pressure-correction steps. This is a **numerical showcase**, not a validated general-purpose Navier–Stokes solver or a reproduction of a published high-Reynolds benchmark.
+The example advances a small lid-driven cavity using the maintained solver in `examples/navier_stokes_cavity.py`. The tutorial wrapper chooses cloud resolution, final time, and an optional animation path; it then records velocity, pressure, and discrete divergence. The full solver uses a coupled velocity/pressure block solve with Crank–Nicolson diffusion and explicit Adams–Bashforth convection (first-step startup uses the current convection). Reynolds number is fixed at 100 in this example. This is a **numerical showcase**, not a validated general-purpose Navier–Stokes solver or a reproduction of a published high-Reynolds benchmark.
 
 ??? example "Complete runnable script"
 
