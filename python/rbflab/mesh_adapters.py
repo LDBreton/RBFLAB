@@ -4,7 +4,10 @@ from .geometry import PointCloud
 
 
 def from_rbfmeshgen(mesh, *, boundary_labels, normals=None, interface_labels=()):
-    """Import a 2D or 3D mesh using explicitly selected exterior boundary labels.
+    """Compatibility importer for already-sampled RBFMeshGen-style objects.
+
+    Prefer meshgen.generate for new domains or oriented Border constructions.
+    This importer preserves existing samples and requires selected boundary labels.
 
     Other labeled interface samples remain interior nodes. Exact duplicate
     coordinates are merged, preserving membership in multiple boundary labels.

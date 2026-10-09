@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.4.0
+
+- Unify generation of primitive domains, oriented borders, RBFMesh constructions, implicit volumes and parametric surfaces under `meshgen.generate`.
+- Add shared symbolic curve derivatives, optional explicit tangents, endpoint-safe numerical differentiation, and explicit normal overrides for `Border` and `ParametricBoundary`.
+- Preserve boundary/interface labels and automatically orient border-derived normals without changing input samples.
+- Replace the geometry chapter with illustrated construction sections for 2D, labels, normals, sampling, 3D volumes, surfaces and mesh topology.
+- Document primitive arguments, partial-boundary labeling and staggered clouds; keep older importers and inbound documentation URLs compatible.
+
+
 ## 0.3.0
 
 - Add labeled `geometry.Polygon`, rotated `Rectangle`, and validated `with_holes` composition.

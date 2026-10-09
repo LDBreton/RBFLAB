@@ -1,6 +1,7 @@
 import numpy as np
 from collections import deque
 from numbers import Integral
+from ._curves import Curve2D
 
 
 def _coordinates(value, label):
@@ -33,36 +34,44 @@ class MeshPoint:
 
 
 class Border:
-    """Labeled parametric curve with FreeFEM-inspired segment-count syntax.
+    """Labeled parametric curve with signed segment-count syntax.
 
-    Call border(n) before passing it to meshgen.RBFMesh. The sign of n selects
-    orientation: a negative count reverses the parameter traversal. Sampling
-    is uniform in the parameter, not in arc length. At a junction the curve
-    starting there owns the point; the terminal endpoint is omitted. Calling border(n)
-    updates this object in place, so use distinct Border objects for distinct
-    arcs. See the parametric-borders tutorial for conversion to a PDE PointCloud.
+    Args:
+        parametric_function (Callable | Sequence): Callable t -> (x, y), or two
+            SymPy coordinate expressions. Bind extra symbolic parameters first.
+        label (str | int): Boundary or interface group name; arcs may share a label.
+        t_start (float): Initial parameter value.
+        t_end (float): Distinct final parameter value; decreasing intervals work.
+        is_border (bool): Retain samples as labeled boundary/interface nodes.
+        tangent (Callable | Sequence | None): Optional derivative in the original
+            parameter direction. Otherwise symbolic curves differentiate exactly,
+            and ordinary callables use second-order finite differences.
+        parameter (Symbol | None): Symbolic parameter; inferred if unambiguous.
+        normal (Callable | Sequence | None): Explicit outward normal n(t), normalized
+            on generation. Not flipped by negative segment counts.
+        difference_step (float | None): Numerical derivative step in parameter
+            units, default interval length times machine-epsilon^(1/3).
+
+    Call border(n) to select abs(n) segments; negative n reverses traversal.
+    Sampling is uniform in the parameter and excludes the terminal endpoint.
+    A call modifies this object; create distinct objects for distinct arcs.
+    meshgen.generate accepts a list of sampled borders directly, computes
+    outward normals, and returns a PointCloud. Split curves at corners/cusps.
     """
-    def __init__(self, parametric_function, label, t_start, t_end, is_border=True):
-        """
-        Represents a border in the mesh.
-
-        Args:
-            parametric_function (function): The parametric function that defines the border.
-            label (str or int): The label of the border.
-            t_start (float): The start parameter value of the border.
-            t_end (float): The end parameter value of the border.
-            is_border (bool, optional): Indicates if the border is a boundary. Defaults to True.
-        """
-        self.parametric_function = parametric_function
+    def __init__(self, parametric_function, label, t_start, t_end, is_border=True,
+                 *, tangent=None, parameter=None, normal=None, difference_step=None):
+        self._geometry = Curve2D(parametric_function, (t_start, t_end),
+            tangent=tangent, parameter=parameter, normal=normal, difference_step=difference_step)
+        self.parametric_function = self._geometry.point
+        self.tangent, self.normal = tangent, normal
+        self.derivative_source = self._geometry.derivative_source
         self.label = label
-        self.t_start = t_start
-        self.t_end = t_end
-        # Calculate start and end points using the parametric function
-        self.start_point = _coordinates(parametric_function(t_start), label)
-        self.end_point = _coordinates(parametric_function(t_end), label)
+        self.t_start, self.t_end = float(t_start), float(t_end)
+        self.start_point = _coordinates(self.parametric_function(t_start), label)
+        self.end_point = _coordinates(self.parametric_function(t_end), label)
         self.is_border = is_border
         self.n_segments = None
-        self.reverse = False  # Attribute to control direction
+        self.reverse = False
 
     def __call__(self, n) -> "Border":
         """

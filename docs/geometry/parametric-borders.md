@@ -1,153 +1,126 @@
-# Parametric borders: the FreeFEM-inspired style
+# 2D construction with oriented borders
 
-**Your original `Border` syntax is part of RBFLAB.** Define a labeled curve,
-choose its parameter interval, then attach a signed segment count when building
-the domain. These interfaces have been included since RBFLAB 0.2; no separate
-RBFMeshGen installation is needed.
+A `Border` describes one parametric boundary piece. Its formula, parameter
+interval and label describe the geometry; calling `piece(n)` chooses how many
+segments sample it. Assemble pieces into closed contours, then pass them directly
+to `meshgen.generate`. No adapter or separate generator package is needed.
 
-The idea follows [FreeFEM's border-based mesh construction](https://doc.freefem.org/documentation/mesh-generation.html):
-parametric pieces, boundary labels and signed traversal counts. Here `RBFMesh`
-generates a point cloud. It does not call FreeFEM or construct a finite-element
-triangulation, and border composition uses comma-separated arguments rather than `+`.
-
-## A domain with a hole
-
-```python
-import numpy as np
-import rbflab as rbf
-from rbflab.geometry import Border
-from rbflab.meshgen import RBFMesh
-
-outer = Border(lambda t: (np.cos(t), np.sin(t)),
-               label="outer", t_start=0, t_end=2*np.pi)
-hole = Border(lambda t: (.4*np.cos(t), .4*np.sin(t)),
-              label="hole", t_start=0, t_end=2*np.pi)
-mesh = RBFMesh(outer(96), hole(-48))
-mesh.generate_points(240, method="halton", seed=42, append=False)
-cloud = rbf.from_rbfmeshgen(mesh, boundary_labels=["outer", "hole"])
-```
-
-This produces 240 interior nodes, 96 exterior nodes and 48 hole nodes. The adapter
-name `from_rbfmeshgen` is retained for compatibility; it also accepts the integrated
-`rbflab.meshgen.RBFMesh` object shown here. Its output is the same `PointCloud`
-used by global collocation, LHI and RBF-FD.
-
-### What does the sign mean?
-
-`outer(96)` samples 96 parameter subintervals in the curve's given direction.
-`hole(-48)` reverses the second curve. Both curves above were initially defined
-counterclockwise, so reversal makes the inner contour clockwise.
-
-`RBFMesh` interprets **counterclockwise closed contours as material** and
-**clockwise closed contours as holes**. Negative counts reverse traversal; they
-do not independently declare a hole if the underlying curve already runs clockwise.
-Boundary labels become the names used in `model.bc(...)`.
-
-Each arc omits its terminal endpoint. On a joined contour, the next arc owns that
-corner. A call such as `outer(96)` modifies the `Border` object in place; create
-separate objects for distinct arcs rather than passing the same object twice.
-
-## Join several curves
-
-A contour can combine straight and curved pieces. This upper half-disk has
-separate labels on the curved wall and its base:
-
-```python
-wall = Border(lambda t: (np.cos(t), np.sin(t)),
-              label="wall", t_start=0, t_end=np.pi)
-base = Border(lambda t: (-1 + 2*t, 0),
-              label="base", t_start=0, t_end=1)
-half_disk = RBFMesh(wall(80), base(40))
-half_disk.generate_points(200, seed=7, append=False)
-half_cloud = rbf.from_rbfmeshgen(half_disk, boundary_labels=["wall", "base"])
-```
-
-Endpoints must connect within `RBFMesh`'s `abs_tol`. Open or invalid contours raise
-an error. Multiple arcs may share a label, which groups them for a boundary condition.
-To retain internal interfaces, explicitly list their labels in the adapter's
-`interface_labels` argument; an interface is not automatically an exterior boundary.
-
-## Supply normals for flux conditions
-
-Dirichlet data only needs points and labels. Neumann and Robin data also needs
-outward normals. `Border` takes coordinates alone, so the adapter requires you
-to supply those normals instead of guessing derivatives.
-
-For these circles, the smooth-boundary normals are known exactly:
-
-```python
-unit_radial = lambda points: points / np.linalg.norm(points, axis=1)[:, None]
-cloud = rbf.from_rbfmeshgen(
-    mesh, boundary_labels=["outer", "hole"],
-    normals={"outer": unit_radial, "hole": lambda points: -unit_radial(points)},
-)
-```
-
-Callbacks receive an `(N, 2)` array of the selected label's points and return the
-corresponding normal vectors. Hole normals point **out of the material**, into
-the hole. These callbacks describe the original smooth circles; they are not
-normals to the straight chords used for interior membership tests.
-
-![Labeled annular cloud with exterior and hole normals](../assets/parametric_borders.png)
-
-## Use the cloud in a symbolic PDE
-
-For a concrete check, let $u_\star=\exp(x/2)\cos(y)$ and solve
-
-$$
-(-\Delta+1)u=\tfrac74 u_\star,
-\qquad u=u_\star\ \text{on the outer wall},
-\qquad \partial_n u=\partial_n u_\star\ \text{on the hole}.
-$$
+## A circular exterior and an inner hole
 
 ```python
 import sympy as sp
+from rbflab import geometry as g, meshgen, viz
 
-model = rbf.SymbolicScalar(2)
-u = model.field
-x, y = model.coordinates
-exact = sp.exp(x/2)*sp.cos(y)
-lhs = -model.laplacian(u) + u
-dn = model.normal_derivative(u)
-problem = model.stationary(
-    sp.Eq(lhs, lhs.subs(u, exact).doit()),
-    boundary=[
-        model.bc("outer", sp.Eq(u, exact)),
-        model.bc("hole", sp.Eq(dn, dn.subs(u, exact).doit())),
-    ],
-)
-method = rbf.RBFFD(rbf.PHS(5), 35, polynomial_degree=3,
-    stencil_policy=rbf.StencilPolicy(scaling="local"),
-    local_backend=rbf.PythonBackend(compute_condition=False))
-solution = problem.solve(cloud, method)
+t = sp.symbols("t", real=True)
+outer = g.Border((sp.cos(t), sp.sin(t)), label="outer", t_start=0, t_end=2*sp.pi)
+hole = g.Border((sp.Rational(2,5)*sp.cos(t), sp.Rational(2,5)*sp.sin(t)), label="hole", t_start=0, t_end=2*sp.pi)
+cloud = meshgen.generate([outer(96), hole(-48)], interior=240, seed=42)
+fig, ax = viz.plot_cloud(cloud, normals=True)
 ```
 
-The runnable example reports maximum nodal error against the known solution.
-The documented 384-node Float64 Python recipe gives approximately $6.43\times10^{-4}$;
-this is one mixed-boundary example, not a convergence result.
+![A circular domain with a reversed inner contour and normals pointing into the hole](../assets/meshes/border-ring.png)
 
-From a source checkout:
+Symbolic coordinates derive their tangents and
+normals automatically. Here `t` is inferred as the only free symbol; `parameter=t`
+can make that choice explicit. Substitute any additional symbolic parameters first.
 
-```sh
-python -m examples.parametric_borders --plot borders.png
-python -m examples.parametric_borders --backend cpp
-python -m examples.parametric_borders --backend torch
+## Traversal, material and holes
+
+For `RBFMesh`/border construction, a counterclockwise closed contour adds material;
+a clockwise contour removes it. For the circles above, positive counts traverse
+counterclockwise and `hole(-48)` reverses the inner circle.
+
+The sign means **reverse the supplied curve**, not simply “make a hole.” If your
+formula already runs clockwise, a positive count keeps it clockwise. Reversing
+a contour built from several pieces means reversing every piece consistently.
+Open contours and inconsistent endpoint connections raise an error.
+
+`abs(n)` is the number of parameter subintervals. Each arc retains its first
+endpoint and omits its last, so a junction belongs to the next arc. `Border(n)`
+updates that object; construct distinct `Border` objects for distinct pieces.
+
+## Connect a line to a curved wall
+
+```python
+wall = g.Border((sp.cos(t), sp.sin(t)), "wall", 0, sp.pi)
+base = g.Border((-1+2*t, 0), "base", 0, 1)
+cloud = meshgen.generate([wall(80), base(40)], interior=200)
 ```
 
-The shared example helper prepares C++/PyTorch kernels before assembly.
-The global sparse solve in these examples remains SciPy Float64.
+![Upper half-disk constructed from one semicircle and one line](../assets/meshes/half-disk.png)
 
-## Which curve interface should I choose?
+Follow the contour: `wall` starts at `(1,0)` and ends at `(-1,0)`; `base` starts
+there and returns to `(1,0)`. The resulting material lies on the left of traversal.
+The two labels let you later prescribe different equations on the base and wall.
 
-| Interface | Input | Sampling and geometry | Normals |
+## Build a channel from independently labeled pieces
+
+Think in endpoints first. For this example, use four pieces around the exterior:
+
+| Piece | Start | End | Formula for $0\le t\le1$ |
 |---|---|---|---|
-| `Border` + `RBFMesh` | Coordinates, interval, label and signed segment count | Uniform in parameter; sampled polygon determines material and holes | Supplied explicitly when converting to `PointCloud` |
-| `ParametricBoundary` + `ParametricDomain` | Coordinates and analytic tangent, with explicit outer/hole contours | Approximately uniform arc length; dense polygons for generic membership | Computed from the tangent and corrected for outward orientation |
+| bottom | `(0,0)` | `(3,0)` | $(3t,0)$ |
+| outlet | `(3,0)` | `(3,1)` | $(3,t)$ |
+| top | `(3,1)` | `(0,1)` | $(3(1-t),1+\sin(\pi t)/4)$ |
+| inlet | `(0,1)` | `(0,0)` | $(0,1-t)$ |
 
-Use the border syntax when it matches how you think about your geometry. Use
-[analytic parametric boundaries](custom-domains.md) when you want tangent-based
-normals and arc-length sampling. Both lead to the same solver API.
+```python
+bottom = g.Border((3*t, 0), "bottom", 0, 1)
+outlet = g.Border((3, t), "outlet", 0, 1)
+top = g.Border((3*(1-t), 1+sp.sin(sp.pi*t)/4), "top", 0, 1)
+inlet = g.Border((0, 1-t), "inlet", 0, 1)
+obstacle = g.Border((1+sp.cos(t)/4, sp.Rational(1,2)+sp.sin(t)/4),
+                    "obstacle", 0, 2*sp.pi)
+cloud = meshgen.generate(
+    [bottom(60), outlet(24), top(60), inlet(24), obstacle(-40)],
+    interior=350, seed=42,
+)
+```
 
-Increasing `Border(n)` refines **both** its boundary nodes and its polygonal
-geometry approximation. Interior refinement alone does not improve that geometry.
-Random, Halton and Sobol samplers do not guarantee a minimum inter-node distance.
+![The same channel constructed with oriented borders and explicit parametric contours](../assets/meshes/channels.png)
+
+The left panel uses this border recipe. Increase a piece's count to resolve its
+curvature or a nearby narrow gap. Keep `boundary` omitted from `generate`: the
+counts are already encoded in each `Border(n)`. The interior count is independent.
+
+You can give different arcs the same label, for example `wall` on both the top
+and bottom. The returned `cloud.boundary["wall"]` then groups their nodes. Split
+labels wherever boundary equations or corner-normal ownership need to differ.
+
+## Ordinary callables and supplied derivatives
+
+NumPy callables use the same interface:
+
+```python
+import numpy as np
+wall = g.Border(lambda t: (2*np.cos(t), np.sin(t)), "wall", 0, 2*np.pi,
+                tangent=lambda t: (-2*np.sin(t), np.cos(t)))
+```
+
+`tangent` is optional. Without it, a callable uses a second-order numerical
+approximation, with one-sided differences at interval endpoints. Read
+[labels and normals](labels-normals.md) before relying on numerical normals for
+flux conditions. Explicit `normal=lambda t: (...)` is also supported; its
+orientation is retained and its length normalized.
+
+## Regions, interfaces and existing constructions
+
+The border engine can partition overlapping positive contours and retain internal
+interfaces. In the unified cloud, samples on the **union's exterior** become
+boundary groups; retained internal contours become `cloud.interfaces` groups.
+Internal interfaces remain interior unknowns and get no automatic normal or PDE.
+Use separate labels for exterior and internal pieces: reusing one name across
+both roles is rejected. `is_border=False` keeps a contour in the geometry but
+omits its samples from these labeled groups.
+
+An existing `meshgen.RBFMesh(...)` construction is also accepted by
+`meshgen.generate(mesh, interior=...)`. Generation resamples according to the
+requested options without changing `mesh.Points`. `from_rbfmeshgen` remains a
+compatibility importer for already-sampled object lists; new tutorials use
+`meshgen.generate`.
+
+**Geometry accuracy:** the segment samples define a polygonal approximation.
+Nodes are uniform in the parameter, not generally in physical arc length.
+Increasing the interior count does not refine boundary geometry. For a separate
+geometric representation and approximately uniform arc-length sampling, use
+[ParametricBoundary and ParametricDomain](custom-domains.md).

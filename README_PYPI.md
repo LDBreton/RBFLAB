@@ -7,11 +7,11 @@ Build labeled **2D and 3D point clouds**, write equations with **SymPy**, and ch
 weights and sparse matrices when you want to go beyond the high-level API.
 
 [**Read the manual**](https://ldbreton.github.io/RBFLAB/) ·
-[Geometry cookbook](https://ldbreton.github.io/RBFLAB/geometry/cookbook/) ·
+[2D shapes and holes](https://ldbreton.github.io/RBFLAB/geometry/planar-domains/) ·
 [Mathematical foundations](https://ldbreton.github.io/RBFLAB/theory/) ·
 [API reference](https://ldbreton.github.io/RBFLAB/api/discretizations/)
 
-![Actual generated clouds: obstacles, curved holes, a concave polygon and a 3D volume](https://raw.githubusercontent.com/LDBreton/RBFLAB/v0.3.0/docs/assets/geometry_gallery.png)
+![Actual generated clouds: obstacles, curved holes, a concave polygon and a 3D volume](https://raw.githubusercontent.com/LDBreton/RBFLAB/v0.4.0/docs/assets/geometry_gallery.png)
 
 ## Install and start
 
@@ -24,7 +24,7 @@ python -m pip install "rbflab[examples]"
 The Python core needs no compiler, Gmsh or tensor framework. Geometry generation
 is built in. See the [installation guide](https://ldbreton.github.io/RBFLAB/INSTALL/)
 for optional backends and exact dependencies. The new polygon and hole-composition
-helpers below require **RBFLAB 0.3 or newer**.
+examples below require **RBFLAB 0.4 or newer**.
 
 ## One domain. One equation. A numerical solution.
 
@@ -59,7 +59,7 @@ solution = problem.solve(cloud, method)
 print(solution.evaluate([[0., 0.], [0., .5]]))
 ```
 
-![Generated labeled nodes and the computed solution on a perforated ellipse](https://raw.githubusercontent.com/LDBreton/RBFLAB/v0.3.0/docs/assets/perforated_poisson.png)
+![Generated labeled nodes and the computed solution on a perforated ellipse](https://raw.githubusercontent.com/LDBreton/RBFLAB/v0.4.0/docs/assets/perforated_poisson.png)
 
 With this 692-node recipe, the Float64 Python run gives maximum nodal error
 **3.77 × 10⁻⁵** and independent off-node error **3.86 × 10⁻⁵**. Read the
@@ -78,8 +78,8 @@ fig.savefig("solution.png", dpi=180)
 
 <table>
 <tr>
-<td width="50%"><a href="https://ldbreton.github.io/RBFLAB/tutorials/flower-heat/"><img src="https://raw.githubusercontent.com/LDBreton/RBFLAB/v0.3.0/docs/assets/flower_heat.gif" alt="Computed heat evolution on a flower-shaped domain"></a></td>
-<td width="50%"><a href="https://ldbreton.github.io/RBFLAB/tutorials/annular-stokes/"><img src="https://raw.githubusercontent.com/LDBreton/RBFLAB/v0.3.0/docs/assets/method_stokes.png" alt="Computed velocity streamlines between rotating cylinders"></a></td>
+<td width="50%"><a href="https://ldbreton.github.io/RBFLAB/tutorials/flower-heat/"><img src="https://raw.githubusercontent.com/LDBreton/RBFLAB/v0.4.0/docs/assets/flower_heat.gif" alt="Computed heat evolution on a flower-shaped domain"></a></td>
+<td width="50%"><a href="https://ldbreton.github.io/RBFLAB/tutorials/annular-stokes/"><img src="https://raw.githubusercontent.com/LDBreton/RBFLAB/v0.4.0/docs/assets/method_stokes.png" alt="Computed velocity streamlines between rotating cylinders"></a></td>
 </tr>
 <tr>
 <td><b>Heat on a flower</b><br>Symbolic forcing, BDF2 time stepping and animation.</td>
@@ -89,7 +89,7 @@ fig.savefig("solution.png", dpi=180)
 
 | Explore | Learn to use |
 |---|---|
-| [Geometry cookbook](https://ldbreton.github.io/RBFLAB/geometry/cookbook/) | Named walls, holes, concave polygons and 3D volumes |
+| [2D shapes and holes](https://ldbreton.github.io/RBFLAB/geometry/planar-domains/) | Named walls, holes, concave polygons and 3D volumes |
 | [One local stencil](https://ldbreton.github.io/RBFLAB/tutorials/one-stencil/) | Approximation, differentiation weights and sparse rows |
 | [Heat from matrices](https://ldbreton.github.io/RBFLAB/tutorials/heat-equation/) | Finite differences, RBF-FD and time integration |
 | [Mixed conditions](https://ldbreton.github.io/RBFLAB/tutorials/ellipse/) | Dirichlet, Neumann and Robin data on curved boundaries |
@@ -98,26 +98,25 @@ fig.savefig("solution.png", dpi=180)
 | [Custom kernels](https://ldbreton.github.io/RBFLAB/tutorials/custom-kernel/) | Symbolic kernels, derivatives and optional C++ compilation |
 | [Navier–Stokes cavity](https://ldbreton.github.io/RBFLAB/tutorials/cavity/) | An experimental staggered-flow showcase with documented limitations |
 
-## Prefer parametric borders?
+## Build a domain from labeled curves
 
-Your FreeFEM-inspired syntax is included too:
+Symbolic curves derive tangents and outward normals automatically:
 
 ```python
-import numpy as np
-from rbflab.geometry import Border
-from rbflab.meshgen import RBFMesh
+import sympy as sp
+from rbflab import geometry, meshgen
 
-outer = Border(lambda t: (np.cos(t), np.sin(t)),
-               label="outer", t_start=0, t_end=2*np.pi)
-hole = Border(lambda t: (.4*np.cos(t), .4*np.sin(t)),
-              label="hole", t_start=0, t_end=2*np.pi)
-mesh = RBFMesh(outer(96), hole(-48))
-mesh.generate_points(240, seed=42, append=False)
+t = sp.symbols("t", real=True)
+outer = geometry.Border((sp.cos(t), sp.sin(t)), "outer", 0, 2*sp.pi)
+hole = geometry.Border((sp.cos(t)/3, sp.sin(t)/3), "hole", 0, 2*sp.pi)
+cloud = meshgen.generate([outer(96), hole(-48)], interior=240, seed=42)
 ```
 
-The [parametric-borders tutorial](https://ldbreton.github.io/RBFLAB/geometry/parametric-borders/)
-connects this syntax to a PDE point cloud, including normals and flux conditions.
-No separate RBFMeshGen installation is needed.
+Ordinary callables accept optional tangents and explicit normals, with a documented
+numerical derivative fallback. The [mesh-generation chapter](https://ldbreton.github.io/RBFLAB/geometry/)
+explains both curve APIs, boundary labels, sampling, 3D volumes/surfaces and staggered
+clouds, with images of the constructions. These unified curve features require
+**RBFLAB 0.4 or newer**.
 
 ## Choose a backend; keep the problem
 
@@ -158,7 +157,7 @@ not necessarily run faster with extra threads or a tensor backend.
 
 Source code lives in `python/rbflab`, runnable examples in `examples`, and focused
 regression tests in `tests`. Gallery figures are reproducible from
-[geometry_gallery.py](https://github.com/LDBreton/RBFLAB/blob/v0.3.0/examples/geometry_gallery.py) and
-[make_method_gallery.py](https://github.com/LDBreton/RBFLAB/blob/v0.3.0/examples/make_method_gallery.py).
+[geometry_gallery.py](https://github.com/LDBreton/RBFLAB/blob/v0.4.0/examples/geometry_gallery.py) and
+[make_method_gallery.py](https://github.com/LDBreton/RBFLAB/blob/v0.4.0/examples/make_method_gallery.py).
 
-[Maintaining the documentation](https://ldbreton.github.io/RBFLAB/MAINTAINING_DOCS/) · [Changelog](https://github.com/LDBreton/RBFLAB/blob/v0.3.0/CHANGELOG.md) · [MIT license](https://github.com/LDBreton/RBFLAB/blob/v0.3.0/LICENSE)
+[Maintaining the documentation](https://ldbreton.github.io/RBFLAB/MAINTAINING_DOCS/) · [Changelog](https://github.com/LDBreton/RBFLAB/blob/v0.4.0/CHANGELOG.md) · [MIT license](https://github.com/LDBreton/RBFLAB/blob/v0.4.0/LICENSE)

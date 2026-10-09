@@ -3,10 +3,11 @@
 Parametric domains use a dense polygon for membership tests. Primitive disk,
 ellipse, annulus and flower domains use analytic membership instead.
 """
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import numpy as np
 from shapely.geometry import Polygon as _Polygon
 from shapely import intersects_xy
+from ._curves import Curve2D
 
 
 def _positive(value, name):
@@ -31,53 +32,72 @@ def _center(value):
 
 @dataclass(frozen=True)
 class ParametricBoundary:
-    """A regular oriented curve, evaluated with scalar parameter values.
+    """A labeled regular planar curve, sampled approximately by arc length.
 
     Args:
-        curve: Callable t -> (x, y).
-        tangent: Analytic derivative t -> (dx/dt, dy/dt); never guessed.
-        label (object): Boundary-condition group name.
-        interval: Increasing finite parameter endpoints.
+        curve (Callable | Sequence): Callable t -> (x, y), or two SymPy expressions.
+        tangent (Callable | Sequence | None): Optional derivative. Symbolic curves
+            are differentiated exactly; ordinary callables use second-order
+            finite differences when this is omitted.
+        label (object): Unique arc name within its ParametricDomain.
+        interval (tuple): Increasing finite parameter endpoints, default (0, 2*pi).
+        parameter (Symbol | None): Symbolic parameter; inferred if unambiguous.
+        normal (Callable | Sequence | None): Explicit outward normal n(t), normalized
+            on sampling. Overrides tangent-derived normals and is never flipped.
+        difference_step (float | None): Finite-difference step in parameter units.
+            Default is interval length times machine-epsilon^(1/3). Endpoint
+            stencils are one-sided and never evaluate outside the interval.
 
-    Curves in each domain contour must connect in the supplied order.
-    Sampling is approximately uniform in arc length, excluding the endpoint.
+    Arcs in a contour must connect. Each arc excludes its terminal endpoint;
+    the next arc owns the junction. Split curves at corners and singular points.
+    Symbolic expressions must have all extra parameters substituted beforehand.
+    Explicit normals must already point out of the material, including into holes.
     """
     curve: object
-    tangent: object
+    tangent: object = None
     label: str = "boundary"
     interval: tuple = (0., 2*np.pi)
+    parameter: object = field(default=None, kw_only=True)
+    normal: object = field(default=None, kw_only=True)
+    difference_step: object = field(default=None, kw_only=True)
 
     def __post_init__(self):
-        a = np.asarray(self.interval, dtype=float)
-        if a.shape != (2,) or not np.isfinite(a).all() or a[0] >= a[1]:
+        limits = np.asarray(self.interval, dtype=float)
+        if limits.shape != (2,) or not np.isfinite(limits).all() or limits[0] >= limits[1]:
             raise ValueError("interval must have two increasing finite endpoints")
-        if not callable(self.curve) or not callable(self.tangent):
-            raise TypeError("curve and tangent must be callable")
+        object.__setattr__(self, "interval", tuple(limits.tolist()))
+        object.__setattr__(self, "_geometry", Curve2D(self.curve, self.interval,
+            tangent=self.tangent, normal=self.normal, parameter=self.parameter,
+            difference_step=self.difference_step))
+
+    @property
+    def derivative_source(self):
+        """Return explicit, symbolic, or finite_difference for the tangent source."""
+        return self._geometry.derivative_source
+
+    def evaluate(self, t):
+        """Evaluate either a symbolic or callable curve at a scalar parameter."""
+        return self._geometry.point(t)
 
     def _table(self):
         t = np.linspace(*self.interval, 2049)
-        points = np.asarray([self.curve(v) for v in t], dtype=float)
-        if points.shape != (len(t), 2) or not np.isfinite(points).all():
-            raise ValueError("curve must return finite 2D coordinates")
+        points = np.asarray([self.evaluate(v) for v in t])
         length = np.r_[0., np.cumsum(np.linalg.norm(np.diff(points, axis=0), axis=1))]
         if np.any(np.diff(length) <= 0):
             raise ValueError("curve must be regular and have positive arc length")
         return t, points, length
 
     def sample(self, count):
-        """Return points and unit right-hand normals before contour orientation."""
+        """Return samples and right-hand normals, or explicit outward overrides.
+
+        ParametricDomain corrects tangent-derived normals to point outward.
+        Explicit normal callbacks already specify outward orientation.
+        """
         if type(count) is not int or count < 1:
             raise ValueError("boundary counts must be positive integers")
         t, _, length = self._table()
         q = np.interp(np.linspace(0, length[-1], count, endpoint=False), length, t)
-        points = np.asarray([self.curve(v) for v in q], dtype=float)
-        tangents = np.asarray([self.tangent(v) for v in q], dtype=float)
-        if tangents.shape != points.shape or not np.isfinite(tangents).all():
-            raise ValueError("tangent must return finite 2D vectors")
-        norms = np.linalg.norm(tangents, axis=1)
-        if np.any(norms == 0):
-            raise ValueError("boundary tangent must be nonzero")
-        return points, np.column_stack((tangents[:, 1], -tangents[:, 0]))/norms[:, None]
+        return np.asarray([self.evaluate(v) for v in q]), self._geometry.normals(q)
 
 
 class ParametricDomain:
@@ -88,7 +108,8 @@ class ParametricDomain:
         holes (Sequence): Sequence of boundaries or arc sequences, one per hole.
 
     Orientation may be clockwise or counterclockwise: outward normals are
-    corrected automatically, including on holes. Labels must be unique across
+    corrected automatically, including on holes. Explicit normal overrides keep
+    their supplied direction. Labels must be unique across
     arcs. Membership uses 2048 straight segments per arc; refine the geometric
     model separately when studying very small spatial errors.
     """
@@ -151,15 +172,25 @@ class ParametricDomain:
         result = {}
         for label, b in self.boundaries.items():
             p, normal = b.sample(counts[label])
-            result[label] = p, self._signs[label]*normal
+            result[label] = p, normal if b.normal is not None else self._signs[label]*normal
         return result
 
 
 class Ellipse(ParametricDomain):
-    """Ellipse with semi-axes a, b and a counterclockwise angle in radians.
+    """Ellipse with analytic membership and automatically oriented normals.
 
-    Pass labels=(...) to split its parameter interval into equally sized arcs,
-    useful for mixed boundary conditions. Each arc starts at its first node.
+    Args:
+        a (float): Positive semi-axis along the local x direction (not full width).
+        b (float): Positive semi-axis along the local y direction (not full height).
+        center (tuple): Physical (x, y) center, default (0, 0).
+        angle (float): Counterclockwise rotation in radians, default zero.
+        labels (Sequence[str]): One label for the full boundary, or distinct labels
+            for equal parameter-angle arcs starting at local (a, 0). Four labels
+            cover t in [0, pi/2), [pi/2, pi), [pi, 3*pi/2), [3*pi/2, 2*pi).
+
+    The curve is center + rotation(angle) @ (a*cos(t), b*sin(t)). Arc labels
+    rotate with the shape. Node counts may be a total or a dictionary per label.
+    Sampling along each arc is approximately uniform in physical arc length.
     """
     def __init__(self, a=1.3, b=0.8, *, center=(0., 0.), angle=0., labels=("boundary",)):
         self.a, self.b = _positive(a, "a"), _positive(b, "b")
@@ -180,14 +211,34 @@ class Ellipse(ParametricDomain):
 
 
 class Disk(Ellipse):
-    """Circular 2D domain with analytic membership and outward normals."""
+    """Filled circular 2D domain, including its labeled perimeter.
+
+    Args:
+        radius (float): Positive radius, default 1.
+        center (tuple): Finite (x, y) center, default (0, 0).
+        label (str): Name of the entire circular boundary, default boundary.
+
+    meshgen.generate(Disk(.8), interior=200, boundary=80) samples the filled
+    disk and its perimeter. Use with_holes to remove an inner disk, or Annulus
+    for concentric circles. Use Ellipse with equal axes for labeled circle arcs.
+    """
     def __init__(self, radius=1., *, center=(0., 0.), label="boundary"):
         self.radius = _positive(radius, "radius")
         super().__init__(radius, radius, center=center, labels=(label,))
 
 
 class Annulus(ParametricDomain):
-    """Concentric circular boundaries labeled inner and outer by default."""
+    """Planar material between two concentric circles.
+
+    Args:
+        inner_radius (float): Positive hole radius, smaller than outer_radius.
+        outer_radius (float): Positive exterior radius, default 1.
+        center (tuple): Common finite (x, y) center, default (0, 0).
+
+    Labels are inner and outer. Counts can be set separately with
+    boundary={"inner": 40, "outer": 80}. Inner normals point toward the center;
+    outer normals point away. Membership is analytic rather than polygonal.
+    """
     def __init__(self, inner_radius=0.4, outer_radius=1., *, center=(0., 0.)):
         self.inner_radius = _positive(inner_radius, "inner_radius")
         self.outer_radius = _positive(outer_radius, "outer_radius")
@@ -205,7 +256,19 @@ class Annulus(ParametricDomain):
 
 
 class Flower(ParametricDomain):
-    """Smooth star-shaped boundary r(theta)=radius*(1+amplitude*cos(petals*theta))."""
+    """Smooth filled domain with a radial, petal-shaped boundary.
+
+    Args:
+        radius (float): Positive reference radius in r(t)=radius*(1+amplitude*cos(petals*t)).
+        amplitude (float): Relative modulation, 0 <= amplitude < 1; zero is a disk.
+        petals (int): Positive number of lobes, default 5.
+        center (tuple): Finite (x, y) center, default (0, 0).
+        label (str): Name for the complete exterior boundary, default boundary.
+
+    Membership is analytic. Large amplitudes create narrow necks needing suitable
+    node resolution. This constructor provides one label; use ParametricBoundary
+    arcs if different portions require different boundary conditions.
+    """
     def __init__(self, radius=1., amplitude=.18, petals=5, *, center=(0., 0.), label="boundary"):
         self.radius = _positive(radius, "radius")
         if not np.isfinite(amplitude) or not 0 <= amplitude < 1:

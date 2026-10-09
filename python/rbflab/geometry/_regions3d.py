@@ -45,6 +45,12 @@ class ImplicitRegion:
         bounds (Sequence): Three ``(minimum, maximum)`` pairs for x, y, and z.
         label (object): Optional point label. An automatic region label is used when
             omitted.
+        boundary_label (object): Exterior boundary label; defaults to label when
+            supplied, otherwise "boundary".
+        surface_area (float | None): Optional positive known boundary area.
+        gradient (Callable | None): Gradient of field, returning three components.
+            Used for surface projection and outward normals; finite differences
+            provide a fallback when omitted.
         volume (float | None): Optional known volume. It avoids numerical volume estimation
             when points are allocated across multiple regions.
         clearance (Callable | None): Optional function returning a positive physical distance
@@ -200,7 +206,18 @@ class ImplicitRegion:
 
 
 class Sphere(ImplicitRegion):
-    """A solid sphere implicit region."""
+    """A solid ball with analytic membership, clearance and surface normals.
+
+    Args:
+        center (Sequence): Three coordinates of the center; defaults to the origin.
+        radius (float): Positive physical radius, default 1.
+        label (object): Optional label for the volume region.
+        boundary_label (object): Surface label; defaults to label if supplied,
+            otherwise "boundary".
+
+    Pass to meshgen.generate with separate interior and boundary counts.
+    Boundary samples lie on the sphere and normals point radially outward.
+    """
 
     def __init__(self, center=(0, 0, 0), radius=1, *, label=None,
                  boundary_label=None):
@@ -243,7 +260,20 @@ class Sphere(ImplicitRegion):
 
 
 class Box(ImplicitRegion):
-    """An axis-aligned solid box implicit region."""
+    """An axis-aligned solid box with individually labeled faces.
+
+    Args:
+        minimum (Sequence): Lower x, y, z coordinates, default (-1, -1, -1).
+        maximum (Sequence): Upper x, y, z coordinates, default (1, 1, 1).
+            Each must exceed the corresponding minimum.
+        label (object): Optional volume-region label.
+        boundary_labels (dict | None): Optional face-name replacements, e.g.
+            {"xmin": "inlet", "xmax": "outlet"}. Available keys are xmin,
+            xmax, ymin, ymax, zmin, zmax; omitted faces keep their names.
+
+    meshgen.generate allocates the total boundary count across faces by area;
+    it does not guarantee an exact count per face. Normals are face normals.
+    """
 
     def __init__(self, minimum=(-1, -1, -1), maximum=(1, 1, 1), *, label=None,
                  boundary_labels=None):
@@ -310,7 +340,20 @@ class Box(ImplicitRegion):
 
 
 class Cylinder(ImplicitRegion):
-    """A finite axis-aligned solid cylinder implicit region."""
+    """A finite solid cylinder with a lateral wall and two end caps.
+
+    Args:
+        center (Sequence): Midpoint of the cylinder axis, default (0, 0, 0).
+        radius (float): Positive radius, default 1.
+        height (float): Positive full axial length, default 2.
+        axis (str): One of "x", "y", "z"; defaults to "z".
+        label (object): Optional volume-region label.
+        boundary_labels (dict | None): Optional replacements for side, bottom,
+            and top. Bottom is the negative-axis cap; top is positive-axis.
+
+    The caps are center[axis] +/- height/2. Boundary sampling allocates a
+    total count by surface area; normals point out of the solid.
+    """
 
     def __init__(self, center=(0, 0, 0), radius=1, height=2, *, axis='z', label=None,
                  boundary_labels=None):

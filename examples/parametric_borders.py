@@ -1,7 +1,7 @@
 """FreeFEM-inspired Border syntax, connected to a symbolic Poisson problem.
 
 Run: python -m examples.parametric_borders --plot borders.png
-The Border and RBFMesh interfaces are available in RBFLAB 0.2 and later.
+Unified border generation and automatic normals require RBFLAB 0.4 or later.
 """
 import argparse
 import numpy as np
@@ -13,16 +13,13 @@ from examples._curved import local_method, solve, report
 
 
 def make_cloud(interior=240, seed=42):
-    """Generate an oriented annulus and explicitly supply smooth curve normals."""
+    """Generate an oriented annulus with automatic curve normals."""
     outer = Border(lambda t: (np.cos(t), np.sin(t)),
                    label="outer", t_start=0, t_end=2*np.pi)
     hole = Border(lambda t: (.4*np.cos(t), .4*np.sin(t)),
                   label="hole", t_start=0, t_end=2*np.pi)
     mesh = RBFMesh(outer(96), hole(-48))
-    mesh.generate_points(interior, method="halton", seed=seed, append=False)
-    unit_radial = lambda points: points/np.linalg.norm(points, axis=1)[:, None]
-    cloud = rbf.from_rbfmeshgen(mesh, boundary_labels=["outer", "hole"],
-        normals={"outer": unit_radial, "hole": lambda points: -unit_radial(points)})
+    cloud = rbf.meshgen.generate(mesh, interior=interior, method="halton", seed=seed)
     return mesh, cloud
 
 

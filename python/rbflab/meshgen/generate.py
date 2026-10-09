@@ -1,29 +1,45 @@
 """Reproducible node generation returning the shared PointCloud contract."""
 import numpy as np
 from scipy.spatial import cKDTree
-from scipy.stats import qmc
-from ..geometry import PointCloud, ParametricDomain, ImplicitRegion
+from ..geometry import PointCloud, ParametricDomain, ImplicitRegion, Border
 from .volumes import RBFMesh3D
+from .polygons import RBFMesh
+from .surfaces import ParametricSurface3D
+from ._sampling import planar_interior
 
 
-def generate(domain, *, interior=400, boundary=100, method="halton", seed=0,
-             boundary_distance=0., max_candidates=1000000) -> PointCloud:
-    """Generate a 2D parametric or 3D implicit cloud, without connectivity.
+def generate(domain, *, interior=400, boundary=None, method="halton", seed=0,
+             boundary_distance=0., max_candidates=1000000, normals=None) -> PointCloud:
+    """Generate labeled 2D/3D nodes through one geometry-independent entry point.
 
     Args:
-        domain (ParametricDomain | ImplicitRegion): ParametricDomain (including primitives) or ImplicitRegion.
-        interior (int): Exact nonnegative interior node count.
-        boundary (int | dict): Total boundary count; 2D also accepts counts by arc label.
-        method (str): 'random', 'halton', or 'sobol'. No minimum separation guarantee.
-        seed (int | None): Nonnegative integer or None. Does not change global random state.
-        boundary_distance (float): Physical clearance from the boundary. 2D generic
-            domains use the polygon approximation; 3D needs region clearance.
-        max_candidates (int): Rejection budget; failure raises instead of returning
-            fewer interior points.
+        domain (ParametricDomain | ImplicitRegion | ParametricSurface3D | Border | Sequence | RBFMesh):
+            Primitive/parametric 2D domain, implicit 3D region, sampled Border,
+            list/tuple of sampled borders, an RBFMesh construction, or a
+            ParametricSurface3D (use interior=0 for a surface).
+        interior (int): Nonnegative number of points sampled in the material.
+            Retained internal-interface samples add further interior unknowns.
+        boundary (int | dict | None): Boundary count for domains (default 100).
+            2D parametric domains also accept a count per arc label. For borders,
+            omit this argument: counts are already fixed by border(n).
+        method (str): random, halton, or sobol. No minimum separation guarantee.
+        seed (int | None): Nonnegative seed or None; global random state is unchanged.
+        boundary_distance (float): Physical boundary clearance. Generic 2D domains
+            use a polygon approximation; custom 3D regions need clearance support.
+        max_candidates (int): Positive rejection budget; failure raises rather
+            than silently returning fewer interior points.
+        normals (dict | None): Optional label -> normal arrays or callbacks of
+            the label's point coordinates. Overrides generated normals; finite
+            nonzero vectors are normalized and their supplied direction is retained.
 
     Returns:
-        PointCloud: Float64 coordinates, boundary labels, unit normals and
-            region membership. Rejection/truncation weakens Sobol balance.
+        PointCloud: Float64 coordinates, exterior boundary labels, outward unit
+            normals, and region/interface metadata. No connectivity is invented.
+
+    Border geometry is rebuilt from its signed counts without mutating its
+    objects or an input RBFMesh's samples. Internal interfaces remain interior;
+    no interface normals or transmission equations are inferred. A label cannot
+    simultaneously describe an exterior boundary and an internal interface.
     """
     if type(interior) is not int or interior < 0:
         raise ValueError("interior must be a nonnegative integer")
@@ -35,6 +51,34 @@ def generate(domain, *, interior=400, boundary=100, method="halton", seed=0,
         raise ValueError("boundary_distance must be finite and nonnegative")
     if type(max_candidates) is not int or max_candidates < 1:
         raise ValueError("max_candidates must be a positive integer")
+    if normals is not None and not isinstance(normals, dict):
+        raise TypeError("normals must be a mapping from boundary labels to vectors or callbacks")
+    overrides = normals or {}
+    if isinstance(domain, (Border, RBFMesh, list, tuple)):
+        if boundary is not None:
+            raise ValueError("omit boundary for Border geometry; choose resolution with border(n)")
+        from ._border_cloud import generate_borders
+        cloud = generate_borders(domain, interior=interior, method=method, seed=seed,
+            boundary_distance=boundary_distance, max_candidates=max_candidates,
+            normal_overrides=overrides)
+        return _with_normals(cloud, overrides)
+    if boundary is None:
+        boundary = 100
+    if isinstance(domain, ParametricSurface3D):
+        if interior != 0 or boundary_distance != 0:
+            raise ValueError("a parametric surface has no volume interior; use interior=0 and boundary_distance=0")
+        if type(boundary) is not int or boundary < 1:
+            raise ValueError("surface boundary must be a positive total count")
+        from copy import copy
+        surface = copy(domain)
+        surface.Boundary_Points = []
+        sample_seed = seed if seed is not None else int(np.random.default_rng().integers(0, 2**32))
+        samples = surface.generate_points(boundary, method=method, seed=sample_seed,
+            append=False, max_candidates=max_candidates)
+        p = np.array([(v.x, v.y, v.z) for v in samples])
+        vectors = np.array([v.normal for v in samples])
+        cloud = PointCloud(p, {domain.label: np.arange(len(p))}, {domain.label: vectors})
+        return _with_normals(cloud, overrides)
     if isinstance(domain, ImplicitRegion):
         if type(boundary) is not int or boundary < 1:
             raise ValueError("3D boundary must be a positive total count")
@@ -51,33 +95,36 @@ def generate(domain, *, interior=400, boundary=100, method="halton", seed=0,
         for i, v in enumerate(mesh.Boundary_Points, interior):
             groups.setdefault(v.boundary_label, []).append(i)
             normals.setdefault(v.boundary_label, []).append(v.normal)
-        return PointCloud(p, groups, normals, regions={domain.label or "domain":np.arange(interior)})
+        return _with_normals(PointCloud(p, groups, normals, regions={domain.label or "domain":np.arange(interior)}), overrides)
     if not isinstance(domain, ParametricDomain):
-        raise TypeError("domain must be ParametricDomain or ImplicitRegion")
+        raise TypeError("domain must be a 2D domain, 3D region/surface, Border collection, or RBFMesh")
     groups = domain.sample_boundary(boundary)
-    bounds = np.asarray(domain.bounds)
-    engine = np.random.default_rng(seed) if method == "random" else (
-        qmc.Halton(2, scramble=True, seed=seed) if method == "halton" else qmc.Sobol(2, scramble=True, seed=seed))
-    accepted, count, attempted = [], 0, 0
-    # Fixed power-of-two batches avoid Sobol warnings on ordinary calls.
-    while count < interior and attempted < max_candidates:
-        n = min(1024, max_candidates-attempted)
-        unit = engine.random((n, 2)) if method == "random" else engine.random(n)
-        p = bounds[:,0]+unit*(bounds[:,1]-bounds[:,0])
-        keep = domain.contains_points(p)
-        if boundary_distance:
-            from shapely import points, distance
-            keep &= distance(points(p), domain.polygon.boundary) >= boundary_distance
-        p = p[keep][:interior-count]
-        accepted.append(p);count += len(p);attempted += n
-    if count != interior:
-        raise ValueError("Interior sampling exhausted max_candidates; check domain and clearance")
-    points = [np.concatenate(accepted) if accepted else np.empty((0,2))]
+    interior_points = planar_interior(interior, domain.bounds, domain.contains_points,
+        domain.polygon, method, seed, boundary_distance, max_candidates)
+    points = [interior_points]
     ids, normals, offset = {}, {}, interior
     for label, (p, normal) in groups.items():
         ids[label]=np.arange(offset,offset+len(p));normals[label]=normal
         points.append(p);offset += len(p)
-    return PointCloud(np.concatenate(points), ids, normals, regions={"domain":np.arange(interior)})
+    return _with_normals(PointCloud(np.concatenate(points), ids, normals, regions={"domain":np.arange(interior)}), overrides)
+
+
+def _with_normals(cloud, overrides):
+    if set(overrides)-set(cloud.boundary):
+        raise ValueError("normal overrides must refer to exterior boundary labels")
+    for label, spec in overrides.items():
+        locations = cloud.points[cloud.boundary[label]]
+        raw = np.asarray(spec(locations) if callable(spec) else spec)
+        if np.iscomplexobj(raw):
+            raise ValueError("normal override vectors must be real-valued")
+        vectors = np.asarray(raw, dtype=float)
+        if vectors.shape != locations.shape or not np.isfinite(vectors).all():
+            raise ValueError("normal override must match the boundary's coordinate shape")
+        length = np.linalg.norm(vectors, axis=1)
+        if np.any(length == 0):
+            raise ValueError("normal override vectors must be nonzero")
+        cloud.normals[label] = vectors/length[:, None]
+    return cloud
 
 
 def quality(cloud, *, stencil_size=25, polynomial_degree=2):

@@ -69,12 +69,20 @@ nav:
   - Introduction:
       - First problem: getting-started.md
       - Installation: INSTALL.md
-  - Geometry and nodes:
-      - Geometry to PDE: geometry/index.md
-      - Geometry cookbook: geometry/cookbook.md
-      - Parametric borders: geometry/parametric-borders.md
-      - Custom domains and 3D: geometry/custom-domains.md
-      - Gmsh and staggered clouds: geometry/staggered.md
+  - Mesh generation:
+      - Construction overview: geometry/index.md
+      - 2D domains:
+          - Built-in shapes and holes: geometry/planar-domains.md
+          - Oriented borders: geometry/parametric-borders.md
+          - Parametric contours: geometry/custom-domains.md
+          - Labels and normals: geometry/labels-normals.md
+      - Sampling and quality: geometry/sampling.md
+      - 3D geometry:
+          - Volume clouds: geometry/volumes-3d.md
+          - Surface clouds: geometry/surfaces-3d.md
+      - Connected meshes:
+          - Gmsh triangles: geometry/gmsh.md
+          - Staggered clouds explained: geometry/staggered.md
   - Curved-domain examples:
       - Poisson with holes: tutorials/perforated-poisson.md
       - Laplace on an annulus: tutorials/annulus.md
