@@ -2,11 +2,13 @@
 
 The scalar API accepts linear differential operators and tagged boundary conditions. The symbolic interfaces compile SymPy expressions into these numerical problems.
 
+`SymbolicSystem` declares coupled scalar stationary fields. `SymbolicStokes` is
+the specialized constant-viscosity momentum compiler with prescribed velocity
+boundaries; it does not claim arbitrary mixed vector PDE support.
+
 ::: rbflab.SymbolicScalar
 
 ::: rbflab.SymbolicSystem
-
-::: rbflab.BlockPDE
 
 ::: rbflab.LinearPDE
 
@@ -32,12 +34,8 @@ The scalar API accepts linear differential operators and tagged boundary conditi
 
 ::: rbflab.PressureSpace
 
-::: rbflab.StokesProblem
-
-::: rbflab.UnsteadyStokesProblem
-
 ::: rbflab.EvolutionPDE
 
-::: rbflab.InitialData
+::: rbflab.SymbolicStokes
 
-::: rbflab.TimeData
+::: rbflab.CenterGroup

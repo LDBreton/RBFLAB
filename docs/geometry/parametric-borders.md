@@ -115,9 +115,8 @@ omits its samples from these labeled groups.
 
 An existing `meshgen.RBFMesh(...)` construction is also accepted by
 `meshgen.generate(mesh, interior=...)`. Generation resamples according to the
-requested options without changing `mesh.Points`. `from_rbfmeshgen` remains a
-compatibility importer for already-sampled object lists; new tutorials use
-`meshgen.generate`.
+requested options without changing `mesh.Points`. For already sampled arrays,
+construct a `PointCloud` with explicit boundary labels and normals.
 
 **Geometry accuracy:** the segment samples define a polygonal approximation.
 Nodes are uniform in the parameter, not generally in physical arc length.

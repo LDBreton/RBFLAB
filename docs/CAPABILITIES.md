@@ -28,3 +28,22 @@ Curved-domain scalar examples were compared on identical clouds with Python,
 C++ Float64 and PyTorch CPU Float64. See [the validation record](guides/curved-validation.md).
 Core geometry includes 2D parametric domains/holes, 3D implicit regions and
 parametric surfaces. Staggering remains explicit 2D triangle-based geometry.
+
+## Configuration preflight
+
+Use `method.preflight(problem, cloud)` or
+`method.preflight(operation="operators")` before an expensive run. The same
+validation is used by assembly. This checks configuration support, not geometric
+rank or expected accuracy.
+
+Independent `CenterGroup` layouts support scalar stationary Python LHI in 2D/3D,
+including supported extended arithmetic. Default-layout transient LHI remains
+supported; independent transient groups require additional unknown-data maps and
+are explicitly rejected. `SymbolicStokes` describes constant-viscosity momentum
+with prescribed velocity boundaries. Coupled scalar stationary problems use
+`SymbolicSystem`; arbitrary mixed vector equations are not advertised.
+
+`RBFFD.weights` and `RBFFD.operators` currently support the standard nodal
+construction. PDE assembly retains `standard`, `symmetric`, and
+`boundary_hermite` variants. Solver availability is checked separately:
+`LocalSolver("svd")` currently requires C++ Float64 Stokes LHI.

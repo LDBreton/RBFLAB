@@ -137,3 +137,7 @@ with their imports and preceding steps.
     ```
 
 [Download the script](https://raw.githubusercontent.com/LDBreton/RBFLAB/main/examples/tutorials/lhi_construction.py).
+
+## Independent functional centers
+
+Use [named center groups](lhi-centers.md) to choose solution, boundary, PDE, and derivative-data points separately.

@@ -95,6 +95,7 @@ nav:
           - One RBF-FD stencil: tutorials/one-stencil.md
           - Assemble your own PDE: tutorials/custom-assembly.md
           - Local Hermite interpolation: tutorials/lhi.md
+          - Choose LHI functional centers: tutorials/lhi-centers.md
           - Heat time stepping: tutorials/heat-equation.md
           - Coupled Stokes fields: tutorials/annular-stokes.md
           - Build a cavity algorithm: tutorials/cavity.md
@@ -118,6 +119,7 @@ nav:
       - Errors and residuals: theory/errors.md
       - Papers and further reading: theory/references.md
   - Practical guides:
+      - Construct your own method: guides/research-api.md
       - Visualization: VISUALIZATION.md
       - Curved-domain backends: guides/curved-backends.md
       - Curved-domain validation: guides/curved-validation.md

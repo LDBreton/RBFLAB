@@ -4,7 +4,7 @@ Global methods assemble dense systems. LHI and RBF-FD construct local weights an
 
 ::: rbflab.interpolate
 
-::: rbflab.rbf_fd_weights
+::: rbflab.RBFFD.weights
 
 ::: rbflab.GlobalCollocation
 
@@ -12,20 +12,6 @@ Global methods assemble dense systems. LHI and RBF-FD construct local weights an
 
 ::: rbflab.RBFFD
 
-::: rbflab.BlockGlobal
-
-::: rbflab.BlockLHI
-
-::: rbflab.GlobalStokes
-
-::: rbflab.GlobalUnsteadyStokes
-
-::: rbflab.LHIUnsteadyStokes
-
 ::: rbflab.DiscreteOperator
 
 ::: rbflab.OperatorSet
-
-::: rbflab.EvolutionSystem
-
-::: rbflab.EvolutionTrajectory

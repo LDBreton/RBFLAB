@@ -104,7 +104,7 @@ other code needs the original operator. Changing that matrix does not update
 cached local inspection records.
 
 For custom neighborhoods, choose indices and call
-`rbf_fd_weights(kernel, selected_points, target, operator, polynomial_degree=...)`,
+`method.weights(centers=selected_points, target=target, operator=operator)`,
 then scatter the weights into your own sparse matrix. There is currently no
 generic public callback to replace every method's local ansatz or solver; use
 this explicit construction when the existing method settings do not express your idea.
@@ -128,7 +128,7 @@ in the same algebraic form. A quick check compares `U` with `symbolic.evaluate(X
 | New boundary model | Boundary rows or elimination |
 | New solver/preconditioner | The `spsolve` call |
 | New time integrator | A loop around the spatial matrices |
-| New neighbor rule | Explicit points supplied to `rbf_fd_weights` |
+| New neighbor rule | Explicit points supplied to `method.weights` |
 
 New values on fixed nodes can reuse fixed weights. Changing nodes, kernel or
 stencil settings requires rebuilding. With [backend setup](../INSTALL.md), the

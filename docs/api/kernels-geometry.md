@@ -18,10 +18,10 @@ Kernel shape parameters use the conventions in their docstrings. When using PHS 
 
 ::: rbflab.PointCloud
 
-::: rbflab.unit_box_grid
+::: rbflab.geometry
+    options:
+      members: false
 
-::: rbflab.gmsh_square
-
-::: rbflab.gmsh_cube
-
-::: rbflab.from_rbfmeshgen
+::: rbflab.meshgen
+    options:
+      members: false

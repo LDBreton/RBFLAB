@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased — research API consolidation (breaking)
+
+- Canonical `interpolate`, `GlobalCollocation`, `RBFFD`, and `LHI` entry points.
+- `RBFFD.weights` replaces the root `rbf_fd_weights`; explicit centers retain order.
+- `SymbolicStokes` explicitly identifies the specialized vector Stokes compiler.
+- Numerical shape policy belongs to `StencilPolicy`; local factorization belongs to `LocalSolver`.
+- `CenterGroup` exposes independent scalar stationary LHI solution, PDE, boundary and derivative-data centers.
+- Shared preflight, prepared copies, system recipes/DOF descriptions and matrix-cache safeguards.
+- Root compatibility/experimental exports removed; geometry and diagnostics use named modules.
+- Stokes LHI matrix edits are rejected because dependent row maps require reassembly.
+
+See the [research API guide](docs/guides/research-api.md) and
+[API decision record](docs/development/API_CONSOLIDATION.md).
+
+
 ## 0.4.0
 
 - Unify generation of primitive domains, oriented borders, RBFMesh constructions, implicit volumes and parametric surfaces under `meshgen.generate`.

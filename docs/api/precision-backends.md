@@ -17,10 +17,4 @@ shape parameters, see [local stencil scaling](../theory/conditioning.md#local-st
 
 ::: rbflab.TorchBackend
 
-::: rbflab.TorchKernel
-
-::: rbflab.CudaLHIBackend
-
-::: rbflab.DifferentiableLHI
-
-::: rbflab.LegacyCppLHIBackend
+::: rbflab.LocalSolver
