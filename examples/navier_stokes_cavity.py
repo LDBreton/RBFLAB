@@ -13,6 +13,7 @@ import rbflab as r
 from rbflab import viz
 
 
+# --8<-- [start:clouds]
 def clouds(cells):
     """Vertices carry pressure; triangle edge midpoints carry velocity."""
     pressure = r.unit_box_grid(cells)
@@ -36,8 +37,15 @@ def clouds(cells):
     return r.PointCloud(points, boundary, normals), pressure
 
 
+# --8<-- [end:clouds]
 def solve(*, cells=16, dt=.00125, end=20., backend="python", frames=60):
-    """Return nodes, time samples, velocities, and final diagnostics."""
+    """Advance CN diffusion / AB2 convection with a coupled pressure constraint.
+
+    All arrays and sparse operators use Float64. A compatibility multiplier
+    allows a spatially constant divergence defect; this is reported explicitly.
+    Returns velocity samples, not a pressure time history. See the cavity
+    tutorial for the block equations and the meaning of each diagnostic.
+    """
     if cells < 6 or dt <= 0 or end <= 0 or frames < 2:
         raise ValueError("Require cells >= 6 and positive dt, end, and frames >= 2")
     steps = round(end / dt)
@@ -47,6 +55,7 @@ def solve(*, cells=16, dt=.00125, end=20., backend="python", frames=60):
              r.CppBackend(threads=8, compute_condition=False) if backend == "cpp" else None)
     if local is None:
         raise ValueError("backend must be 'python' or 'cpp'")
+    # --8<-- [start:operators]
     velocity, pressure = clouds(cells)
     rbffd = r.RBFFD(spaces={"u": r.ScalarSpace(r.PHS(7), 3),
                             "p": r.PressureSpace(r.PHS(7), 3)},
@@ -63,14 +72,20 @@ def solve(*, cells=16, dt=.00125, end=20., backend="python", frames=60):
     Dx, Dy = vp.dx.matrix, vp.dy.matrix
     Gx, Gy = pv.dx.matrix, pv.dy.matrix
 
+    # --8<-- [end:operators]
+    # --8<-- [start:assembly]
     inside, wall = velocity.interior_indices, velocity.boundary_indices
     n, m = len(velocity.points), len(pressure.points)
     viscosity = .01  # Re = lid speed * box width / viscosity = 100
+    # CN diffusion: A multiplies u^{n+1}, B multiplies u^n.
     A = eye(n, format="csr") / dt - .5 * viscosity * lap
     B = eye(n, format="csr") / dt + .5 * viscosity * lap
     a = A[inside][:, inside]
     zero = csr_matrix(a.shape)
     ones = csr_matrix(np.ones((m, 1)))
+    # Unknowns: [u_I, v_I, pressure, compatibility multiplier].
+    # Last row fixes the arithmetic pressure mean; the column of ones allows
+    # D_x u + D_y v = -lambda at every pressure node, not exactly zero.
     coupled = bmat([[a, zero, Gx[inside], None],
                     [zero, a, Gy[inside], None],
                     [Dx[:, inside], Dy[:, inside], None, ones],
@@ -78,16 +93,21 @@ def solve(*, cells=16, dt=.00125, end=20., backend="python", frames=60):
     factor = splu(coupled)
     fixed = np.zeros((n, 2))
     fixed[velocity.boundary["top"], 0] = 1.
+    # Eliminate the known velocity boundary values from momentum/continuity.
     correction = A[inside][:, wall] @ fixed[wall]
     continuity = -Dx[:, wall] @ fixed[wall, 0] - Dy[:, wall] @ fixed[wall, 1]
+    # --8<-- [end:assembly]
+    # --8<-- [start:time_loop]
     u = fixed.copy()
     previous = None
     times, samples = [0.], [u.copy()]
     stride = max(1, steps // (frames - 1))
     for step in range(1, steps + 1):
+        # Advective (not conservative/skew-symmetric) convection, evaluated at velocity nodes.
         convection = u[:, 0, None] * (dx @ u) + u[:, 1, None] * (dy @ u)
         explicit = convection if previous is None else 1.5 * convection - .5 * previous
         rhs = B[inside] @ u - explicit[inside] - correction
+        # Reuse the same sparse LU because dt, viscosity and nodes are fixed.
         answer = factor.solve(np.r_[rhs[:, 0], rhs[:, 1], continuity, 0.])
         new = fixed.copy()
         new[inside, 0] = answer[:len(inside)]
@@ -98,8 +118,12 @@ def solve(*, cells=16, dt=.00125, end=20., backend="python", frames=60):
         if step % stride == 0 or step == steps:
             times.append(step * dt)
             samples.append(u.copy())
+    # --8<-- [end:time_loop]
     divergence = Dx @ u[:, 0] + Dy @ u[:, 1]
+    last_rhs = np.r_[rhs[:, 0], rhs[:, 1], continuity, 0.]
     diagnostics = {"velocity_nodes": n, "pressure_nodes": m,
+                   "linear_residual_max": float(np.max(np.abs(coupled @ answer - last_rhs))),
+                   "continuity_equation_max": float(np.max(np.abs(divergence + answer[-1]))),
                    "max_divergence": float(np.max(np.abs(divergence))),
                    "compatibility": float(answer[-1]),
                    "pressure_mean": float(np.mean(answer[2 * len(inside):2 * len(inside) + m])),

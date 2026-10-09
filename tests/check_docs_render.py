@@ -22,7 +22,7 @@ for relative in (
     assert '<em>i)' not in html, relative
 
 heat = (root / "site/tutorials/heat-equation/index.html").read_text(encoding="utf-8")
-for name in ("five_point_laplacian", "rbf_fd_laplacian", "symbolic_solution"):
+for name in ("rbf_fd_laplacian", "symbolic_solution", "lap_ib"):
     assert name in heat, name
 print("Rendered documentation includes math and runnable source.")
 
@@ -70,3 +70,13 @@ for path, parser in pages.items():
         if parts.fragment and target in pages:
             assert unquote(parts.fragment) in pages[target].ids, (path, url)
 print(f"Shared versioned styling and local links verified on {len(pages)} pages.")
+
+# The main example route must be unified; cavity source must be visible beyond its wrapper.
+nav = (root / "mkdocs.yml").read_text(encoding="utf-8")
+assert "  - Examples:" in nav
+assert "Curved-domain examples:" not in nav and "Learning by examples:" not in nav
+assert "five_point_laplacian" not in heat
+cavity = (root / "site/tutorials/cavity/index.html").read_text(encoding="utf-8")
+for name in ("convection", "coupled", "continuity_equation_max", "factor"):
+    assert name in cavity, name
+assert "--8<--" not in cavity

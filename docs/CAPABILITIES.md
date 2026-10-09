@@ -1,4 +1,4 @@
-# Verified capabilities for RBFLAB 0.2.0
+# Verified capabilities
 
 The method and backend combinations below are intentionally precise. A local
 backend choice does not automatically change a separate global sparse solve.

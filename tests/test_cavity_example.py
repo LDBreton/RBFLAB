@@ -19,3 +19,5 @@ def test_cavity_example_constraints():
     assert abs(diagnostics["pressure_mean"]) < 1e-10
     assert abs(diagnostics["max_divergence"] - abs(diagnostics["compatibility"])) < 1e-10
     assert diagnostics["max_speed"] < 1.1
+    assert diagnostics["linear_residual_max"] < 1e-9
+    assert diagnostics["continuity_equation_max"] < 1e-10

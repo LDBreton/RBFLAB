@@ -22,33 +22,10 @@ help small systems. The documented Torch path does not use CUDA or MPFR.
 
 ## C++ source setup
 
-Linux, from a checkout:
-
-```sh
-python -m pip install -e ".[examples]"
-bash cpp/prepare_dependencies.sh
-python -m examples.annulus --backend cpp
-```
-
-Install GCC with OpenMP and the system development tools first. The dependency
-script downloads/extracts Ubuntu/Debian Eigen and MPFR/GMP development packages
-locally; it does not require a system-wide install. Other distributions need
-an equivalent layout described in the native build guide.
-
-On Windows with an existing Ubuntu WSL toolchain:
-
-```powershell
-python -m pip install -e ".[examples]"
-wsl -d Ubuntu -- bash /mnt/f/Proyectos/RBFLAB-public/cpp/prepare_dependencies.sh
-python -m examples.annulus --backend cpp
-```
-
-Replace the WSL path with your checkout path. Scalar examples compile/cache the
-needed kernels automatically; the built-in vector LHI executables have the
-separate build command in [the native guide](https://github.com/LDBreton/RBFLAB/blob/main/cpp/README.md).
-C++ source paths are now resolved relative to the actual source checkout, not
-an assumed flat Python layout. An installed wheel can use a matching checkout
-through `RBFLAB_SOURCE_ROOT`; native sources are not bundled in the wheel.
+Use the step-by-step [Ubuntu](../INSTALL.md#4-enable-c-on-ubuntu-linux) or
+[Windows/WSL](../INSTALL.md#5-enable-c-from-windows-through-wsl) installation route.
+The guide distinguishes generated scalar kernels from dedicated vector LHI
+executables and explains dependencies, cache reuse and matching native sources.
 
 ## Read timings honestly
 

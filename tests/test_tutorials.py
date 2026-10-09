@@ -49,3 +49,21 @@ def test_global_local_comparison_and_custom_kernel():
     assert set(errors) == {"global_symmetric", "global_asymmetric", "lhi", "rbffd"}
     assert all(np.isfinite(value) and value < 0.05 for value in errors.values())
     assert custom_kernel.run() < 0.01
+
+
+def test_first_problem_on_ellipse():
+    from examples.tutorials.first_problem import run
+    assert run() < 2e-4
+
+
+def test_heat_page_standalone_symbolic_recipe():
+    from pathlib import Path
+    import re
+    page = Path(__file__).resolve().parents[1] / "docs/tutorials/heat-equation.md"
+    code = re.search(r"```python\n(.*?)\n```", page.read_text(encoding="utf-8"), re.S).group(1)
+    namespace = {}
+    exec(compile(code, str(page), "exec"), namespace)
+    cloud, trajectory = namespace["cloud"], namespace["trajectory"]
+    x, y = cloud.points.T
+    truth = np.exp(-1)*(np.cos(x)*np.cos(y)+np.sin(2*x)/4)
+    assert np.max(np.abs(trajectory.final.evaluate(cloud.points)-truth)) < .004

@@ -1,5 +1,10 @@
 # C++ local numerical backend
 
+For the step-by-step Ubuntu or Windows/WSL setup, start with the
+[installation guide](https://ldbreton.github.io/RBFLAB/INSTALL/). This reference
+describes solver internals after that setup. Generated scalar kernels compile
+on demand; built-in vector LHI also has the dedicated executables below.
+
 The production LHI local factorization is Eigen `PartialPivLU`. Float64 uses
 `Eigen::Matrix<double,...>`; arbitrary precision uses the existing MPFR `Real`
 wrapper with `Eigen::NumTraits<Real>`. No conversion through double occurs in

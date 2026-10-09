@@ -67,8 +67,8 @@ extra_javascript:
 nav:
   - Manual overview: index.md
   - Introduction:
-      - First problem: getting-started.md
       - Installation: INSTALL.md
+      - Your first RBF problem: getting-started.md
   - Mesh generation:
       - Construction overview: geometry/index.md
       - 2D domains:
@@ -83,23 +83,18 @@ nav:
       - Connected meshes:
           - Gmsh triangles: geometry/gmsh.md
           - Staggered clouds explained: geometry/staggered.md
-  - Curved-domain examples:
-      - Poisson with holes: tutorials/perforated-poisson.md
-      - Laplace on an annulus: tutorials/annulus.md
-      - Heat on a flower: tutorials/flower-heat.md
-      - Mixed conditions on an ellipse: tutorials/ellipse.md
-      - Annular Stokes flow: tutorials/annular-stokes.md
-      - Poisson inside a ball: tutorials/ball.md
-  - Learning by examples:
+  - Examples:
+      - Choose a tutorial: tutorials/index.md
       - Interpolation and derivatives: tutorials/interpolation.md
       - One RBF-FD stencil: tutorials/one-stencil.md
-      - Heat equation from matrices: tutorials/heat-equation.md
-      - Mixed-boundary Poisson: tutorials/mixed-boundary.md
-      - Global collocation and LHI: tutorials/global-lhi.md
-      - Symbolic custom kernels: tutorials/custom-kernel.md
-      - Steady and unsteady Stokes: tutorials/stokes.md
-      - A 3D scalar problem: tutorials/scalar-3d.md
-      - Navier-Stokes cavity: tutorials/cavity.md
+      - Poisson with holes: tutorials/perforated-poisson.md
+      - Mixed boundaries on an ellipse: tutorials/ellipse.md
+      - Heat diffusion and RBF matrices: tutorials/heat-equation.md
+      - Compare global, LHI and RBF-FD: tutorials/global-lhi.md
+      - Define a custom kernel: tutorials/custom-kernel.md
+      - Stokes between rotating cylinders: tutorials/annular-stokes.md
+      - Poisson inside a 3D ball: tutorials/ball.md
+      - Build a Navier-Stokes cavity solver: tutorials/cavity.md
   - Mathematical foundations:
       - Reading route: theory/index.md
       - Notation and model problem: theory/notation.md
@@ -117,7 +112,6 @@ nav:
       - Visualization: VISUALIZATION.md
       - Curved-domain backends: guides/curved-backends.md
       - Curved-domain validation: guides/curved-validation.md
-      - Lid-driven cavity: guides/LID_DRIVEN_CAVITY.md
   - API reference:
       - Kernels and geometry: api/kernels-geometry.md
       - Geometry and generation: api/mesh-generation.md

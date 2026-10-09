@@ -1,4 +1,4 @@
-"""Heat equation through classical finite differences, RBF-FD matrices, and SymPy.
+"""Heat equation through exposed RBF-FD matrices and the symbolic PDE interface.
 
 Run: python -m examples.tutorials.heat_matrices
 Optional: python -m examples.tutorials.heat_matrices --plot
@@ -31,20 +31,7 @@ def forcing(points, time, kappa=1.0, nonzero_boundary=False):
     return np.zeros(len(points))
 
 
-def five_point_laplacian(cells):
-    """Return a full-node Laplacian with zero rows at boundary nodes."""
-    n = cells + 1
-    h2 = (1 / cells)**2
-    matrix = sparse.lil_matrix((n*n, n*n), dtype=float)
-    for i in range(1, cells):
-        for j in range(1, cells):
-            row = i*n + j  # unit_box_grid uses indexing='ij'.
-            matrix[row, row] = -4 / h2
-            for neighbor in (row-n, row+n, row-1, row+1):
-                matrix[row, neighbor] = 1 / h2
-    return matrix.tocsr()
-
-
+# --8<-- [start:rbf_fd_laplacian]
 def rbf_fd_laplacian(cloud, stencil_size=20):
     """Assemble reusable RBF-FD Laplacian weights at every node."""
     method = rbf.RBFFD(
@@ -59,6 +46,10 @@ def rbf_fd_laplacian(cloud, stencil_size=20):
     return ops.lap.matrix.tocsr(), ops
 
 
+# --8<-- [end:rbf_fd_laplacian]
+
+
+# --8<-- [start:march]
 def march(matrix, cloud, *, dt, steps, kappa=1.0, scheme="backward_euler",
           nonzero_boundary=False):
     """March the interior nodal vector with BE or BE-started BDF2."""
@@ -88,6 +79,10 @@ def march(matrix, cloud, *, dt, steps, kappa=1.0, scheme="backward_euler",
     return np.asarray(states), (1 + int(bdf2_factor is not None))
 
 
+# --8<-- [end:march]
+
+
+# --8<-- [start:symbolic_solution]
 def symbolic_solution(cloud, *, dt, steps, kappa=1.0, scheme="backward_euler",
                       nonzero_boundary=False):
     """Solve the same PDE using the higher-level symbolic interface."""
@@ -106,6 +101,9 @@ def symbolic_solution(cloud, *, dt, steps, kappa=1.0, scheme="backward_euler",
     )
     method = rbf.RBFFD(rbf.PHS(5), min(20, len(cloud.points)), polynomial_degree=2)
     return problem.solve(cloud, method, str(dt), steps, scheme=scheme)
+
+
+# --8<-- [end:symbolic_solution]
 
 
 def plot_states(cloud, states, dt, output):
@@ -134,8 +132,8 @@ def plot_states(cloud, states, dt, output):
 
 
 
-def plot_diagnostics(cloud, fd_matrix, rbf_matrix, fd_final, rbf_final, time, output):
-    """Save a labeled cloud, matrix pattern, and final-temperature comparison."""
+def plot_diagnostics(cloud, rbf_matrix, rbf_final, truth, time, output):
+    """Save a labeled cloud, matrix pattern, computed field and nodal error."""
     import matplotlib.pyplot as plt
 
     n = int(np.sqrt(len(cloud.points)))
@@ -149,16 +147,15 @@ def plot_diagnostics(cloud, fd_matrix, rbf_matrix, fd_final, rbf_final, time, ou
     axes[0, 1].spy(rbf_matrix, markersize=2)
     axes[0, 1].set(xlabel="source node", ylabel="target row",
                    title=f"RBF-FD Laplacian: {rbf_matrix.nnz} nonzeros")
-    image_options = dict(origin="lower", extent=(0, 1, 0, 1), cmap="inferno",
-                         vmin=min(fd_final.min(), rbf_final.min()),
-                         vmax=max(fd_final.max(), rbf_final.max()))
-    for ax, values, title in (
-        (axes[1, 0], fd_final, "Five-point FD"),
-        (axes[1, 1], rbf_final, "RBF-FD"),
-    ):
-        image = ax.imshow(values.reshape(n, n).T, **image_options)
-        ax.set(xlabel="x", ylabel="y", title=f"{title} at t={time:g}")
-    fig.colorbar(image, ax=axes[1, :], label="temperature", shrink=0.85)
+    image = axes[1, 0].imshow(rbf_final.reshape(n, n).T, origin="lower",
+        extent=(0, 1, 0, 1), cmap="inferno")
+    axes[1, 0].set(xlabel="x", ylabel="y", title=f"RBF-FD temperature at t={time:g}")
+    fig.colorbar(image, ax=axes[1, 0], label="temperature", shrink=.85)
+    error = np.abs(rbf_final-truth)
+    image = axes[1, 1].imshow(error.reshape(n, n).T, origin="lower",
+        extent=(0, 1, 0, 1), cmap="magma", vmin=0)
+    axes[1, 1].set(xlabel="x", ylabel="y", title="Absolute nodal error")
+    fig.colorbar(image, ax=axes[1, 1], label="absolute error", shrink=.85)
     output = Path(output)
     output.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(output, dpi=160)
@@ -195,12 +192,9 @@ def refinement_study(kappa=1.0, final_time=0.05):
 
 def run(cells=6, dt=0.01, steps=5, *, kappa=1.0, scheme="backward_euler",
         nonzero_boundary=False, plot=None, figure=None):
-    """Run three implementations and report final nodal maximum errors."""
+    """Compare direct RBF-FD time marching with symbolic RBF-FD assembly."""
     cloud = rbf.unit_box_grid(cells)
-    fd = five_point_laplacian(cells)
     rbf_matrix, ops = rbf_fd_laplacian(cloud)
-    fd_states, fd_factors = march(fd, cloud, dt=dt, steps=steps, kappa=kappa,
-                                  scheme=scheme, nonzero_boundary=nonzero_boundary)
     rbf_states, rbf_factors = march(rbf_matrix, cloud, dt=dt, steps=steps, kappa=kappa,
                                     scheme=scheme, nonzero_boundary=nonzero_boundary)
     trajectory = symbolic_solution(cloud, dt=dt, steps=steps, kappa=kappa,
@@ -208,19 +202,17 @@ def run(cells=6, dt=0.01, steps=5, *, kappa=1.0, scheme="backward_euler",
     final_truth = exact(cloud.points, dt*steps, kappa, nonzero_boundary)
     symbolic_values = np.asarray(trajectory.final.evaluate(cloud.points), dtype=float).reshape(-1)
     errors = {
-        "five_point_fd": float(np.max(np.abs(fd_states[-1]-final_truth))),
         "rbf_fd_matrix": float(np.max(np.abs(rbf_states[-1]-final_truth))),
         "symbolic_rbffd": float(np.max(np.abs(symbolic_values-final_truth))),
     }
     print(f"nodes={len(cloud.points)} interior={len(cloud.interior_indices)} "
           f"boundary={len(cloud.boundary_indices)} stencil={min(20, len(cloud.points))}")
-    print(f"L_fd={fd.shape}, L_rbf={rbf_matrix.shape}, "
+    print(f"L_rbf={rbf_matrix.shape}, "
           f"L_rbf_nnz={rbf_matrix.nnz}, local_factorizations={ops.diagnostics['factorizations']}")
     print(f"time_scheme={scheme}, dt={dt}, steps={steps}, "
           f"matrix_factorizations={rbf_factors}, final_nodal_max_error={errors}")
     if figure is not None:
-        plot_diagnostics(cloud, fd, rbf_matrix, fd_states[-1],
-                         rbf_states[-1], dt*steps, figure)
+        plot_diagnostics(cloud, rbf_matrix, rbf_states[-1], final_truth, dt*steps, figure)
         print(f"figure={figure}")
     if plot is not None:
         plot_states(cloud, rbf_states, dt, plot)

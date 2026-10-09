@@ -111,3 +111,14 @@ Generate the homepage method cards with `python -m examples.make_method_gallery`
 not substitutes for validation plots. method_gallery.json records the recipes
 and diagnostics. Keep their captions and tutorial links aligned with the actual
 example; no image should imply a benchmark that has not been checked.
+
+## Curated learning route
+
+Keep a single Examples chapter. Select one leading geometry/problem for each
+concept, with foundational operator lessons before coupled flow. Supplementary
+regression pages can remain linked without expanding the main navigation.
+Heat teaches RBF matrices; its source no longer includes classical five-point FD.
+Cavity equations must match the maintained solver, including the compatibility
+multiplier and the difference between algebraic residual and divergence defect.
+Named snippet markers expose the actual implementation, not a duplicate pseudocode
+solver. Run the first-problem, heat and cavity tests after changing these sections.

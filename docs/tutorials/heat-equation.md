@@ -1,109 +1,186 @@
-# Heat equation from matrices
+# Heat diffusion with RBF-FD
 
-<figure class="method-detail"><img src="../../assets/method_heat.png" alt="RBF-FD temperature at t = 0.02, computed on 361 nodes with PHS5, degree-two polynomials, 25-node stencils, and BE-started BDF2. The surface uses cubic display interpolation of computed nodal temperatures; the contours show the same field."><figcaption>RBF-FD temperature at t = 0.02, computed on 361 nodes with PHS5, degree-two polynomials, 25-node stencils, and BE-started BDF2. The surface uses cubic display interpolation of computed nodal temperatures; the contours show the same field.</figcaption></figure>
+![Computed heat diffusion on a flower domain](../assets/flower_heat.gif)
 
-**You will learn:** to assemble a Laplacian, eliminate Dirichlet values, reuse a sparse factorization, and compare five-point FD, RBF-FD, and RBFLAB's symbolic interface. Prerequisites: sparse matrices and the [single-stencil tutorial](one-stencil.md).
+**Learn two levels of control:** declare a transient PDE symbolically, then build
+the RBF-FD Laplacian and time step its sparse matrix yourself. Both routes use RBF
+weights. The square below is only a convenient domain with a known decaying mode;
+the stencil construction also works on irregular clouds.
 
-## PDE, cloud, and unknowns
+## 1. Start with the equation and a curved domain
 
-On \(\Omega=(0,1)^2\), solve
+For a diffusivity $\kappa>0$,
 
-$$
-u_t=\kappa\Delta u+f,\qquad u|_{\partial\Omega}=g(t),\qquad u(x,0)=u_0(x).
-$$
+$$u_t-\kappa\Delta u=f,\qquad u|_{\partial\Omega}=g(t),\qquad u(\cdot,0)=u_0.$$
 
-The main example uses \(\kappa=1\), \(f=g=0\), and
-\(u=e^{-2\pi^2t}\sin(\pi x)\sin(\pi y)\). `unit_box_grid(cells)` produces \(N=(\mathrm{cells}+1)^2\) nodes ordered with `indexing="ij"`: node \((i,j)\) has flat index \(i(\mathrm{cells}+1)+j\). `cloud.interior_indices` identifies unknown temperatures; `cloud.boundary_indices` identifies prescribed values.
+The flower example uses $\kappa=0.15$ and the known solution
 
-## Three spatial implementations
+$$u_{\rm exact}(x,y,t)=e^{-2t}\left(\cos x\cos y+\tfrac14\sin(2x)\right).$$
 
-The classical five-point formula is
+The forcing is $f=\partial_tu_{\rm exact}-\kappa\Delta u_{\rm exact}$, and the boundary
+values are its trace. This is a forced verification case, not an insulated heat pulse.
+Here is the complete core calculation, without example-helper functions:
 
-$$
-(\Delta_hu)_{i,j}=
-\frac{u_{i-1,j}+u_{i+1,j}+u_{i,j-1}+u_{i,j+1}-4u_{i,j}}{h^2}.
-$$
+```python
+import sympy as sp
+import rbflab as rbf
+from rbflab import geometry, meshgen
 
-`five_point_laplacian` writes its coefficients into a full \(N\times N\) sparse matrix. Boundary rows are zero because the march uses only interior rows. For RBF-FD, `RBFFD(...).operators(...).lap.matrix` also builds a full \(N\times N\) Laplacian, using PHS5, degree-two polynomials, and 20-node stencils. The symbolic route declares \(u_t-\kappa\Delta u=f\) and lets RBFLAB assemble the same RBF-FD operators.
+domain = geometry.Flower()
+cloud = meshgen.generate(domain, interior=250, boundary=120, seed=42)
+model = rbf.SymbolicScalar(2, transient=True)
+u, t = model.field, model.time
+x, y = model.coordinates
+exact = sp.exp(-2*t)*(sp.cos(x)*sp.cos(y) + sp.sin(2*x)/4)
+lhs = sp.diff(u,t) - sp.Rational(15,100)*model.laplacian(u)
+problem = model.evolution(
+    sp.Eq(lhs, lhs.subs(u,exact).doit()), initial=exact.subs(t,0),
+    boundary=[model.bc("boundary", sp.Eq(u,exact))],
+)
+method = rbf.RBFFD(rbf.PHS(5), 35, polynomial_degree=3,
+    stencil_policy=rbf.StencilPolicy(scaling="local"))
+trajectory = problem.solve(cloud, method, "0.025", 20, scheme="bdf2")
+```
 
-## Boundary elimination and time stepping
+The 370-node recipe uses PHS5, degree-three polynomials, 35-node stencils and
+Float64. Backward Euler starts BDF2. To animate the computed solution:
 
-Partition the full nodal vector into interior \(\boldsymbol u_I\) and known boundary values \(\boldsymbol g_B\). Slicing either Laplacian \(L\) gives
+```python
+from rbflab import viz
+viz.animate_scalar(trajectory, "flower.gif", domain=domain)
+```
 
-$$
-\dot{\boldsymbol u}_I
-=\kappa L_{II}\boldsymbol u_I+\kappa L_{IB}\boldsymbol g_B(t)+\boldsymbol f_I(t).
-$$
+The display grid does not enter the PDE discretization. The recorded final
+sampled off-node error at $t=0.5$ is about $1.1\times10^{-3}$; it contains both
+space and time error. Reproduce the error report with
+`python -m examples.heat_flower` from a source checkout.
 
-The code uses `lap_ii = matrix[interior, :][:, interior]` and `lap_ib = matrix[interior, :][:, boundary]`. For backward Euler,
+## 2. Open up the spatial operator
+
+At each target node $x_i$, local RBF interpolation determines Laplacian weights:
+
+$$ (L\boldsymbol u)_i=\sum_{j\in S_i}w_{ij}^{\Delta}u_j\approx\Delta u(x_i). $$
+
+Rows use overlapping stencils $S_i$. Assemble the reusable operator once:
+
+```python
+--8<-- "examples/tutorials/heat_matrices.py:rbf_fd_laplacian"
+```
+
+This function returns the full $N\times N$ sparse Laplacian and its operator
+collection. `ops.lap @ values` applies it; `ops.lap.local(i)` exposes a row's local
+weights, and `ops.lap.reconstruct_local(i)` rebuilds its local interpolation system.
+See [one stencil](one-stencil.md) for the derivation.
+
+The following matrix demonstration uses `unit_box_grid(6)`: 49 nodes, 25 interior
+unknowns, PHS5, degree-two polynomials and 20-node stencils. Its parameters differ
+from the flower recipe so it can run quickly and be checked against a simple exact mode:
+
+$$u(x,y,t)=e^{-2\kappa\pi^2t}\sin(\pi x)\sin(\pi y),\quad f=g=0.$$
+
+## 3. Eliminate prescribed boundary values
+
+Separate interior indices $I$ and boundary indices $B$. The full field is
+$(\boldsymbol u_I,\boldsymbol g_B)$, so the interior equations become
+
+$$\dot{\boldsymbol u}_I=\kappa L_{II}\boldsymbol u_I
++\kappa L_{IB}\boldsymbol g_B(t)+\boldsymbol f_I(t).$$
+
+The matrix slices are:
+
+```python
+interior, boundary = cloud.interior_indices, cloud.boundary_indices
+lap_ii = matrix[interior, :][:, interior]
+lap_ib = matrix[interior, :][:, boundary]
+```
+
+This is a fragment of the time marcher below; `matrix` is the Laplacian returned
+by `rbf_fd_laplacian`. Boundary contributions are on the right-hand side. Dropping
+$L_{IB}g_B$ is only valid when those prescribed values are zero.
+
+## 4. Take implicit time steps
+
+Backward Euler gives
 
 $$
 (I-\Delta t\,\kappa L_{II})\boldsymbol u_I^{n+1}
-=\boldsymbol u_I^n+\Delta t\bigl(\kappa L_{IB}\boldsymbol g_B^{n+1}
-+\boldsymbol f_I^{n+1}\bigr).
+=\boldsymbol u_I^n+\Delta t(\kappa L_{IB}\boldsymbol g_B^{n+1}+\boldsymbol f_I^{n+1}).
 $$
 
-`splu` factors the fixed left matrix once. At each step the code updates \(g\) and \(f\), solves for the interior vector, then inserts it with the boundary values into a full nodal array for plotting.
-
-With one backward Euler startup step, BDF2 instead uses
+After one startup step, BDF2 gives
 
 $$
-\left(\tfrac32 I-\Delta t\,\kappa L_{II}\right)\boldsymbol u_I^{n+1}
+(\tfrac32 I-\Delta t\,\kappa L_{II})\boldsymbol u_I^{n+1}
 =2\boldsymbol u_I^n-\tfrac12\boldsymbol u_I^{n-1}
-+\Delta t\bigl(\kappa L_{IB}\boldsymbol g_B^{n+1}
-+\boldsymbol f_I^{n+1}\bigr).
++\Delta t(\kappa L_{IB}\boldsymbol g_B^{n+1}+\boldsymbol f_I^{n+1}).
 $$
 
-This needs one factorization for startup and one for subsequent steps. The built-in scalar integrator supports backward Euler and BDF2; Crank–Nicolson is an optional direct-matrix exercise, not a built-in scheme.
+The fixed left matrix is factored once per time formula. Changing boundary values
+or forcing only changes the right-hand side; changing the time step would require
+new factors. The actual implementation is:
 
-## Run, visualize, and assess
+```python
+--8<-- "examples/tutorials/heat_matrices.py:march"
+```
 
-From a source checkout, install `rbflab[examples]` when plotting, then run:
+`exact` and `forcing` below provide the verification data. An application can
+replace these callbacks with its own initial state, boundary values and source.
+This loop is ordinary SciPy code acting on RBFLAB's spatial matrix.
+
+## 5. Compare matrix and symbolic assembly
+
+The example also declares the same square-domain problem through `model.evolution`:
+
+??? example "Symbolic version of the same matrix verification problem"
+
+    ```python
+    --8<-- "examples/tutorials/heat_matrices.py:symbolic_solution"
+    ```
+
+The two RBF-FD routes use identical nodes, kernels, stencils and time steps.
+Their agreement tests assembly and boundary handling; it is not an independent
+check of spatial accuracy. Compare both against the known continuous solution.
 
 ```sh
 python -m examples.tutorials.heat_matrices
 python -m examples.tutorials.heat_matrices --scheme bdf2 --nonzero-boundary
 python -m examples.tutorials.heat_matrices --study
-python -m examples.tutorials.heat_matrices --plot outputs/heat_tutorial.gif
 python -m examples.tutorials.heat_matrices --figure outputs/heat_matrices.png
 ```
 
-??? example "Complete runnable script"
+The default five backward-Euler steps use $\Delta t=0.01$ and reach $t=0.05$.
+The nodal maximum error is about $0.03767$ for both routes. This deliberately
+small test has substantial time error. `--nonzero-boundary` switches to
+$u=e^{-t}(1+x+y)$, $f=-u$, and $g=u|_{\partial\Omega}$ to test the boundary term.
+
+![RBF-FD nodes, sparse matrix, computed temperature and absolute nodal error](../assets/heat_matrices.png)
+
+## 6. Separate the sources of error
+
+`--study` uses `expm_multiply` to evolve the fixed semidiscrete system without the
+BE/BDF2 time formula. First it compares that reference with the continuous solution
+on progressively finer clouds; then it holds the cloud fixed and varies $\Delta t$.
+
+| Measurement | What changes? | What it isolates |
+|---|---|---|
+| Semidiscrete versus exact PDE solution | Node count | Spatial error for this recipe |
+| Time-stepped versus semidiscrete solution | Time step | Time-integration error |
+| Matrix versus symbolic route | Assembly route only | Implementation agreement |
+
+An implicit time formula cannot repair an unstable spatial operator. Check errors,
+cloud quality and refinement together; see [time discretization](../theory/time-discretization.md)
+and [error measures](../theory/errors.md).
+
+## Complete matrix example and backend choices
+
+??? example "Complete runnable matrix and symbolic comparison"
 
     ```python
     --8<-- "examples/tutorials/heat_matrices.py"
     ```
 
-[Download the runnable script](https://raw.githubusercontent.com/LDBreton/RBFLAB/main/examples/tutorials/heat_matrices.py).
-
-The default run has 49 nodes (25 interior), \(\Delta t=0.01\), and five steps. Final **nodal maximum** errors were \(0.04123\) for five-point FD and \(0.03767\) for both explicit-matrix and symbolic RBF-FD. Agreement of the latter two checks assembly; their common error mixes space and time effects.
-
-### Reproduce the measured case
-
-The recorded run used Python 3.12.14, NumPy 2.5.3, SciPy 1.18.1,
-RBFLAB 0.1.0 source, and Float64 arithmetic. The cloud was
-unit_box_grid(6) on the unit square; both RBF-FD routes used signed
-PHS5, degree-two polynomials, 20-node stencils, and the Python local
-backend. The five-point FD route used the same 49 nodes. Dirichlet
-values were eliminated through the interior/boundary matrix blocks.
-
-| Check | Resolution | Nodal maximum error |
-|---|---:|---:|
-| Semidiscrete RBF-FD versus exact at \(t=0.05\) | 25 / 49 / 81 nodes | \(5.7173/4.3519/3.5978\) × \(10^{-3}\) |
-| Backward Euler versus fixed 81-node semidiscrete solution | \(\Delta t=0.025/0.0125/0.00625\) | \(7.5005/4.0859/2.1412\) × \(10^{-2}\) |
-
-The spatial row evolves the discrete system with a matrix exponential,
-removing time-stepping error. The temporal row fixes the cloud and
-compares against that same discrete system. It shows first-order time
-behavior over these three steps; the spatial errors decrease more slowly
-and do not establish an asymptotic convergence rate.
-
-The second run uses \(u=e^{-t}(1+x+y)\), \(f=-u\), and \(g=u|_{\partial\Omega}\). Its BDF2 errors were near \(10^{-4}\) for both spatial matrices, exercising the \(L_{IB}g\) term. `--study` compares semidiscrete evolution using `expm_multiply` with the continuous exact solution at several clouds, then holds a cloud fixed to isolate backward Euler time error against the semidiscrete solution. An implicit time step avoids a forward-Euler restriction for a stable diffusion matrix; it cannot repair growing modes in an unstable spatial operator.
-
-![Point cloud, RBF-FD matrix pattern, and computed heat fields](../assets/heat_matrices.png)
-
-The upper-left panel labels interior unknowns and Dirichlet boundary nodes. The upper-right panel shows the nonzero pattern of the full RBF-FD Laplacian; only its interior rows enter the time step. The lower panels use the same temperature scale at \(t=0.05\). The figure is regenerated with `--figure docs/assets/heat_matrices.png` from a source checkout.
-
-![Solved heat pulse in RBFLAB](../assets/heat_diffusion.gif)
-
-Try halving \(\Delta t\) on a fixed cloud; only the time contribution should shrink until spatial error dominates. See [time discretization](../theory/time-discretization.md), [error measures](../theory/errors.md), and the [discretization API](../api/discretizations.md).
+[Download the standalone matrix example](https://raw.githubusercontent.com/LDBreton/RBFLAB/main/examples/tutorials/heat_matrices.py).
+The plotting options require `rbflab[examples]`. For the flower, use
+`python -m examples.heat_flower --backend cpp --animation flower.gif` or
+`--backend torch` after [installing the backend](../INSTALL.md). C++/PyTorch change
+local weight construction; the sparse time solves remain Float64 SciPy solves.
