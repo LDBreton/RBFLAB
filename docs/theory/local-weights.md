@@ -1,5 +1,8 @@
 # From a local approximation to weights
 
+The executable [functional approximation tutorial](../tutorials/local-approximation.md)
+maps these trial, data and target functionals directly to the public API.
+
 This is the algebra shared by local differentiation methods. It explains **why a transpose solve appears**, and why local expansion coefficients disappear from the global PDE solve.
 
 ## 1. Match the local data
@@ -27,6 +30,23 @@ $$
 H_i=\begin{bmatrix}G_i&P_i\\P_i^{\mathsf T}&0\end{bmatrix},\qquad
 (G_i)_{kj}=\lambda_k\psi_j,\quad (P_i)_{km}=\lambda_kp_m.
 $$
+
+When trial and data functionals differ, write
+
+$$\psi_j=m_j^yK(\cdot,z_j),\quad
+G_{ij}=\ell_i^xm_j^yK(x_i,z_j),\quad
+(P_\ell)_{ik}=\ell_ip_k,\quad(P_m)_{jk}=m_jp_k.$$
+
+The explicit representer construction in `LocalApproximation` uses
+
+$$H=\begin{bmatrix}G&P_\ell\\P_m^T&0\end{bmatrix}.$$
+
+The lower block comes from the **trial** functionals. Replacing it silently by
+$P_\ell^T$ would change the method. A symmetric kernel and matching point/functionals
+give a symmetric Hermite block; source-transformed trial functions with nodal
+data generally do not. Both polynomial functional blocks must have the required
+rank. For example, Laplacian-only trial functionals annihilate constants, so they
+cannot support an unconstrained constant polynomial tail in this formulation.
 
 Assume this system is nonsingular. The derivation below also works with other invertible interpolation systems that are not symmetric.
 

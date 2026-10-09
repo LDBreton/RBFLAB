@@ -16,6 +16,8 @@ from .symbolic import SymbolicScalar
 from .symbolic_system import SymbolicSystem
 from .spaces import ScalarSpace, DivergenceFreeSpace, PressureSpace, SymbolicStokes
 from .stencils import StencilPolicy
+from .samples import Samples
+from .local_approximation import LocalApproximation
 from .centers import CenterGroup
 from .methods import GlobalCollocation, LHI, interpolate
 from .rbf_fd import RBFFD
@@ -29,7 +31,7 @@ __all__ = [
     'Identity', 'Derivative', 'Laplacian', 'NormalDerivative', 'Robin', 'SpatialOperator',
     'LinearPDE', 'BoundaryCondition', 'Dirichlet', 'EvolutionPDE',
     'SymbolicScalar', 'SymbolicSystem', 'SymbolicStokes',
-    'ScalarSpace', 'DivergenceFreeSpace', 'PressureSpace', 'StencilPolicy', 'CenterGroup',
+    'ScalarSpace', 'DivergenceFreeSpace', 'PressureSpace', 'StencilPolicy', 'Samples', 'LocalApproximation', 'CenterGroup',
     'GlobalCollocation', 'LHI', 'RBFFD', 'interpolate', 'DiscreteOperator', 'OperatorSet',
     'PythonBackend', 'CppBackend', 'TorchBackend',
 ]

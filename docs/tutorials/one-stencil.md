@@ -1,5 +1,9 @@
 # Build one RBF-FD stencil
 
+For the canonical explicit local API, see [functionals to operators](local-approximation.md)
+and [LHI and heat from matrices](lhi-matrices.md). This page explains the retained
+PDE convenience interface.
+
 **You will learn:** to turn local kernel interpolation into one sparse Laplacian row, inspect its weights, and check polynomial reproduction. Prerequisite: basic NumPy.
 
 

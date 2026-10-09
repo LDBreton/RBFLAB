@@ -17,6 +17,21 @@ class ScalarSpace:
     kernel: object
     polynomial_degree: object = 'auto'
 
+    def representers(self, source):
+        """Construct trial functions by applying source functionals to the kernel.
+
+        Value samples give ordinary kernel translates. Derivative samples
+        give the corresponding source-argument derivatives. The same sample
+        groups can be fitted to obtain Hermite interpolation.
+        """
+        from .samples import KernelTrial
+        return KernelTrial(self, source)
+
+    def translates(self, points):
+        """Construct ordinary kernel translates at explicit trial centers."""
+        from .samples import KernelTrial
+        return KernelTrial(self, points, 'translates')
+
     def degree(self):
         if not isinstance(self.kernel,(ScalarKernel,PHS,Hybrid,BoundKernel)):raise TypeError("Expected a scalar radial kernel")
         minimum=getattr(self.kernel,'minimum_degree',-1)

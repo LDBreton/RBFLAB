@@ -28,6 +28,9 @@ boundaries; it does not claim arbitrary mixed vector PDE support.
 
 ::: rbflab.SpatialOperator
 
+Spaces also describe explicit local trials through `.representers(source)` and
+`.translates(points)`. See [functional approximation](../tutorials/local-approximation.md).
+
 ::: rbflab.ScalarSpace
 
 ::: rbflab.DivergenceFreeSpace

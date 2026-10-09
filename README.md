@@ -74,6 +74,21 @@ fig, ax = viz.plot_scalar(solution, domain=domain, title="Poisson / two holes")
 fig.savefig("solution.png", dpi=180)
 ```
 
+## Construct your own numerical method
+
+The development API exposes **sampled functionals, trial functions and named
+sparse blocks** through `LocalApproximation`. Ordinary RBF-FD and local Hermite
+interpolation use the same mathematical construction. Assemble stiffness, mass,
+forcing and boundary contributions yourself, then write a SciPy solve or time
+loop. Existing PDE convenience interfaces remain available.
+
+- [From functionals to operators](https://ldbreton.github.io/RBFLAB/tutorials/local-approximation/)
+- [LHI and heat from matrices](https://ldbreton.github.io/RBFLAB/tutorials/lhi-matrices/)
+- [Architecture and research API](https://ldbreton.github.io/RBFLAB/guides/research-api/)
+
+These additions are unreleased; use the current source checkout. The installed
+PyPI release may not yet provide these names.
+
 ## See the methods at work
 
 <table>

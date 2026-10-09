@@ -200,60 +200,26 @@ class DiscreteOperator:
 
 
 def build_operators(method,*,source,targets=None,operators,space=None,_indices=None):
-    """Build named differentiation matrices with shared local stencils.
+    """Compatibility adapter from nodal RBFFD to the shared functional engine.
 
-    source and targets are (N, 2) or (N, 3) point arrays or clouds;
-    omitted targets reuse source. operators maps names to differential
-    functionals. One local factorization supplies every named operator
-    at a target. Returns an OperatorSet.
+    Existing result storage is preserved: SciPy Float64 or MPSparseMatrix.
+    Use LocalApproximation directly for named functional groups and native
+    Torch tensor maps.
     """
-    from .operator_backends import execute,reconstruct
+    from .samples import Samples, points_array
+    from .local_approximation import LocalApproximation, nodal_compatibility
     from .lhi_backends import PythonBackend
-    from .precision import Precision
-    from .stencils import StencilPolicy
-    if not isinstance(method.precision,Precision):raise TypeError('precision must be Precision')
-    if not isinstance(method.stencil_policy,StencilPolicy):raise TypeError('stencil_policy must be StencilPolicy')
-    if method.scheme!='standard':raise NotImplementedError('operators currently uses standard nodal RBF-FD; Hermite schemes need explicit source functionals')
-    if not isinstance(operators,Mapping) or not operators:raise ValueError('operators must be a nonempty name-to-operator mapping')
-    if any(not isinstance(k,str) or not k for k in operators):raise ValueError('Operator names must be nonempty strings')
-    descriptor=resolve_space(method,space);degree=descriptor.degree()
-    if isinstance(descriptor,PressureSpace) and degree is None:degree=0
-    vector=isinstance(descriptor,DivergenceFreeSpace)
-    source=np.array(getattr(source,'points',source),dtype=float,copy=True)
-    targets=np.array(source if targets is None else getattr(targets,'points',targets),dtype=float,copy=True)
-    if source.ndim!=2 or source.shape[1] not in (2,3) or not len(source) or not np.isfinite(source).all():raise ValueError('Expected finite nonempty Nx2 or Nx3 sources')
-    if targets.ndim!=2 or targets.shape[1]!=source.shape[1] or not len(targets) or not np.isfinite(targets).all():raise ValueError('Expected matching nonempty targets')
-    if len(np.unique(source,axis=0))!=len(source):raise ValueError('Sources must be distinct')
-    if type(method.stencil_size) is not int or not 2<=method.stencil_size<=len(source):raise ValueError('Invalid stencil_size')
-    if method.precision.global_digits is not None:raise ValueError('Local operators use local_digits')
-    tree=cKDTree(source);ids=[];jobs=[];geometry=[]
-    for row, target in enumerate(targets):
-        selected=method.stencil_policy.select(tree,target,method.stencil_size,degree) if _indices is None else np.asarray(_indices[row], dtype=int)
-        ops=[bind_operators([op],target[None,:])[0] for op in operators.values()]
-        if any(op.dimension!=source.shape[1] for op in ops):raise ValueError('Operator dimension mismatch')
-        ids.append(selected.copy());jobs.append(dict(points=source[selected].copy(),target=target.copy(),ops=ops))
-        geometry.append(geometry_quality(source[selected],target,degree if degree is not None else 1))
-    from .configuration import configured_backend
-    owner=SimpleNamespace(source=source,targets=targets,ids=ids,jobs=jobs,kernel=copy.deepcopy(descriptor.kernel),degree=degree,vector=vector,
-        components=source.shape[1] if vector else 1,precision=copy.deepcopy(method.precision),scaling=method.stencil_policy.scaling,
-        backend=configured_backend(method),arithmetic=Arithmetic(descriptor.kernel,method.precision.local_digits))
-    results=execute(owner);owner.weights=[r['weights'] for r in results]
-    owner.diagnostics=[dict(geometry=g,scaled_condition=r['condition'],weight_residual=r['residual'],factorizations=1) for g,r in zip(geometry,results)]
-    owner.reconstruct=lambda i:reconstruct(owner,i)
-    c=owner.components;out={};a=owner.arithmetic;full=method.precision.global_dtype=='mpmath'
-    if full and not a.ctx:raise ValueError('mpmath sparse weights require local_digits')
-    for k,name in enumerate(operators):
-        rows=[]
-        for selected,w in zip(ids,owner.weights):
-            for component in range(c):
-                rows.append({int(node)*c+b:w[j*c+b,k*c+component] for j,node in enumerate(selected) for b in range(c)})
-        if full:matrix=MPSparseMatrix(a.ctx,rows,ncols=len(source)*c)
-        else:
-            ii=[];jj=[];vv=[]
-            for i,row in enumerate(rows):
-                for j,v in row.items():ii.append(i);jj.append(j);vv.append(float(v))
-            matrix=csr_matrix((vv,(ii,jj)),shape=(len(targets)*c,len(source)*c))
-            if not np.isfinite(matrix.data).all():raise FloatingPointError('Sparse weights overflow Float64')
-        out[name]=DiscreteOperator(matrix,owner,k)
-    return OperatorSet(out,dict(backend=type(owner.backend).__name__,factorizations=len(targets),rhs_per_stencil=len(operators)*c,
-        components=c,ordering='node-major',local_digits=method.precision.local_digits,global_dtype=method.precision.global_dtype))
+    if method.scheme != 'standard':
+        raise NotImplementedError('operators currently requires standard nodal RBF-FD')
+    x = points_array(source)
+    if len(np.unique(x,axis=0)) != len(x):
+        raise ValueError('Sources must be distinct')
+    if type(method.stencil_size) is not int or not 2 <= method.stencil_size <= len(x):
+        raise ValueError('Invalid stencil_size')
+    descriptor = resolve_space(method,space)
+    samples = Samples(x, size=method.stencil_size) if _indices is None else Samples(x,indices=_indices)
+    groups = {'u':samples}
+    local = LocalApproximation(source=groups,trial=descriptor.representers(groups),
+        backend=method.local_backend or PythonBackend(),precision=method.precision,
+        stencil_policy=method.stencil_policy,local_solver=method.local_solver)
+    return nodal_compatibility(local.operators(targets=x if targets is None else targets,operators=operators))

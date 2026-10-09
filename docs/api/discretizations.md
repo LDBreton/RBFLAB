@@ -1,6 +1,15 @@
 # Discretizations and results
 
-Global methods assemble dense systems. LHI and RBF-FD construct local weights and sparse systems. Inspect each method's supported scheme and precision options before applying it to a new PDE.
+Use `LocalApproximation` for named functional maps and matrix-first algorithms.
+Global collocation retains coefficient-based assembly. `RBFFD` and `LHI` remain
+convenience/compatibility entry points for their supported PDE paths.
+
+See [functional operators](../tutorials/local-approximation.md) and
+[LHI from matrices](../tutorials/lhi-matrices.md).
+
+::: rbflab.Samples
+
+::: rbflab.LocalApproximation
 
 ::: rbflab.interpolate
 

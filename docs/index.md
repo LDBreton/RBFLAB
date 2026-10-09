@@ -8,10 +8,10 @@ hide:
 <section class="rbf-hero" aria-labelledby="manual-title">
 <p class="rbf-eyebrow">RBFLAB · Scientific computing in Python</p>
 <h1 id="manual-title">Radial basis functions.<br>From equations to solutions.</h1>
-<p class="rbf-lead">A Python library for interpolation and PDEs on scattered nodes. Describe a domain, write the equation, choose global collocation, LHI or RBF-FD, and inspect the weights and matrices behind the result.</p>
+<p class="rbf-lead">A Python library for interpolation and PDEs on scattered nodes. Choose a space, declare sampled functionals, build named sparse operators, and write your numerical algorithm. Global collocation and packaged PDE solvers remain available.</p>
 <div class="rbf-actions">
 <a class="rbf-button rbf-button--primary" href="getting-started/">Solve your first PDE <span aria-hidden="true">→</span></a>
-<a class="rbf-button" href="tutorials/interpolation/">Interpolate your data</a>
+<a class="rbf-button" href="tutorials/local-approximation/">Build your operators</a>
 <a class="rbf-button" href="INSTALL/">Install Python or C++</a>
 </div>
 <div class="rbf-install"><code>pip install rbflab</code><span>Python 3.11+ · Open source · Version 0.4.0</span></div>
@@ -41,6 +41,10 @@ hide:
 <div><h3><a href="api/discretizations/">Python API reference</a></h3><p>Inspect operators, local weights, sparse matrices, spaces, precision settings, and the available backends.</p></div>
 </section>
 </div>
+
+<h2 id="local-api">From approximation to your algorithm</h2>
+<p>The development API makes ordinary RBF-FD and Hermite constructions explicit through <code>LocalApproximation</code>. <a href="tutorials/local-approximation/">Declare source functionals and target operators</a>, then <a href="tutorials/lhi-matrices/">assemble LHI and a heat time loop with sparse matrices</a>. These additions require the current source checkout until the next release.</p>
+<figure class="rbf-feature"><a href="guides/research-api/"><img src="assets/local-architecture.svg" alt="Spaces and sampled functionals become local systems, named sparse blocks and user-written algorithms"></a></figure>
 
 <h2 id="methods">One problem, several numerical methods</h2>
 <p>Keep the equation and cloud, then change the approximation. The manual explains what each system solves for and how to assess its result.</p>

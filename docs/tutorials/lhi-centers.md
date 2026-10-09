@@ -1,5 +1,9 @@
 # Choose LHI functional centers
 
+For the canonical explicit local API, see [functionals to operators](local-approximation.md)
+and [LHI and heat from matrices](lhi-matrices.md). This page explains the retained
+PDE convenience interface.
+
 An LHI patch combines unknown solution values, prescribed boundary data and
 prescribed PDE data. These functionals need not share one point cloud:
 

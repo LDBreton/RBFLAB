@@ -92,6 +92,8 @@ nav:
       - Construct PDE methods:
           - Write a symbolic PDE: tutorials/symbolic-pde.md
           - Global collocation: tutorials/global-collocation.md
+          - From functionals to operators: tutorials/local-approximation.md
+          - LHI and heat from matrices: tutorials/lhi-matrices.md
           - One RBF-FD stencil: tutorials/one-stencil.md
           - Assemble your own PDE: tutorials/custom-assembly.md
           - Local Hermite interpolation: tutorials/lhi.md

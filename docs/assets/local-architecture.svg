@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="560" viewBox="0 0 1040 560" role="img" aria-labelledby="title desc">
+<title id="title">From mathematical functionals to matrix algorithms</title><desc id="desc">Geometry, spaces, and sampled functionals feed a shared approximation engine. Python, C++, and PyTorch execute local algebra. Named matrix blocks are used in user-written stationary solves, time stepping, and reconstruction.</desc>
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#536a83"/></marker></defs>
+<rect width="1040" height="560" rx="18" fill="#f5f8fc"/>
+<g font-family="Arial,sans-serif" fill="#17324d">
+<text x="40" y="42" font-size="23" font-weight="bold">Your mathematics, explicit matrices</text>
+<text x="40" y="70" font-size="15">A shared approximation engine; equation assembly and time stepping stay in your hands.</text>
+<g fill="#e6efff" stroke="#93b4df"><rect x="40" y="105" width="290" height="84" rx="10"/><rect x="375" y="105" width="290" height="84" rx="10"/><rect x="710" y="105" width="290" height="84" rx="10"/></g>
+<g text-anchor="middle"><text x="185" y="138" font-size="18" font-weight="bold">Space and trial</text><text x="185" y="166" font-size="14">Kernel · polynomials · representers</text><text x="520" y="138" font-size="18" font-weight="bold">Source samples</text><text x="520" y="166" font-size="14">u(X) · Lu(Z) · Bu(boundary)</text><text x="855" y="138" font-size="18" font-weight="bold">Targets</text><text x="855" y="166" font-size="14">Evaluation points and operators</text></g>
+<g stroke="#536a83" stroke-width="2" fill="none" marker-end="url(#arrow)"><path d="M185 189V218H445V242"/><path d="M520 189V242"/><path d="M855 189V218H595V242"/></g>
+<rect x="300" y="245" width="440" height="92" rx="12" fill="#ece6fb" stroke="#a793cc"/>
+<text x="520" y="278" text-anchor="middle" font-size="19" font-weight="bold">LocalApproximation</text><text x="520" y="303" text-anchor="middle" font-size="14">Neighborhoods · kernel actions · local solves · weights</text><text x="520" y="324" text-anchor="middle" font-size="13">Python / C++ / PyTorch · precision · compilation cache</text>
+<path d="M520 337V374" stroke="#536a83" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+<rect x="300" y="377" width="440" height="62" rx="10" fill="#e2f3e9" stroke="#8fbaa4"/>
+<text x="520" y="403" text-anchor="middle" font-size="18" font-weight="bold">Named sparse blocks and local weights</text><text x="520" y="425" text-anchor="middle" font-size="14">Inspect, apply, combine, or export</text>
+<path d="M520 439V472" stroke="#536a83" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+<rect x="150" y="475" width="740" height="56" rx="10" fill="#fff0d8" stroke="#d3b078"/>
+<text x="520" y="510" text-anchor="middle" font-size="17">Your code: assemble A and M · solve · advance in time · reconstruct</text>
+</g></svg>

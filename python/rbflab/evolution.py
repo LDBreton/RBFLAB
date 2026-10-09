@@ -366,7 +366,7 @@ class _LHIField:
 
     def evaluate_mp(self,points,operator=None):
         factor=self.system.base.stencils[0].factor
-        if not isinstance(factor,MPFactor):raise ValueError("Extended local arithmetic is not enabled")
+        if getattr(factor,"ctx",None) is None:raise ValueError("Extended local arithmetic is not enabled")
         return factor.ctx.matrix(self._evaluate(points,operator))
 
 

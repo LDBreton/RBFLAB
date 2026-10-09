@@ -1,5 +1,9 @@
 # Time-step the heat equation
 
+For an entirely matrix-first Hermite construction, start with
+[LHI and heat from matrices](lhi-matrices.md). The comparison below retains the
+optional symbolic evolution convenience; a time integrator object is not required.
+
 **Goal:** express heat diffusion with the symbolic API, then build exactly the
 same update from an RBF-FD Laplacian and ordinary SciPy algebra. Read
 [custom matrix assembly](custom-assembly.md) first if sparse slicing is new.

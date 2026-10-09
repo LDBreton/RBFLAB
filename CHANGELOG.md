@@ -1,6 +1,16 @@
 # Changelog
 
-## Unreleased — research API consolidation (breaking)
+## Unreleased — functional approximation and matrix algorithms
+
+- Add `Samples` and `LocalApproximation`, with explicit space representers and translates.
+- Expose named source blocks, target operators, local weights and on-demand local algebra.
+- Add executable tutorials constructing scalar LHI, its stationary system and heat mass matrix with ordinary SciPy code.
+- Route standard `RBFFD.operators`/`.weights` and scalar LHI weight assembly through the shared functional engine; preserve convenience assembly/reconstruction and the RBF-FD SciPy result contract.
+- Support scalar and componentwise divergence-free functional construction in 2D/3D, with Python, C++ Float64/MPFR and Torch backend checks.
+- Retain specialized coupled-block and Stokes compatibility implementations; general mixed-field symbolic assembly is not added.
+- Document the shared numerical architecture, backend limits, target exclusion and independent-center evolution maps.
+
+### Earlier unreleased research API consolidation (breaking)
 
 - Canonical `interpolate`, `GlobalCollocation`, `RBFFD`, and `LHI` entry points.
 - `RBFFD.weights` replaces the root `rbf_fd_weights`; explicit centers retain order.

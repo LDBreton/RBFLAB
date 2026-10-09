@@ -32,12 +32,86 @@ class MPSparseMatrix:
 
 
     def __matmul__(self, values):
+        if isinstance(values, MPSparseMatrix):
+            if self.shape[1] != values.shape[0]:
+                raise ValueError('Sparse product dimension mismatch')
+            self._same_precision(values)
+            rows = []
+            for row in self.rows:
+                result = {}
+                for k, left in row.items():
+                    for j, right in values.rows[k].items():
+                        result[j] = result.get(j, self.ctx.zero) + left*mp_number(self.ctx, right)
+                rows.append(result)
+            return MPSparseMatrix(self.ctx, rows, ncols=values.shape[1])
         data=np.asarray(values.tolist() if hasattr(values,"rows") else values,dtype=object)
         if data.ndim==1:return self.matvec(data)
         if data.ndim!=2 or data.shape[0]!=self.shape[1]:raise ValueError("Sparse input dimension mismatch")
         out=self.ctx.matrix(self.shape[0],data.shape[1])
         for j in range(data.shape[1]):out[:,j]=self.matvec(data[:,j])
         return out
+
+
+    def _same_precision(self, other):
+        if self.ctx.dps != other.ctx.dps:
+            raise ValueError('Sparse arithmetic requires matching precision contexts')
+
+    def copy(self):
+        """Copy sparse coefficients without rounding."""
+        return MPSparseMatrix(self.ctx, self.rows, ncols=self.shape[1])
+
+    @classmethod
+    def eye(cls, ctx, size):
+        """Construct an identity matrix in an explicit mpmath context."""
+        if type(size) is not int or size < 0:
+            raise ValueError('Identity size must be a nonnegative integer')
+        return cls(ctx, [{i:ctx.one} for i in range(size)], ncols=size)
+
+    @property
+    def T(self):
+        """Sparse transpose retaining the arithmetic context."""
+        rows = [{} for _ in range(self.shape[1])]
+        for i, row in enumerate(self.rows):
+            for j, value in row.items():
+                rows[j][i] = value
+        return MPSparseMatrix(self.ctx, rows, ncols=self.shape[0])
+
+    def __add__(self, other):
+        if not isinstance(other, MPSparseMatrix):
+            if np.isscalar(other) and other == 0:
+                return self.copy()
+            return NotImplemented
+        if self.shape != other.shape:
+            raise ValueError('Sparse addition dimension mismatch')
+        self._same_precision(other)
+        rows = [row.copy() for row in self.rows]
+        for row, source in zip(rows, other.rows):
+            for j, value in source.items():
+                row[j] = row.get(j, self.ctx.zero) + mp_number(self.ctx, value)
+        return MPSparseMatrix(self.ctx, rows, ncols=self.shape[1])
+
+    __radd__ = __add__
+
+    def __neg__(self):
+        return self * -1
+
+    def __sub__(self, other):
+        return self + (-other)
+
+    def __rsub__(self, other):
+        return (-self) + other
+
+    def __mul__(self, scalar):
+        if isinstance(scalar, MPSparseMatrix):
+            return NotImplemented
+        value = mp_number(self.ctx, scalar)
+        return MPSparseMatrix(self.ctx,
+            [{j:v*value for j,v in row.items()} for row in self.rows], ncols=self.shape[1])
+
+    __rmul__ = __mul__
+
+    def __truediv__(self, scalar):
+        return self * (self.ctx.one/mp_number(self.ctx, scalar))
 
 
 class MPSparseLU:

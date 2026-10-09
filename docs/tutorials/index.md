@@ -34,6 +34,8 @@ coefficients, values, and derivative weights are introduced as they are used.
 |---|---|---|
 | [Write a symbolic PDE](symbolic-pde.md) | Equation and boundary expressions become a problem | Differential expression and boundary model |
 | [Global collocation](global-collocation.md) | Trial expansion becomes dense PDE rows | Ordinary or source-functional trial basis |
+| [Functionals to operators](local-approximation.md) | Space, sampled data and trial become named sparse maps | Trial construction, source groups, target operators |
+| [LHI and heat from matrices](lhi-matrices.md) | Hermite maps become stiffness, mass and forcing blocks | Center layout, equations, time integrator |
 | [One RBF-FD stencil](one-stencil.md) | Local interpolation becomes derivative weights | Space, target functional, chosen neighbors |
 | [Local Hermite interpolation](lhi.md) | Values and PDE/boundary data become a local identity | Local center roles and PDE-center count |
 | [Heat time stepping](heat-equation.md) | A spatial matrix becomes an evolution equation | Initial data, boundary values, time formula |
@@ -44,7 +46,11 @@ constructions easy to follow. [Compare the methods](global-lhi.md) afterward.
 
 ## Path C — Implement your own ideas
 
-Start with [one stencil](one-stencil.md), then [assemble your own PDE](custom-assembly.md).
+Start with [functionals to sparse operators](local-approximation.md), then
+[LHI and heat from matrices](lhi-matrices.md). These are the canonical local
+research interfaces. [One stencil](one-stencil.md) and
+[assemble your own PDE](custom-assembly.md) also explain the retained RBF-FD
+convenience interface.
 This path shows where ordinary NumPy/SciPy code takes over: combining derivative
 maps, eliminating prescribed values, solving matrices and writing update loops.
 Continue with [heat](heat-equation.md) before the advanced [cavity algorithm](cavity.md).

@@ -1,5 +1,9 @@
 # Solve a PDE with local Hermite interpolation
 
+For the canonical explicit local API, see [functionals to operators](local-approximation.md)
+and [LHI and heat from matrices](lhi-matrices.md). This page explains the retained
+PDE convenience interface.
+
 **Goal:** understand which data enter an LHI patch and which weights enter the
 sparse PDE equation. Read [one stencil](one-stencil.md) and the
 [global construction](global-collocation.md) first.
