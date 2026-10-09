@@ -122,3 +122,29 @@ Cavity equations must match the maintained solver, including the compatibility
 multiplier and the difference between algebraic residual and divergence defect.
 Named snippet markers expose the actual implementation, not a duplicate pseudocode
 solver. Run the first-problem, heat and cavity tests after changing these sections.
+
+## Mathematics-to-code teaching route
+
+The Examples chapter serves RBF researchers adapting methods and instructors
+teaching students. Its paths cover data approximation, PDE construction, and
+custom algorithms. Keep the main route focused on writing mathematics with the
+API; diagnostics and convergence studies remain supporting guides.
+
+For each main lesson:
+
+1. State the mathematical task and prerequisites.
+2. Introduce arrays, symbols and their shapes before using them.
+3. Pair each mathematical construction with a short visible code snippet.
+4. Explain the object returned and how to use or modify it.
+5. Include a brief useful check and a complete runnable source at the end.
+
+Use named source snippets rather than duplicate teaching implementations in
+Markdown. Tests in test_tutorials check matrix meaning and agreement between
+API routes. Do not imply that inspection records are solver-editing hooks.
+Keep source/target ordering and coefficient-versus-value distinctions explicit.
+
+The new teaching illustrations are regenerated with
+`python -m examples.make_teaching_figures`. Each figure uses its lesson's recipe;
+caption any deliberately different geometry or illustrative schematic. Course
+sequences and modification exercises live in tutorials/teaching.md. Avoid exposing
+private planning notes or historical implementation discussions in the manual.

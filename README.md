@@ -90,8 +90,11 @@ fig.savefig("solution.png", dpi=180)
 | Explore | Learn to use |
 |---|---|
 | [2D shapes and holes](https://ldbreton.github.io/RBFLAB/geometry/planar-domains/) | Named walls, holes, concave polygons and 3D volumes |
+| [Interpolate data](https://ldbreton.github.io/RBFLAB/tutorials/interpolation/) | Arrays, interpolants and field derivatives |
+| [Your own PDE assembly](https://ldbreton.github.io/RBFLAB/tutorials/custom-assembly/) | Combine RBF maps with ordinary SciPy algebra |
+| [Teach with RBFLAB](https://ldbreton.github.io/RBFLAB/tutorials/teaching/) | Lesson sequences and mathematical modification exercises |
 | [One local stencil](https://ldbreton.github.io/RBFLAB/tutorials/one-stencil/) | Approximation, differentiation weights and sparse rows |
-| [Heat from matrices](https://ldbreton.github.io/RBFLAB/tutorials/heat-equation/) | Finite differences, RBF-FD and time integration |
+| [Heat from matrices](https://ldbreton.github.io/RBFLAB/tutorials/heat-equation/) | RBF spatial matrices and explicit time-integration code |
 | [Mixed conditions](https://ldbreton.github.io/RBFLAB/tutorials/ellipse/) | Dirichlet, Neumann and Robin data on curved boundaries |
 | [Compare methods](https://ldbreton.github.io/RBFLAB/tutorials/global-lhi/) | Global collocation and local Hermite interpolation |
 | [Poisson in a ball](https://ldbreton.github.io/RBFLAB/tutorials/ball/) | 3D scalar operators and independent error checks |

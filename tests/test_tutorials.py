@@ -59,7 +59,7 @@ def test_first_problem_on_ellipse():
 def test_heat_page_standalone_symbolic_recipe():
     from pathlib import Path
     import re
-    page = Path(__file__).resolve().parents[1] / "docs/tutorials/heat-equation.md"
+    page = Path(__file__).resolve().parents[1] / "docs/tutorials/flower-heat.md"
     code = re.search(r"```python\n(.*?)\n```", page.read_text(encoding="utf-8"), re.S).group(1)
     namespace = {}
     exec(compile(code, str(page), "exec"), namespace)
@@ -67,3 +67,46 @@ def test_heat_page_standalone_symbolic_recipe():
     x, y = cloud.points.T
     truth = np.exp(-1)*(np.cos(x)*np.cos(y)+np.sin(2*x)/4)
     assert np.max(np.abs(trajectory.final.evaluate(cloud.points)-truth)) < .004
+
+
+def test_teaching_derivative_maps_reproduce_polynomials():
+    from examples.tutorials.differentiation import run
+    result = run()
+    assert result["polynomial_laplacian_error"] < 1e-10
+    assert result["gradient_error"] < .01
+
+
+def test_teaching_global_and_lhi_rows_match_assembly():
+    from examples.tutorials.global_collocation import run as global_run
+    from examples.tutorials.lhi_construction import run as lhi_run
+    global_result, local_result = global_run(), lhi_run()
+    assert global_result["assembly_difference"] < 1e-11
+    assert global_result["evaluation_difference"] < 1e-11
+    assert local_result["center_excluded"]
+    assert local_result["row_difference"] < 1e-11
+    assert local_result["rhs_difference"] < 1e-11
+
+
+def test_teaching_custom_matrix_matches_symbolic_equation():
+    from examples.tutorials.custom_assembly import run
+    result = run()
+    assert result["route_difference"] < 1e-9
+    assert result["error"] < .002
+
+
+def test_teaching_heat_has_identical_symbolic_and_matrix_recipe():
+    from examples.tutorials.heat_equation import run
+    result = run()
+    assert result["route_difference"] < 1e-10
+    assert result["error"] < .02
+
+
+def test_teaching_symbolic_boundary_variations():
+    from examples.tutorials.symbolic_pde import run
+    assert run() < .001
+    assert run(robin=True) < .001
+
+
+def test_teaching_coupled_spaces_and_pressure_reference():
+    from examples.tutorials.stokes_construction import run
+    assert run() < .02

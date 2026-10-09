@@ -1,62 +1,124 @@
-# Stokes flow between rotating cylinders
+# Couple velocity and pressure in Stokes flow
 
-<figure class="method-detail"><img src="../../assets/method_stokes.png" alt="Computed speed and streamlines for the annular Stokes example below. The inner wall rotates and the outer wall is fixed."><figcaption>Computed speed and streamlines for the annular Stokes example below. The inner wall rotates and the outer wall is fixed.</figcaption></figure>
+**Goal:** express coupled fields and choose a divergence-free velocity space.
+Read [symbolic PDEs](symbolic-pde.md) and [global collocation](global-collocation.md) first.
 
-Consider a two-dimensional annular cross-section, inner radius $a=0.5$ and outer
-radius $b=1$. The inner cylinder rotates with angular speed one; the outer wall
-is fixed. In the **steady Stokes** model,
+## 1. Model creeping flow between rotating cylinders
 
-$$
--\mu\Delta\boldsymbol u+\nabla p=0,\qquad \nabla\cdot\boldsymbol u=0,
-\qquad \mu=1.
-$$
+In an annulus with radii $a=0.5$ and $b=1$, solve
 
-The azimuthal solution is
+$$-\mu\Delta\boldsymbol u+\nabla p=0,\qquad \nabla\cdot\boldsymbol u=0,\qquad\mu=1.$$
 
-$$
-u_\theta(r)=Ar+B/r,\quad A=-\tfrac13,\quad B=\tfrac13,
-\qquad \boldsymbol u=(-y,x)\,\frac{1/r^2-1}{3},\quad \nabla p=0.
-$$
-
-There is no convective acceleration in this model. Do not interpret its constant
-pressure as the radial pressure distribution of finite-inertia rotating flow.
+The inner wall rotates with angular speed one, so $\boldsymbol u=(-y,x)$ there.
+The outer wall is fixed. There is no convective term in steady Stokes flow.
 
 ```python
-spaces = {
-    U: rbf.DivergenceFreeSpace(rbf.IMQ(3), 2),
-    p: rbf.PressureSpace(rbf.IMQ(3), 1),
-}
-method = rbf.GlobalCollocation(spaces=spaces)
+import numpy as np
+import sympy as sp
+import rbflab as rbf
+from rbflab import geometry, meshgen
 ```
 
-The velocity kernel is constructed from the Hessian/Laplacian of a scalar kernel;
-its columns are divergence-free. The equation list therefore contains momentum,
-with incompressibility supplied by the space. Pressure is represented modulo
-constants. See [divergence-free mathematics](../theory/divergence-free.md).
-
-![Computed annular Stokes velocity and its numerical cloud](../assets/annular_stokes.png)
-
-```sh
-python -m examples.stokes_annulus
+```python
+--8<-- "examples/tutorials/stokes_construction.py:geometry"
 ```
 
-This small example uses the Python global space assembler, 70 Halton interior
-nodes and 80 boundary nodes (150 total), seed 42, IMQ parameter 3, velocity
-polynomial degree 2, pressure degree 1, and Float64. C++/Torch selection in the
-other curved examples applies to local scalar RBF-FD; it does not accelerate
-this global space assembly.
+The two labels connect wall pieces to different vector boundary equations. The
+cloud has 70 interior and 80 boundary nodes.
 
-The default independent sampled velocity error is about $4.0\times10^{-3}$.
-Divergence evaluates to zero in this run. The pressure-gradient error is about
-$4.6\times10^{-2}$: the velocity picture alone is not a pressure-accuracy claim.
-Keep the [existing manufactured Stokes example](stokes.md), with nonconstant
-pressure, as a separate regression check.
+![The annular cloud and computed velocity](../assets/annular_stokes.png)
 
-??? example "Complete runnable source"
+## 2. Declare the fields and momentum equation
+
+```python
+--8<-- "examples/tutorials/stokes_construction.py:fields"
+```
+
+`U` is a two-component symbolic vector; `p` is a scalar symbolic function.
+`laplacian(U)` acts component by component, while `gradient(p)` is a vector.
+Their sum expresses the two momentum equations.
+
+```python
+--8<-- "examples/tutorials/stokes_construction.py:boundary"
+```
+
+`sp.zeros(2, 1)` is a vector right-hand side. Boundary equations also compare
+vectors. This velocity-Dirichlet problem does not prescribe pressure on the wall.
+
+## 3. Choose the approximation spaces
+
+```python
+--8<-- "examples/tutorials/stokes_construction.py:spaces"
+```
+
+The dictionary keys are the symbolic fields. Each value describes how that
+field is approximated. For velocity, the scalar radial kernel generates
+
+$$\Phi_{\rm div}(x-y)=\bigl(\nabla\nabla^T-I\Delta\bigr)\phi(\|x-y\|).$$
+
+Every column has zero divergence. Velocity polynomials are restricted to
+divergence-free modes as well. Thus the equation list contains momentum, while
+incompressibility belongs to the trial space. Adding an explicit
+`Eq(model.divergence(U), 0)` is not how this space-based route is specified.
+
+The velocity polynomial degree is two; the pressure degree is one. Pressure is
+represented modulo additive constants. This formulation handles the nullspace
+in its construction; it is not an arbitrary extra pressure row in a scalar
+block system. The [space derivation](../theory/divergence-free.md) explains the
+coupled kernel and its pressure representation.
+
+## 4. Recover physical fields
+
+```python
+--8<-- "examples/tutorials/stokes_construction.py:evaluate"
+```
+
+Velocity and pressure gradient have shape `(M, 2)`; pressure has shape `(M,)`.
+The reference fixes the displayed pressure constant at $(0.75,0)$. It does not
+alter velocity or the pressure gradient.
+
+Here the analytic solution is
+
+$$\boldsymbol u=(-y,x)\frac{1/r^2-1}{3},\qquad\nabla p=0.$$
+
+Constant pressure belongs to this creeping-flow model. Finite-inertia circular
+flow has a different momentum balance.
+
+## 5. Display and modify the problem
+
+```python
+from rbflab import viz
+fig, ax = viz.plot_velocity(solution, domain=domain, title="Rotating inner wall")
+```
+
+- Change wall expressions to prescribe another velocity.
+- Replace the zero momentum right-hand side with a vector body force.
+- Change kernels independently in velocity and pressure spaces.
+- For another domain, supply its corresponding boundary labels and data.
+
+This lesson uses the Python global space assembler. Selecting a local C++ backend
+does not accelerate this dense system. LHI Stokes has different capabilities,
+including pressure-gradient reconstruction rather than a globally reconciled
+pressure field; see [capabilities](../CAPABILITIES.md) before changing routes.
+
+### A quick check
+
+Compare velocity with the azimuthal formula at a few points. Pressure-gradient
+accuracy is a separate question; the existing [validation record](../guides/curved-validation.md)
+reports it independently.
+
+## Complete example
+
+Run `python -m examples.tutorials.stokes_construction` from a source checkout.
+Add `--plot stokes.png` to save a velocity figure.
+
+??? example "Complete runnable script"
 
     ```python
-    --8<-- "examples/stokes_annulus.py"
+    --8<-- "examples/tutorials/stokes_construction.py"
     ```
 
-**Try next:** refine the cloud with the same space parameters and compare velocity
-and pressure-gradient errors separately.
+[Download the script](https://raw.githubusercontent.com/LDBreton/RBFLAB/main/examples/tutorials/stokes_construction.py).
+
+**Next:** [Build a cavity algorithm](cavity.md), using a different scalar-space
+velocity-pressure discretization and explicit sparse blocks.

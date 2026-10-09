@@ -28,3 +28,11 @@ For global collocation, \(U\) consists of expansion coefficients. For RBF-FD and
 
 !!! tip "A short route with code"
     Read [local weights](local-weights.md), work through [one stencil](../tutorials/one-stencil.md), then build the [heat equation from matrices](../tutorials/heat-equation.md). Return to [LHI](lhi.md) to see what changes when local data include derivatives.
+
+## Work through the constructions in code
+
+The [practical global lesson](../tutorials/global-collocation.md) builds PDE rows
+from kernel evaluations. The [LHI lesson](../tutorials/lhi.md) follows the three
+center groups into one sparse equation. For your own differential expression,
+use [custom operator assembly](../tutorials/custom-assembly.md). These lessons
+translate the notation above into concrete arrays and API calls.

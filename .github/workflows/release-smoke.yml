@@ -72,6 +72,7 @@ jobs:
         with:
           python-version: '3.12'
       - run: python -m pip install -e '.[examples,test]'
+      - run: python -m examples.make_teaching_figures
       - run: python -m examples.make_gallery
       - run: python -m examples.make_geometry_gallery
       - run: python -m examples.geometry_gallery

@@ -11,6 +11,7 @@ hide:
 <p class="rbf-lead">A Python library for interpolation and PDEs on scattered nodes. Describe a domain, write the equation, choose global collocation, LHI or RBF-FD, and inspect the weights and matrices behind the result.</p>
 <div class="rbf-actions">
 <a class="rbf-button rbf-button--primary" href="getting-started/">Solve your first PDE <span aria-hidden="true">→</span></a>
+<a class="rbf-button" href="tutorials/interpolation/">Interpolate your data</a>
 <a class="rbf-button" href="INSTALL/">Install Python or C++</a>
 </div>
 <div class="rbf-install"><code>pip install rbflab</code><span>Python 3.11+ · Open source · Version 0.4.0</span></div>
@@ -29,7 +30,7 @@ hide:
 </section>
 <section class="rbf-chapter">
 <span class="rbf-chapter-number" aria-hidden="true">02</span>
-<div><h3><a href="tutorials/">Examples, explained</a></h3><p>Build one stencil, solve on domains with holes, time-step RBF matrices, and assemble a coupled flow algorithm.</p></div>
+<div><h3><a href="tutorials/">Examples, explained</a></h3><p>Follow the mathematics into code: interpolate data, define kernels, construct PDE methods, and build your own sparse algorithm.</p></div>
 </section>
 <section class="rbf-chapter">
 <span class="rbf-chapter-number" aria-hidden="true">03</span>
@@ -55,6 +56,7 @@ hide:
 </table>
 
 <h2 id="examples">Choose a problem and see how it works</h2>
+<p>For a guided learning sequence, choose <a href="tutorials/">interpolation, PDEs, or custom algorithms</a>. Instructors can use the <a href="tutorials/teaching/">teaching guide and modification exercises</a>.</p>
 <div class="rbf-examples">
 <article class="rbf-example"><a href="tutorials/perforated-poisson/"><img src="assets/perforated_poisson.png" alt="Computed Poisson field on an ellipse with two holes" loading="lazy"></a><div class="rbf-example-body"><h3><a href="tutorials/perforated-poisson/">Poisson with holes</a></h3><p>Geometry, labels, symbolic forcing and a measured solution error.</p></div></article>
 <article class="rbf-example"><a href="tutorials/heat-equation/"><img src="assets/flower_heat.gif" alt="Computed heat diffusion on a flower-shaped domain" loading="lazy"></a><div class="rbf-example-body"><h3><a href="tutorials/heat-equation/">Heat diffusion</a></h3><p>Write a transient equation, then open up its RBF-FD matrix and time step.</p></div></article>

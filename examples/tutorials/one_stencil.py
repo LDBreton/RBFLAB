@@ -7,9 +7,12 @@ import rbflab as rbf
 
 
 def run(cells=5, stencil_size=20):
+    # --8<-- [start:geometry]
     cloud = rbf.unit_box_grid(cells)
     target_index = int(np.argmin(np.linalg.norm(cloud.points - [0.5, 0.5], axis=1)))
     target = cloud.points[[target_index]]
+    # --8<-- [end:geometry]
+    # --8<-- [start:operator]
     method = rbf.RBFFD(
         spaces={"u": rbf.ScalarSpace(rbf.PHS(5), 2)},
         stencil_size=min(stencil_size, len(cloud.points)),
@@ -19,8 +22,12 @@ def run(cells=5, stencil_size=20):
         source=cloud.points, targets=target, space="u",
         operators={"lap": rbf.Laplacian(2)},
     ).lap
+    # --8<-- [end:operator]
+    # --8<-- [start:inspect]
     local = op.local(0)
     reconstructed = op.reconstruct_local(0)
+    # --8<-- [end:inspect]
+    # --8<-- [start:weights]
     points = cloud.points[local.indices]
     weights = local.weights[:, 0]
     augmented = np.r_[weights, local.multipliers[:, 0]]
@@ -30,10 +37,13 @@ def run(cells=5, stencil_size=20):
     ))
     constant_response = float(weights.sum())
     quadratic_response = float(weights @ np.sum(points**2, axis=1))
+    # --8<-- [end:weights]
+    # --8<-- [start:direct]
     direct = rbf.rbf_fd_weights(
         rbf.PHS(5), points, target[0], rbf.Laplacian(2),
         polynomial_degree=2,
     )
+    # --8<-- [end:direct]
     direct_difference = float(np.max(np.abs(weights - np.asarray(direct).reshape(-1))))
     radius = float(np.max(np.linalg.norm(points - target[0], axis=1)))
 

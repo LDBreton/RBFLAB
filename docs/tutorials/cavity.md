@@ -1,5 +1,11 @@
 # Build a lid-driven cavity solver
 
+**Goal:** assemble a coupled nonlinear evolution algorithm from reusable maps.
+First work through [custom sparse assembly](custom-assembly.md),
+[heat time stepping](heat-equation.md), and [coupled fields](annular-stokes.md).
+This lesson uses scalar velocity spaces and a separate continuity equation.
+
+
 ![Computed cavity velocity at Re 100](../assets/navier_stokes_cavity.gif)
 
 This example shows how to build a nonlinear time-dependent algorithm from RBFLAB's
@@ -195,7 +201,23 @@ $t=20$ run has about $0.0250$. Neither is roundoff-sized. The animation's smooth
 is not an incompressibility or pressure-validation result. Display interpolation
 is separate from the RBF-FD solve.
 
-## 8. Modify the algorithm deliberately
+## 8. Identify the reusable pieces
+
+| Mathematical ingredient | Construction you can reuse |
+|---|---|
+| Different field locations | `source` and `targets` in each operator map |
+| Spatial differentiation | The `vv`, `vp`, and `pv` operator collections |
+| Nonlinear transport | The explicit `convection` expression |
+| Coupling and boundary equations | The assembled sparse block matrix |
+| Time integration | The update loop and stored previous convection |
+| Pressure reference | The explicit arithmetic-mean constraint |
+
+These pieces belong to this algorithm. Changing one may require changing the
+others: for example, a new pressure boundary treatment cannot be introduced
+only by changing a plotting or reconstruction call. The divergence-free Stokes
+space in the preceding lesson uses a different construction.
+
+## 9. Modify the algorithm deliberately
 
 - Change `viscosity` in `solve` to change Reynolds number; reassess the explicit
   convection time step. The Python function accepts `dt` directly.

@@ -1,189 +1,122 @@
-# Heat diffusion with RBF-FD
+# Time-step the heat equation
 
-![Computed heat diffusion on a flower domain](../assets/flower_heat.gif)
+**Goal:** express heat diffusion with the symbolic API, then build exactly the
+same update from an RBF-FD Laplacian and ordinary SciPy algebra. Read
+[custom matrix assembly](custom-assembly.md) first if sparse slicing is new.
 
-**Learn two levels of control:** declare a transient PDE symbolically, then build
-the RBF-FD Laplacian and time step its sparse matrix yourself. Both routes use RBF
-weights. The square below is only a convenient domain with a known decaying mode;
-the stencil construction also works on irregular clouds.
+## 1. Fix one mathematical problem and one recipe
 
-## 1. Start with the equation and a curved domain
+On $(0,1)^2$, solve
 
-For a diffusivity $\kappa>0$,
-
-$$u_t-\kappa\Delta u=f,\qquad u|_{\partial\Omega}=g(t),\qquad u(\cdot,0)=u_0.$$
-
-The flower example uses $\kappa=0.15$ and the known solution
-
-$$u_{\rm exact}(x,y,t)=e^{-2t}\left(\cos x\cos y+\tfrac14\sin(2x)\right).$$
-
-The forcing is $f=\partial_tu_{\rm exact}-\kappa\Delta u_{\rm exact}$, and the boundary
-values are its trace. This is a forced verification case, not an insulated heat pulse.
-Here is the complete core calculation, without example-helper functions:
+$$u_t=\kappa\Delta u,\qquad u|_{\partial\Omega}=0,\qquad
+u(x,y,0)=\sin(\pi x)\sin(\pi y).$$
 
 ```python
+import numpy as np
 import sympy as sp
+import scipy.sparse as sparse
+from scipy.sparse.linalg import splu
 import rbflab as rbf
-from rbflab import geometry, meshgen
-
-domain = geometry.Flower()
-cloud = meshgen.generate(domain, interior=250, boundary=120, seed=42)
-model = rbf.SymbolicScalar(2, transient=True)
-u, t = model.field, model.time
-x, y = model.coordinates
-exact = sp.exp(-2*t)*(sp.cos(x)*sp.cos(y) + sp.sin(2*x)/4)
-lhs = sp.diff(u,t) - sp.Rational(15,100)*model.laplacian(u)
-problem = model.evolution(
-    sp.Eq(lhs, lhs.subs(u,exact).doit()), initial=exact.subs(t,0),
-    boundary=[model.bc("boundary", sp.Eq(u,exact))],
-)
-method = rbf.RBFFD(rbf.PHS(5), 35, polynomial_degree=3,
-    stencil_policy=rbf.StencilPolicy(scaling="local"))
-trajectory = problem.solve(cloud, method, "0.025", 20, scheme="bdf2")
 ```
-
-The 370-node recipe uses PHS5, degree-three polynomials, 35-node stencils and
-Float64. Here `scaling="local"` divides kernel distances by each stencil's
-radius; RBFLAB includes the inverse-square factor for the physical Laplacian.
-See [local stencil scaling](../theory/conditioning.md#local-stencil-scaling).
-Backward Euler starts BDF2. To animate the computed solution:
 
 ```python
-from rbflab import viz
-viz.animate_scalar(trajectory, "flower.gif", domain=domain)
+--8<-- "examples/tutorials/heat_equation.py:settings"
 ```
 
-The display grid does not enter the PDE discretization. The recorded final
-sampled off-node error at $t=0.5$ is about $1.1\times10^{-3}$; it contains both
-space and time error. Reproduce the error report with
-`python -m examples.heat_flower` from a source checkout.
+Both routes below use these exact objects: 49 nodes, PHS5, quadratic polynomials,
+20-node stencils, Float64, and default physical kernel scaling. Five steps reach
+$t=0.05$. The point grid supplies locations; all spatial weights are RBF-FD.
 
-## 2. Open up the spatial operator
+![The square cloud, initial temperature, and computed BDF2 temperature](../assets/teaching_heat.png)
 
-At each target node $x_i$, local RBF interpolation determines Laplacian weights:
-
-$$ (L\boldsymbol u)_i=\sum_{j\in S_i}w_{ij}^{\Delta}u_j\approx\Delta u(x_i). $$
-
-Rows use overlapping stencils $S_i$. Assemble the reusable operator once:
+## 2. Declare an evolution problem
 
 ```python
---8<-- "examples/tutorials/heat_matrices.py:rbf_fd_laplacian"
+--8<-- "examples/tutorials/heat_equation.py:symbolic"
 ```
 
-This function returns the full $N\times N$ sparse Laplacian and its operator
-collection. `ops.lap @ values` applies it; `ops.lap.local(i)` exposes a row's local
-weights, and `ops.lap.reconstruct_local(i)` rebuilds its local interpolation system.
-See [one stencil](one-stencil.md) for the derivation.
+`transient=True` adds the time symbol. `initial` gives the field at $t=0$;
+boundary equations supply values at subsequent times. `scheme="bdf2"` requests
+BDF2 with a backward-Euler startup. The returned trajectory stores computed
+states; `.final` supplies the final field reconstruction.
 
-The following matrix demonstration uses `unit_box_grid(6)`: 49 nodes, 25 interior
-unknowns, PHS5, degree-two polynomials and 20-node stencils. Its parameters differ
-from the flower recipe so it can run quickly and be checked against a simple exact mode:
-
-$$u(x,y,t)=e^{-2\kappa\pi^2t}\sin(\pi x)\sin(\pi y),\quad f=g=0.$$
-
-## 3. Eliminate prescribed boundary values
-
-Separate interior indices $I$ and boundary indices $B$. The full field is
-$(\boldsymbol u_I,\boldsymbol g_B)$, so the interior equations become
-
-$$\dot{\boldsymbol u}_I=\kappa L_{II}\boldsymbol u_I
-+\kappa L_{IB}\boldsymbol g_B(t)+\boldsymbol f_I(t).$$
-
-The matrix slices are:
+## 3. Construct the same spatial operator explicitly
 
 ```python
-interior, boundary = cloud.interior_indices, cloud.boundary_indices
-lap_ii = matrix[interior, :][:, interior]
-lap_ib = matrix[interior, :][:, boundary]
+--8<-- "examples/tutorials/heat_equation.py:operators"
 ```
 
-This is a fragment of the time marcher below; `matrix` is the Laplacian returned
-by `rbf_fd_laplacian`. Boundary contributions are on the right-hand side. Dropping
-$L_{IB}g_B$ is only valid when those prescribed values are zero.
+`ops.lap @ U` approximates $\Delta u$ at all nodes. Interior equations separate
+unknown interior values from prescribed boundary values:
 
-## 4. Take implicit time steps
+$$\dot U_I=\kappa L_{II}U_I+\kappa L_{IB}g_B(t)+f_I(t).$$
 
-Backward Euler gives
+`lap_ii` is $25\times25$, while `lap_ib` maps 24 boundary values into those 25
+interior equations. The present problem has $g=f=0$; keeping the terms visible
+shows where nonzero data enter. You can also inspect `ops.lap.local(i)` and
+`ops.lap.reconstruct_local(i)` as in [one stencil](one-stencil.md).
 
-$$
-(I-\Delta t\,\kappa L_{II})\boldsymbol u_I^{n+1}
-=\boldsymbol u_I^n+\Delta t(\kappa L_{IB}\boldsymbol g_B^{n+1}+\boldsymbol f_I^{n+1}).
-$$
+## 4. Translate the time formula into factors
 
-After one startup step, BDF2 gives
+Let $q^{n+1}=\kappa L_{IB}g_B^{n+1}+f_I^{n+1}$. The first step is
 
-$$
-(\tfrac32 I-\Delta t\,\kappa L_{II})\boldsymbol u_I^{n+1}
-=2\boldsymbol u_I^n-\tfrac12\boldsymbol u_I^{n-1}
-+\Delta t(\kappa L_{IB}\boldsymbol g_B^{n+1}+\boldsymbol f_I^{n+1}).
-$$
+$$(I-\Delta t\,\kappa L_{II})U_I^1=U_I^0+\Delta t\,q^1.$$
 
-The fixed left matrix is factored once per time formula. Changing boundary values
-or forcing only changes the right-hand side; changing the time step would require
-new factors. The actual implementation is:
+Subsequent BDF2 steps satisfy
+
+$$(\tfrac32I-\Delta t\,\kappa L_{II})U_I^{n+1}
+=2U_I^n-\tfrac12U_I^{n-1}+\Delta t\,q^{n+1}.$$
+
+Prepare the two fixed matrices once:
 
 ```python
---8<-- "examples/tutorials/heat_matrices.py:march"
+--8<-- "examples/tutorials/heat_equation.py:factors"
 ```
 
-`exact` and `forcing` below provide the verification data. An application can
-replace these callbacks with its own initial state, boundary values and source.
-This loop is ordinary SciPy code acting on RBFLAB's spatial matrix.
+The RBF construction determines $L$. Backward Euler and BDF2 determine the time
+formula. They are separate choices, which is why another time integrator can
+reuse these spatial operators.
 
-## 5. Compare matrix and symbolic assembly
+## 5. Advance and restore the full field
 
-The example also declares the same square-domain problem through `model.evolution`:
+```python
+--8<-- "examples/tutorials/heat_equation.py:loop"
+```
 
-??? example "Symbolic version of the same matrix verification problem"
+At each step, the code supplies boundary data and forcing, solves for interior
+values, then fills the full vector in original cloud order. `states` has shape
+`(steps+1, 49)`, including the initial condition. No RBF coefficient solve occurs
+inside this loop: the spatial weights were assembled beforehand.
+
+## Modify the problem
+
+- Replace `g` and `f` with arrays evaluated at the current `time` for nonzero data.
+  Make the corresponding change in the symbolic declaration.
+- Change the initial expression and `initial_values` together.
+- Replace the update formula to experiment with time integration.
+- If `dt`, $\kappa$, or $L$ changes, rebuild the affected factors.
+- Change geometry while preserving boundary groups; see [heat on a flower](flower-heat.md).
+
+For an extended implementation with selectable time schemes and nonzero-data
+examples, `examples/tutorials/heat_matrices.py` provides `rbf_fd_laplacian`,
+`march`, and `symbolic_solution`. The compact script here keeps one case visible.
+
+### A quick check
+
+The full script compares the two final nodal arrays. Their agreement checks the
+translation between API routes, not independent spatial accuracy. The continuous
+solution is $e^{-2\kappa\pi^2t}\sin(\pi x)\sin(\pi y)$ if you want a separate check.
+
+## Complete example
+
+Run `python -m examples.tutorials.heat_equation` from a source checkout.
+
+??? example "Complete runnable script"
 
     ```python
-    --8<-- "examples/tutorials/heat_matrices.py:symbolic_solution"
+    --8<-- "examples/tutorials/heat_equation.py"
     ```
 
-The two RBF-FD routes use identical nodes, kernels, stencils and time steps.
-Their agreement tests assembly and boundary handling; it is not an independent
-check of spatial accuracy. Compare both against the known continuous solution.
+[Download the script](https://raw.githubusercontent.com/LDBreton/RBFLAB/main/examples/tutorials/heat_equation.py).
 
-```sh
-python -m examples.tutorials.heat_matrices
-python -m examples.tutorials.heat_matrices --scheme bdf2 --nonzero-boundary
-python -m examples.tutorials.heat_matrices --study
-python -m examples.tutorials.heat_matrices --figure outputs/heat_matrices.png
-```
-
-The default five backward-Euler steps use $\Delta t=0.01$ and reach $t=0.05$.
-The nodal maximum error is about $0.03767$ for both routes. This deliberately
-small test has substantial time error. `--nonzero-boundary` switches to
-$u=e^{-t}(1+x+y)$, $f=-u$, and $g=u|_{\partial\Omega}$ to test the boundary term.
-
-![RBF-FD nodes, sparse matrix, computed temperature and absolute nodal error](../assets/heat_matrices.png)
-
-## 6. Separate the sources of error
-
-`--study` uses `expm_multiply` to evolve the fixed semidiscrete system without the
-BE/BDF2 time formula. First it compares that reference with the continuous solution
-on progressively finer clouds; then it holds the cloud fixed and varies $\Delta t$.
-
-| Measurement | What changes? | What it isolates |
-|---|---|---|
-| Semidiscrete versus exact PDE solution | Node count | Spatial error for this recipe |
-| Time-stepped versus semidiscrete solution | Time step | Time-integration error |
-| Matrix versus symbolic route | Assembly route only | Implementation agreement |
-
-An implicit time formula cannot repair an unstable spatial operator. Check errors,
-cloud quality and refinement together; see [time discretization](../theory/time-discretization.md)
-and [error measures](../theory/errors.md).
-
-## Complete matrix example and backend choices
-
-??? example "Complete runnable matrix and symbolic comparison"
-
-    ```python
-    --8<-- "examples/tutorials/heat_matrices.py"
-    ```
-
-[Download the standalone matrix example](https://raw.githubusercontent.com/LDBreton/RBFLAB/main/examples/tutorials/heat_matrices.py).
-The plotting options require `rbflab[examples]`. For the flower, use
-`python -m examples.heat_flower --backend cpp --animation flower.gif` or
-`--backend torch` after [installing the backend](../INSTALL.md). C++/PyTorch change
-local weight construction; the sparse time solves remain Float64 SciPy solves.
+**Next:** [Heat on a curved domain](flower-heat.md), or [coupled Stokes fields](annular-stokes.md).

@@ -1,6 +1,15 @@
 # Compare global collocation, LHI, and RBF-FD
 
-**You will learn:** how one Poisson PDE yields distinct ansatz functions, unknown vectors, and evaluation rules. Prerequisites: [interpolation](interpolation.md) and [RBF-FD](one-stencil.md).
+This supplementary comparison brings together [global collocation](global-collocation.md),
+[RBF-FD](one-stencil.md), and [LHI](lhi.md). Work through their individual
+constructions first; then use this page to compare the objects they produce.
+
+| Method | Global unknowns | Local information | Field evaluation |
+|---|---|---|---|
+| Global asymmetric | Ordinary trial coefficients | All centers | Global radial expansion |
+| Global symmetric | Source-functional trial coefficients | All functional centers | Global Hermite expansion |
+| RBF-FD | Nodal solution values | Local value interpolants | Local reconstruction |
+| LHI | Interior solution-center values | Values, boundary data, PDE data | Local Hermite reconstruction |
 
 Solve \(-\Delta u=2\pi^2\sin(\pi x)\sin(\pi y)\) with zero Dirichlet data on the unit square. Symmetric global collocation applies PDE/boundary functionals to both kernel arguments. Asymmetric global collocation uses ordinary kernel translates as its trial basis. LHI forms local Hermite weight systems with solution, boundary, and PDE centers. RBF-FD uses local value-interpolation weights. See the separate [global](../theory/global.md) and [LHI](../theory/lhi.md) derivations before interpreting their matrices.
 
@@ -32,6 +41,13 @@ samples all four results at the same seeded off-node points.
 
 [Download the runnable script](https://raw.githubusercontent.com/LDBreton/RBFLAB/main/examples/tutorials/compare_methods.py).
 
-Run `python -m examples.tutorials.compare_methods`. With 36 cloud nodes, both global matrices and the RBF-FD matrix are \(36\times36\); the LHI matrix is \(16\times16\) because it solves for interior solution values. LHI also pays for local Hermite systems. At 40 independent off-node points, verified maximum errors were \(2.459\times10^{-2}\) (symmetric global), \(1.952\times10^{-2}\) (asymmetric global), \(1.764\times10^{-2}\) (LHI), and \(9.923\times10^{-3}\) (RBF-FD).
+Run `python -m examples.tutorials.compare_methods`. All methods solve the same
+Poisson equation on the same 36-node cloud. The global and RBF-FD matrices have
+36 rows; LHI has 16 interior equations because boundary data are eliminated
+through the local identities. Different matrix dimensions do not by themselves
+compare the total work: LHI also builds local Hermite systems.
 
-The global methods use IMQ(2); the local methods use PHS5 with degree-two polynomials. Therefore these numbers compare complete example recipes, **not** algorithms at matched parameters. Repeat with denser clouds and report both nodal and off-node errors, stencil size, and conditioning. See [discretizations](../api/discretizations.md).
+The global examples use IMQ(2); local examples use PHS5 with quadratic augmentation.
+The script's brief solution checks describe these recipes, not a matched method
+ranking. To adapt it, first choose which local information and which unknown vector
+your mathematical idea requires, then select the corresponding construction.

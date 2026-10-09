@@ -5,6 +5,14 @@ from pathlib import Path
 root = Path(__file__).resolve().parents[1]
 for relative in (
     "tutorials/one-stencil/index.html",
+    "tutorials/interpolation/index.html",
+    "tutorials/differentiation/index.html",
+    "tutorials/custom-kernel/index.html",
+    "tutorials/symbolic-pde/index.html",
+    "tutorials/global-collocation/index.html",
+    "tutorials/lhi/index.html",
+    "tutorials/custom-assembly/index.html",
+    "tutorials/annular-stokes/index.html",
     "tutorials/heat-equation/index.html",
     "tutorials/stokes/index.html",
     "theory/rbf-fd/index.html",

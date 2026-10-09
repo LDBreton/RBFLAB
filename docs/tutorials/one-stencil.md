@@ -28,9 +28,77 @@ $$
 
 Here \(\Phi_{jk}=\phi(\lVert x_j-x_k\rVert)\). Polynomial multipliers \(\lambda\) enforce reproduction and are not nodal solution values. The transpose records the functional convention even when this scalar matrix is symmetric.
 
-## Compute and inspect the row
+## 1. Select source and target locations
 
-Run `python -m examples.tutorials.one_stencil`. The full script is included below:
+```python
+import numpy as np
+import rbflab as rbf
+cells, stencil_size = 5, 20
+```
+
+```python
+--8<-- "examples/tutorials/one_stencil.py:geometry"
+```
+
+`cloud.points` has 36 rows. `target` has shape `(1, 2)`: one evaluation location
+near $(0.5,0.5)$. The introductory figure shows the same construction on a
+separate irregular cloud, not this 36-node demonstration.
+
+## 2. Describe the local space and target functional
+
+```python
+--8<-- "examples/tutorials/one_stencil.py:operator"
+```
+
+`ScalarSpace(PHS(5), 2)` selects the trial family and quadratic polynomials.
+The name `u` labels a space here; it is not a symbolic field. Requesting
+`Laplacian(2)` produces one row of weights. `op` is a `DiscreteOperator` with a
+`(1, 36)` sparse matrix.
+
+This example retains physical kernel scaling. Other lessons choose
+[local scaling](../theory/conditioning.md#local-stencil-scaling); scaling is a
+separate decision from polynomial degree and neighbor count.
+
+## 3. Read the local system and its weights
+
+```python
+--8<-- "examples/tutorials/one_stencil.py:inspect"
+```
+
+`local.indices` selects 20 cloud rows. Scalar `local.weights` has shape `(20, 1)`;
+its polynomial multipliers have shape `(6, 1)`. `reconstructed.matrix` is the
+$26\times26$ augmented interpolation system and `.rhs` is its target-functional
+column. These are not the global PDE matrix and forcing.
+
+```python
+--8<-- "examples/tutorials/one_stencil.py:weights"
+```
+
+This directly expresses the transpose equation in the derivation. Only the first
+20 entries become nodal differentiation weights; polynomial multipliers are not
+columns of the sparse row. `op @ values` applies it to a `(36,)` source vector.
+
+## 4. Supply your own neighborhood
+
+If your method selects neighbors another way, supply them explicitly:
+
+```python
+--8<-- "examples/tutorials/one_stencil.py:direct"
+```
+
+This returns nodal weights. You own the point selection and their scatter into
+global columns. Modifying an inspection copy from `op.local(0)` does not rebuild
+`op.matrix`.
+
+### A quick check
+
+The constant response is zero; the response to $x^2+y^2$ is four, up to roundoff.
+This makes polynomial reproduction tangible. Further diagnostic interpretation
+belongs in [errors and residuals](../theory/errors.md).
+
+## Complete example
+
+Run `python -m examples.tutorials.one_stencil` from a source checkout.
 
 ??? example "Complete runnable script"
 
@@ -38,10 +106,6 @@ Run `python -m examples.tutorials.one_stencil`. The full script is included belo
     --8<-- "examples/tutorials/one_stencil.py"
     ```
 
-[Download the runnable script](https://raw.githubusercontent.com/LDBreton/RBFLAB/main/examples/tutorials/one_stencil.py).
+[Download the script](https://raw.githubusercontent.com/LDBreton/RBFLAB/main/examples/tutorials/one_stencil.py).
 
-## Verify consistency
-
-`op.local(0)` gives selected indices, weights, multipliers, and diagnostics. `op.reconstruct_local(0)` rebuilds the local matrix and right-hand side on demand. `op.matrix` is the assembled sparse differentiation row. With 36 cloud nodes, the example forms a \(26\times26\) local matrix (20 values and 6 polynomial constraints) and a \(1\times36\) global row. It reports \(\sum_jw_{ij}\approx0\), \(\sum_jw_{ij}(x_j^2+y_j^2)\approx4\), and a local equation residual near \(6.1\times10^{-14}\).
-
-These checks establish local algebraic consistency, not PDE stability. Change the stencil size and inspect the selected radius and residual; then try the [heat equation](heat-equation.md). The [RBF-FD derivation](../theory/rbf-fd.md) and [discretization API](../api/discretizations.md) explain the conventions.
+**Next:** [Assemble a PDE](custom-assembly.md) or [include PDE data through LHI](lhi.md).

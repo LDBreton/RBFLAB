@@ -371,6 +371,25 @@ def _query(points, dimension=None):
 
 
 def interpolate(kernel, centers, data, precision=None, polynomial_degree=None):
-    """Ordinary interpolation, optionally polynomial-augmented and extended."""
+    """Fit a scalar RBF interpolant to supplied values at distinct centers.
+
+    Args:
+        kernel (object): Built-in radial kernel or bound symbolic kernel.
+        centers (numpy.ndarray): Finite coordinate array of shape (N, 2) or (N, 3).
+        data (numpy.ndarray or callable): Scalar samples of shape (N,), or a callback evaluated at centers.
+            Row i corresponds to centers[i]. Extended callbacks require
+            PrecisionData.
+        precision (Precision or None): Optional Precision(global_digits=...) for dense arithmetic.
+        polynomial_degree (int or None): Highest total polynomial degree. Must meet
+            the kernel's minimum augmentation requirement.
+
+    Returns:
+        result (NodalSolution): Fitted expansion with coefficients, diagnostics, and
+            evaluate(points, operator=None). Evaluation returns one value per
+            query point; an operator differentiates the fitted expansion.
+
+    This is exact interpolation, not noise-aware smoothing. Coefficients are
+    expansion coefficients, not the input nodal values. Assembly is dense.
+    """
     from .nodal import interpolation
     return interpolation(kernel, centers, data, precision or Precision(), polynomial_degree)
