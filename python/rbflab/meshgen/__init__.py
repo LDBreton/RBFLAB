@@ -1,7 +1,7 @@
 """Point generation; imports no plotting library or PDE solver.
 
 Use generate() for an array PointCloud. RBFMesh and RBFMesh3D retain the
-original object-list APIs for migration of existing RBFMeshGen scripts.
+object-list APIs, including FreeFEM-inspired Border(n) geometry construction.
 """
 from ..geometry import Border, MeshPoint, MeshPoint3D, ImplicitRegion, Sphere, Box, Cylinder, find_polygons
 from .polygons import (RBFMesh, exclude_nested_polygons, calculate_point_allocation,

@@ -33,7 +33,15 @@ class MeshPoint:
 
 
 class Border:
-    """Legacy parametric contour; border(n) samples n segments (negative reverses)."""
+    """Labeled parametric curve with FreeFEM-inspired segment-count syntax.
+
+    Call border(n) before passing it to meshgen.RBFMesh. The sign of n selects
+    orientation: a negative count reverses the parameter traversal. Sampling
+    is uniform in the parameter, not in arc length. At a junction the curve
+    starting there owns the point; the terminal endpoint is omitted. Calling border(n)
+    updates this object in place, so use distinct Border objects for distinct
+    arcs. See the parametric-borders tutorial for conversion to a PDE PointCloud.
+    """
     def __init__(self, parametric_function, label, t_start, t_end, is_border=True):
         """
         Represents a border in the mesh.

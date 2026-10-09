@@ -4,6 +4,9 @@ For labeled polygons, rectangles and named holes, start with the
 [geometry cookbook](cookbook.md). This page explains the lower-level curve
 and implicit-region interfaces.
 
+Prefer the original `Border(...)` and `curve(n)` syntax? Use the
+[parametric-borders tutorial](parametric-borders.md); that interface is also built in.
+
 ## A domain from a curve
 
 Supply coordinates **and their analytic tangent**. This avoids noisy finite

@@ -72,6 +72,7 @@ nav:
   - Geometry and nodes:
       - Geometry to PDE: geometry/index.md
       - Geometry cookbook: geometry/cookbook.md
+      - Parametric borders: geometry/parametric-borders.md
       - Custom domains and 3D: geometry/custom-domains.md
       - Gmsh and staggered clouds: geometry/staggered.md
   - Curved-domain examples:

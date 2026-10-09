@@ -42,12 +42,14 @@ explicitly in your discretization.
 - `geometry.Disk`, `Ellipse`, `Annulus`, and `Flower`: smooth planar domains.
 - `geometry.Polygon` and `Rectangle`: labeled straight edges, including concave shapes.
 - `geometry.with_holes`: add named circular, elliptical or polygonal holes.
-- `geometry.ParametricBoundary` and `ParametricDomain`: user-defined curves and holes.
+- `geometry.Border` + `meshgen.RBFMesh`: FreeFEM-inspired labeled curves with signed segment counts.
+- `geometry.ParametricBoundary` and `ParametricDomain`: user-defined curves with analytic tangents.
 - `geometry.Sphere`, `Box`, `Cylinder`, and `ImplicitRegion`: 3D volumes.
 - `meshgen.ParametricSurface3D`: separately sampled parametric surfaces.
 - `geometry.TriangleMesh2D`: an explicit conforming triangular mesh for staggering.
 
-Start with the [geometry cookbook](cookbook.md), then explore
+Start with the [geometry cookbook](cookbook.md) or the
+[FreeFEM-inspired border syntax](parametric-borders.md), then explore
 [custom boundaries](custom-domains.md) or [staggered clouds](staggered.md).
 The [Poisson example with holes](../tutorials/perforated-poisson.md) carries one
 composed domain all the way through symbolic assembly and error measurement.

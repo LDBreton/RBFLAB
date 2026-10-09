@@ -98,6 +98,27 @@ fig.savefig("solution.png", dpi=180)
 | [Custom kernels](https://ldbreton.github.io/RBFLAB/tutorials/custom-kernel/) | Symbolic kernels, derivatives and optional C++ compilation |
 | [Navier–Stokes cavity](https://ldbreton.github.io/RBFLAB/tutorials/cavity/) | An experimental staggered-flow showcase with documented limitations |
 
+## Prefer parametric borders?
+
+Your FreeFEM-inspired syntax is included too:
+
+```python
+import numpy as np
+from rbflab.geometry import Border
+from rbflab.meshgen import RBFMesh
+
+outer = Border(lambda t: (np.cos(t), np.sin(t)),
+               label="outer", t_start=0, t_end=2*np.pi)
+hole = Border(lambda t: (.4*np.cos(t), .4*np.sin(t)),
+              label="hole", t_start=0, t_end=2*np.pi)
+mesh = RBFMesh(outer(96), hole(-48))
+mesh.generate_points(240, seed=42, append=False)
+```
+
+The [parametric-borders tutorial](https://ldbreton.github.io/RBFLAB/geometry/parametric-borders/)
+connects this syntax to a PDE point cloud, including normals and flux conditions.
+No separate RBFMeshGen installation is needed.
+
 ## Choose a backend; keep the problem
 
 | Backend | Installation | Role |
