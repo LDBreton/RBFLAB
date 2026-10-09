@@ -111,7 +111,7 @@ def test_shared_factorization(monkeypatch):
 
 
 def test_scalar_space_assemble_matches_kernel_api():
-    cloud=r.unit_box_grid(2)
+    cloud=r.geometry.unit_box_grid(2)
     problem=r.LinearPDE(-r.Laplacian(),1,[r.Dirichlet(0)])
     reference=r.RBFFD(r.IMQ(2),stencil_size=9,polynomial_degree=1).assemble(problem,cloud)
     mapped=r.RBFFD(spaces={'u':r.ScalarSpace(r.IMQ(2),1)},stencil_size=9).assemble(problem,cloud)

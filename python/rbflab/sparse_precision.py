@@ -128,7 +128,7 @@ def assemble_sparse_system(kernel, cloud, problem, stencils):
         for j,w in zip(s.solution_indices,weights[:len(s.solution_indices)]):
             col=mapping[int(j)]
             rows[row][col]=rows[row].get(col,ctx.zero)+w
-        known=[bd[int(j)][1] for j in s.boundary_indices]+[forcing[j] for j in s.pde_indices]
+        known=s.known_data if s.known_data is not None else [bd[int(j)][1] for j in s.boundary_indices]+[forcing[j] for j in s.pde_indices]
         rhs[row]-=ctx.fsum(weights[len(s.solution_indices)+j]*v for j,v in enumerate(known))
     return MPSparseLHISystem(kernel,cloud,problem,bd,forcing,stencils,
                             MPSparseMatrix(ctx,rows),rhs)

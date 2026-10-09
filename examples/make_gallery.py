@@ -25,7 +25,7 @@ def heat_trajectory(shape=10):
         initial=pulse,
         boundary=[model.bc("boundary", sp.Eq(u, 0))],
     )
-    cloud = r.unit_box_grid(12)
+    cloud = r.geometry.unit_box_grid(12)
     trajectory = problem.solve(cloud, r.GlobalCollocation(r.IMQ(shape),
                                scheme="asymmetric"), dt="0.0075", steps=40)
     return cloud, trajectory

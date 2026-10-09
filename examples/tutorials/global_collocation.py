@@ -6,7 +6,7 @@ import rbflab as rbf
 
 def run():
     # --8<-- [start:problem]
-    cloud = rbf.unit_box_grid(5)
+    cloud = rbf.geometry.unit_box_grid(5)
     model = rbf.SymbolicScalar(2)
     u = model.field
     x, y = model.coordinates

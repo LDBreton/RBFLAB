@@ -81,9 +81,7 @@ def select_spaces(method,problem):
     velocity,pressure=(method.spaces[f] for f in problem.model.fields)
     if not isinstance(velocity,DivergenceFreeSpace) or not isinstance(pressure,ScalarSpace) or isinstance(pressure,DivergenceFreeSpace):
         raise TypeError("Momentum-only Stokes requires DivergenceFreeSpace velocity and ScalarSpace pressure")
-    legacy=getattr(method,'legacy_unaugmented_hybrid',False)
-    if type(legacy) is not bool:raise ValueError("legacy_unaugmented_hybrid must be a bool")
-    return velocity,pressure,velocity.degree(legacy_unaugmented_hybrid=legacy),pressure.degree(legacy_unaugmented_hybrid=legacy)
+    return velocity,pressure,velocity.degree(),pressure.degree()
 
 
 def assemble_spaces(method,problem,cloud):
@@ -140,6 +138,7 @@ class GlobalFlowSystem:
         for c in range(d):
             self.mass[c*len(ii):(c+1)*len(ii),:]=self.evaluation(cloud.interior,[{c:Identity(d)}]*len(ii))
         self.factor=None;self._factors={}
+        if not problem.transient:self.rhs=self.data(0)
 
     def evaluation(self,points,rows):
         a=self.arithmetic
@@ -157,7 +156,7 @@ class GlobalFlowSystem:
         if not self.problem.transient:
             if dt is not None or steps is not None:raise ValueError("Steady Stokes does not take time-step arguments")
             if self.factor is None:self.factor=a.factor(self.matrix)
-            rhs=self.data(0);z=self.factor.solve(rhs)
+            rhs=self.rhs;z=self.factor.solve(rhs)
             residual=a.norm(_mv(self.matrix,z)-rhs)/(a.norm(rhs) or a.number(1))
             return GlobalFlowSolution(self,z,0,diagnostics={'relative_residual':float(residual),'unknowns':self.size,
                 'pressure':'kernel representative modulo constants','divergence':'analytic','scaled_condition':self.factor.condition})
@@ -301,14 +300,19 @@ class LocalFlowSystem:
         from .legacy_cpp import LegacyCppLHIBackend
         if isinstance(method.local_backend,LegacyCppLHIBackend) and problem.transient:
             raise NotImplementedError('Experimental C++ backend currently supports steady LHI only')
+        from .configuration import configured_backend
         native=UnsteadyStokesProblem(problem.forcing,tuple(TaggedComponent(problem,cloud,j) for j in range(2)),
             problem.initial if problem.transient else (0,0),problem.viscosity)
         backend=LHIUnsteadyStokes(velocity.kernel,method.stencil_size,method.precision,method.stencil_policy,
             method.pde_stencil_size,pressure_kernel=pressure.kernel,polynomial_degree=vd,
-            legacy_unaugmented_hybrid=method.legacy_unaugmented_hybrid,
-            min_boundary_centers=method.min_boundary_centers,local_backend=method.local_backend)
+            legacy_unaugmented_hybrid=False,
+            min_boundary_centers=method.min_boundary_centers,local_backend=configured_backend(method))
         self.base=backend.assemble(native,cloud);self.problem=problem
         self.matrix=self.base.SY;self.mass=self.base.mass;self.arithmetic=self.base.arithmetic;self.factor=None
+        if not problem.transient:
+            f,g=self.base._data(0);a=self.arithmetic
+            boundary=a.vector([sum(v*g[j] for j,v in row.items()) for row in self.base.sb_rows])
+            self.rhs=_mv(self.mass,f)-boundary
 
     def solve(self,dt=None,steps=None,**kwargs):
         if self.problem.transient:
@@ -319,7 +323,6 @@ class LocalFlowSystem:
         from .lhi_stokes import LHIStokesState
         a=self.arithmetic;f,g=self.base._data(0)
         boundary=a.vector([sum(v*g[j] for j,v in row.items()) for row in self.base.sb_rows])
-        self.rhs=_mv(self.mass,f)-boundary
         if self.factor is None:self.factor=_factor(self.matrix,a)
         condition=float(np.linalg.cond(self.matrix.toarray())) if not a.ctx and len(self.rhs)<=300 else None
         if condition is not None and condition>1e12:

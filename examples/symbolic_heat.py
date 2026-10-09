@@ -14,7 +14,7 @@ def run(dt="0.01", steps=5):
         sp.Eq(lhs, 0), initial=exact.subs(t, 0),
         boundary=[model.bc("boundary", sp.Eq(u, 0))],
     )
-    cloud = r.unit_box_grid(5)
+    cloud = r.geometry.unit_box_grid(5)
     trajectory = problem.solve(cloud, r.GlobalCollocation(r.IMQ(2), scheme="asymmetric"), dt, steps)
     query = np.random.default_rng(4).uniform(.1, .9, (30, 2))
     final_time = float(sp.Rational(dt) * steps)

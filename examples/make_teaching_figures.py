@@ -53,7 +53,7 @@ def main():
         ax.spines[["top","right"]].set_visible(False)
     fig.savefig(OUT/"teaching_kernel.png",dpi=170);plt.close(fig)
 
-    cloud=rbf.unit_box_grid(5);model=rbf.SymbolicScalar(2);u=model.field;x,y=model.coordinates
+    cloud=rbf.geometry.unit_box_grid(5);model=rbf.SymbolicScalar(2);u=model.field;x,y=model.coordinates
     exact=sp.sin(sp.pi*x)*sp.sin(sp.pi*y)
     problem=model.stationary(sp.Eq(-model.laplacian(u),2*sp.pi**2*exact),boundary=[model.bc("boundary",sp.Eq(u,0))])
     system=rbf.LHI(rbf.PHS(5),20,polynomial_degree=2).assemble(problem,cloud)
@@ -82,7 +82,7 @@ def main():
     axes[1].xaxis.tick_bottom()
     fig.savefig(OUT/"teaching_operators.png",dpi=170);plt.close(fig)
     from examples.tutorials.heat_matrices import rbf_fd_laplacian, march
-    cloud=rbf.unit_box_grid(6);matrix,_=rbf_fd_laplacian(cloud)
+    cloud=rbf.geometry.unit_box_grid(6);matrix,_=rbf_fd_laplacian(cloud)
     states,_=march(matrix,cloud,dt=.01,steps=5,scheme="bdf2")
     fig,axes=plt.subplots(1,3,figsize=(11,3.5),constrained_layout=True)
     axes[0].scatter(*cloud.interior.T,c=BLUE,s=28,label="interior")

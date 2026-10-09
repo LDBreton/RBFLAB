@@ -8,8 +8,8 @@ import rbflab as rbf
 
 
 def make_problem(transient):
-    model = rbf.SymbolicSystem(
-        2, vector_fields=("U",), scalar_fields=("p",), transient=transient,
+    model = rbf.SymbolicStokes(
+        2,vector_fields=("U",), scalar_fields=("p",), transient=transient,
     )
     U, p = model.fields
     x, y = model.coordinates
@@ -38,7 +38,7 @@ def make_problem(transient):
 
 
 def run(cells=4):
-    cloud = rbf.unit_box_grid(cells)
+    cloud = rbf.geometry.unit_box_grid(cells)
     query = np.array([[0.3, 0.4]])
     results = {}
     for transient in (False, True):

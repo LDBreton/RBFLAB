@@ -21,7 +21,7 @@ def run(cells=5):
             model.bc("boundary", sp.Eq(u, exact)),
         ],
     )
-    cloud = rbf.unit_box_grid(cells)
+    cloud = rbf.geometry.unit_box_grid(cells)
     method = rbf.RBFFD(rbf.PHS(5), min(20, len(cloud.points)), polynomial_degree=2)
     system = method.assemble(problem, cloud)
     solution = system.solve()

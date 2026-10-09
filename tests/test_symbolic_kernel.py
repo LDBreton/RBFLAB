@@ -42,12 +42,12 @@ def test_compiled_scalar_runtime_and_3d(tmp_path,arithmetic):
 @pytest.mark.parametrize('digits',[None,45])
 def test_space_compiler_matches_builtin(tmp_path,digits):
     from examples.tutorials.stokes_spaces import make_problem
-    problem,spaces=make_problem(True);U,p=tuple(spaces);cloud=r.unit_box_grid(3)
+    problem,spaces=make_problem(True);U,p=tuple(spaces);cloud=r.geometry.unit_box_grid(3)
     family=r.Kernel((1+c*s)**sp.Rational(-1,2),s,(c,))
     outputs=[];weights=[]
     for custom in (False,True):
         method=r.LHI(spaces={U:r.DivergenceFreeSpace(family(c='2') if custom else r.IMQ('2'),None),p:r.ScalarSpace(family(c='1') if custom else r.IMQ('1'),None)},stencil_size=12,precision=r.Precision(local_digits=digits),local_backend=r.CppBackend(threads=4,compute_condition=False,cache_dir=str(tmp_path)))
-        if custom:method.prepare(problem,dimension=2,cache_dir=str(tmp_path))
+        if custom:method=method.prepare(problem,dimension=2,cache_dir=str(tmp_path))
         system=method.assemble(problem,cloud);solution=system.solve(dt='.01',steps=2).final
         q=np.vstack([cloud.interior[:2],[[.37,.43]]])
         outputs.append(np.hstack([solution.velocity(q),solution.pressure_gradient(q)]))
@@ -66,7 +66,7 @@ def test_compiled_interpolation_fd_and_symmetric(tmp_path,monkeypatch):
     data=lambda q:1+q[:,0]**2+q[:,1]
     solution=r.interpolate(kernel,points,data,polynomial_degree=2)
     np.testing.assert_allclose(solution.evaluate(target),data(target),atol=1e-10)
-    w=r.rbf_fd_weights(kernel,points,target[0],r.Laplacian(),2)
+    w=r.RBFFD(kernel,polynomial_degree=2).weights(centers=points,target=target[0],operator=r.Laplacian()).weights[:,0]
     assert abs(w@data(points)-2)<1e-10
     left=[r.Laplacian()]*len(points)
     from rbflab.assembly import functional_matrix
@@ -77,7 +77,7 @@ def test_compiled_interpolation_fd_and_symmetric(tmp_path,monkeypatch):
 @pytest.mark.skipif(os.environ.get('RBFLAB_CPP_TESTS')!='1',reason='GCC/WSL opt-in')
 def test_nonbuiltin_space_kernel(tmp_path):
     from examples.tutorials.stokes_spaces import make_problem
-    problem,spaces=make_problem(False);U,p=tuple(spaces);cloud=r.unit_box_grid(3)
+    problem,spaces=make_problem(False);U,p=tuple(spaces);cloud=r.geometry.unit_box_grid(3)
     family=r.Kernel(sp.exp(-c*s)*(1+g*s),s,(c,g))
     outputs=[]
     for backend in (r.PythonBackend(compute_condition=False),r.CppBackend(threads=4,compute_condition=False,cache_dir=str(tmp_path))):

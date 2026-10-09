@@ -19,7 +19,7 @@ def resolve_space(method, space=None):
     if method.spaces is None:
         if space is not None: raise ValueError('space requires an RBFFD spaces mapping')
         if method.kernel is None: raise ValueError('Specify kernel or spaces')
-        return ScalarSpace(method.kernel, method.polynomial_degree)
+        return ScalarSpace(method.kernel, 2 if method.polynomial_degree=="auto" else method.polynomial_degree)
     if method.kernel is not None: raise ValueError('Specify kernel or spaces, not both')
     if not isinstance(method.spaces, Mapping) or not method.spaces:
         raise ValueError('spaces must be a nonempty field-to-space mapping')
@@ -199,7 +199,7 @@ class DiscreteOperator:
             equation='matrix.T @ augmented_weights = rhs',backend=type(o.backend).__name__,local_digits=o.precision.local_digits)
 
 
-def build_operators(method,*,source,targets=None,operators,space=None):
+def build_operators(method,*,source,targets=None,operators,space=None,_indices=None):
     """Build named differentiation matrices with shared local stencils.
 
     source and targets are (N, 2) or (N, 3) point arrays or clouds;
@@ -227,15 +227,16 @@ def build_operators(method,*,source,targets=None,operators,space=None):
     if type(method.stencil_size) is not int or not 2<=method.stencil_size<=len(source):raise ValueError('Invalid stencil_size')
     if method.precision.global_digits is not None:raise ValueError('Local operators use local_digits')
     tree=cKDTree(source);ids=[];jobs=[];geometry=[]
-    for target in targets:
-        selected=method.stencil_policy.select(tree,target,method.stencil_size,degree)
+    for row, target in enumerate(targets):
+        selected=method.stencil_policy.select(tree,target,method.stencil_size,degree) if _indices is None else np.asarray(_indices[row], dtype=int)
         ops=[bind_operators([op],target[None,:])[0] for op in operators.values()]
         if any(op.dimension!=source.shape[1] for op in ops):raise ValueError('Operator dimension mismatch')
         ids.append(selected.copy());jobs.append(dict(points=source[selected].copy(),target=target.copy(),ops=ops))
         geometry.append(geometry_quality(source[selected],target,degree if degree is not None else 1))
+    from .configuration import configured_backend
     owner=SimpleNamespace(source=source,targets=targets,ids=ids,jobs=jobs,kernel=copy.deepcopy(descriptor.kernel),degree=degree,vector=vector,
         components=source.shape[1] if vector else 1,precision=copy.deepcopy(method.precision),scaling=method.stencil_policy.scaling,
-        backend=copy.deepcopy(method.local_backend or PythonBackend()),arithmetic=Arithmetic(descriptor.kernel,method.precision.local_digits))
+        backend=configured_backend(method),arithmetic=Arithmetic(descriptor.kernel,method.precision.local_digits))
     results=execute(owner);owner.weights=[r['weights'] for r in results]
     owner.diagnostics=[dict(geometry=g,scaled_condition=r['condition'],weight_residual=r['residual'],factorizations=1) for g,r in zip(geometry,results)]
     owner.reconstruct=lambda i:reconstruct(owner,i)

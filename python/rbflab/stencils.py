@@ -50,6 +50,9 @@ class StencilPolicy:
             automatically; do not rescale returned weights. Shape parameters
             then refer to dimensionless distances, so switching policy with
             the same numeric parameter can change the approximation.
+        shape_rule: ``"fixed"`` uses the supplied kernel parameter. Stokes
+            LHI also supports ``"hardy"``, ``"radius_scaled"`` and
+            ``"separation_scaled"``; other combinations fail preflight.
         selection: ``"nearest"`` keeps the requested stencil size.
             ``"quality"`` grows a nearest-neighbor set until polynomial-rank
             and node-separation thresholds are met, or raises an error.
@@ -69,8 +72,11 @@ class StencilPolicy:
     max_size: int | None = None
     min_polynomial_ratio: float = 1e-5
     min_separation_ratio: float = 1e-6
+    shape_rule: str = "fixed"
 
     def __post_init__(self):
+        if self.shape_rule not in ("fixed", "hardy", "radius_scaled", "separation_scaled"):
+            raise ValueError("Unknown shape rule")
         if self.scaling not in ("physical","local"):
             raise ValueError("scaling must be physical or local")
         if self.selection not in ("nearest","quality"):

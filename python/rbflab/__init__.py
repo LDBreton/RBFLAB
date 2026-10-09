@@ -1,70 +1,35 @@
-"""RBFLAB: radial basis functions for interpolation and PDEs."""
+"""RBFLAB: approximation spaces, differential operators and RBF methods.
+
+Geometry/generation and diagnostics live in their named submodules.
+Historical/experimental algorithms are not part of this stable namespace.
+"""
+from . import geometry, meshgen
+from .geometry import PointCloud
 from .precision import Precision, PrecisionData
+from .configuration import LocalSolver
 from .kernels import IMQ, Gaussian, PHS, Hybrid, DivergenceFree
-from .operators import Identity, Derivative, Laplacian, NormalDerivative, Robin
-from .geometry import PointCloud, gmsh_square, gmsh_cube, unit_box_grid
+from .symbolic_kernel import Kernel, Wendland
+from .operators import Identity, Derivative, Laplacian, NormalDerivative, Robin, SpatialOperator
 from .problems import LinearPDE, BoundaryCondition, Dirichlet
-from .nodal import rbf_fd_weights
-from .rbf_fd import RBFFD
+from .evolution import EvolutionPDE
+from .symbolic import SymbolicScalar
+from .symbolic_system import SymbolicSystem
+from .spaces import ScalarSpace, DivergenceFreeSpace, PressureSpace, SymbolicStokes
+from .stencils import StencilPolicy
+from .centers import CenterGroup
 from .methods import GlobalCollocation, LHI, interpolate
+from .rbf_fd import RBFFD
+from .discrete_operators import DiscreteOperator, OperatorSet
+from .lhi_backends import PythonBackend, CppBackend
+from .torch_backend import TorchBackend
 
 __all__ = [
-    "from_rbfmeshgen", "nodal_diagnostics", "TimeData", "UnsteadyStokesProblem", "LHIUnsteadyStokes", "GlobalUnsteadyStokes", "StokesProblem", "GlobalStokes", "StencilPolicy", "Precision", "PrecisionData", "IMQ", "Gaussian", "PHS", "Hybrid", "DivergenceFree", "Identity", "Derivative", "Laplacian",
-    "NormalDerivative", "Robin", "PointCloud", "gmsh_square", "gmsh_cube", "unit_box_grid", "LinearPDE",
-    "BoundaryCondition", "Dirichlet", "GlobalCollocation", "LHI", "RBFFD", "rbf_fd_weights", "interpolate",
+    'geometry', 'meshgen', 'PointCloud', 'Precision', 'PrecisionData', 'LocalSolver',
+    'IMQ', 'Gaussian', 'PHS', 'Hybrid', 'DivergenceFree', 'Kernel', 'Wendland',
+    'Identity', 'Derivative', 'Laplacian', 'NormalDerivative', 'Robin', 'SpatialOperator',
+    'LinearPDE', 'BoundaryCondition', 'Dirichlet', 'EvolutionPDE',
+    'SymbolicScalar', 'SymbolicSystem', 'SymbolicStokes',
+    'ScalarSpace', 'DivergenceFreeSpace', 'PressureSpace', 'StencilPolicy', 'CenterGroup',
+    'GlobalCollocation', 'LHI', 'RBFFD', 'interpolate', 'DiscreteOperator', 'OperatorSet',
+    'PythonBackend', 'CppBackend', 'TorchBackend',
 ]
-
-
-from .stencils import StencilPolicy
-
-from .mesh_adapters import from_rbfmeshgen
-from .diagnostics import nodal_diagnostics
-
-from .stokes import StokesProblem, GlobalStokes
-
-from .unsteady_stokes import TimeData, UnsteadyStokesProblem, GlobalUnsteadyStokes
-
-from .lhi_stokes import LHIUnsteadyStokes
-
-from .strategies import growing_hybrid_stokes, growing_stencil_size
-__all__ += ["growing_hybrid_stokes", "growing_stencil_size"]
-
-from .evolution import EvolutionPDE, EvolutionSystem, EvolutionTrajectory
-__all__ += ["EvolutionPDE", "EvolutionSystem", "EvolutionTrajectory"]
-
-from .symbolic import SymbolicScalar
-__all__ += ["SymbolicScalar"]
-
-from .operators import SpatialOperator
-__all__ += ["SpatialOperator"]
-
-from .time_data import InitialData
-__all__ += ["InitialData"]
-
-from .symbolic_system import SymbolicSystem, BlockPDE
-from .block_methods import BlockGlobal, BlockLHI
-__all__ += ["SymbolicSystem", "BlockPDE", "BlockGlobal", "BlockLHI"]
-
-from .spaces import ScalarSpace, DivergenceFreeSpace, PressureSpace
-__all__ += ["ScalarSpace", "DivergenceFreeSpace", "PressureSpace"]
-
-from .legacy_cpp import LegacyCppLHIBackend
-__all__ += ["LegacyCppLHIBackend"]
-
-from .lhi_backends import PythonBackend, CppBackend
-__all__ += ['PythonBackend', 'CppBackend']
-
-from .symbolic_kernel import Kernel, Wendland
-__all__ += ["Kernel", "Wendland"]
-
-from .cuda_backend import CudaLHIBackend
-__all__ += ["CudaLHIBackend"]
-
-from .torch_backend import TorchBackend, TorchKernel
-__all__ += ['TorchBackend', 'TorchKernel']
-
-from .differentiable_lhi import DifferentiableLHI
-__all__ += ['DifferentiableLHI']
-
-from .discrete_operators import DiscreteOperator, OperatorSet
-__all__ += ["DiscreteOperator", "OperatorSet"]

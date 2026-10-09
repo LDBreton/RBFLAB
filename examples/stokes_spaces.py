@@ -10,7 +10,7 @@ import rbflab as r
 
 
 def make_solution(method_name="global", backend_name="python", local_digits=None):
-    model = r.SymbolicSystem(2, vector_fields=("U",), scalar_fields=("p",))
+    model = r.SymbolicStokes(2,vector_fields=("U",), scalar_fields=("p",))
     U, p = model.fields
     x, y = model.coordinates
     velocity = sp.ImmutableMatrix([y*(1-y), 0])
@@ -39,7 +39,7 @@ def make_solution(method_name="global", backend_name="python", local_digits=None
         method = r.LHI(spaces=spaces, stencil_size=15,
                        precision=r.Precision(local_digits=local_digits),
                        local_backend=backends[backend_name]())
-    return problem.solve(r.unit_box_grid(4), method)
+    return problem.solve(r.geometry.unit_box_grid(4), method)
 
 
 def run(method_name="global", backend_name="python", local_digits=None):

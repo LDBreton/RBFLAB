@@ -42,7 +42,8 @@ def assemble_scalar_fd(method,problem,cloud):
         job=dict(points=basis.centers,left=left,right=right,moments=moments,degree=method.polynomial_degree,scaling=method.stencil_policy.scaling,target=point,op=operators[i])
         jobs.append(job);ids.append(selected)
         stencils.append(SimpleNamespace(basis=basis,factor=None,geometry_diagnostics=geometry_quality(basis.centers,point,method.polynomial_degree or 1)))
-    executor=ScalarExecutor(method.kernel,method.precision.local_digits,method.local_backend,jobs)
+    from .configuration import configured_backend
+    executor=ScalarExecutor(method.kernel,method.precision.local_digits,configured_backend(method),jobs)
     results=executor.solve();rows=[]
     for i,(result,stencil,selected) in enumerate(zip(results,stencils,ids)):
         stencil.factor=SimpleNamespace(condition=result['condition']);stencil.weight_residual=result['residual']

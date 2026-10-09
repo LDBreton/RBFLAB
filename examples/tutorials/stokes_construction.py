@@ -13,7 +13,7 @@ def run(plot=None):
                              boundary={"inner": 32, "outer": 48}, seed=42)
     # --8<-- [end:geometry]
     # --8<-- [start:fields]
-    model = rbf.SymbolicSystem(2, vector_fields=("U",), scalar_fields=("p",))
+    model = rbf.SymbolicStokes(2,vector_fields=("U",), scalar_fields=("p",))
     U, p = model.fields
     x, y = model.coordinates
     mu = 1

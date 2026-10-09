@@ -8,7 +8,7 @@ import rbflab as rbf
 
 def run(cells=5, stencil_size=20):
     # --8<-- [start:geometry]
-    cloud = rbf.unit_box_grid(cells)
+    cloud = rbf.geometry.unit_box_grid(cells)
     target_index = int(np.argmin(np.linalg.norm(cloud.points - [0.5, 0.5], axis=1)))
     target = cloud.points[[target_index]]
     # --8<-- [end:geometry]
@@ -39,10 +39,9 @@ def run(cells=5, stencil_size=20):
     quadratic_response = float(weights @ np.sum(points**2, axis=1))
     # --8<-- [end:weights]
     # --8<-- [start:direct]
-    direct = rbf.rbf_fd_weights(
-        rbf.PHS(5), points, target[0], rbf.Laplacian(2),
-        polynomial_degree=2,
-    )
+    direct = method.weights(
+        centers=points, target=target[0], operator=rbf.Laplacian(2),
+    ).weights[:, 0]
     # --8<-- [end:direct]
     direct_difference = float(np.max(np.abs(weights - np.asarray(direct).reshape(-1))))
     radius = float(np.max(np.linalg.norm(points - target[0], axis=1)))

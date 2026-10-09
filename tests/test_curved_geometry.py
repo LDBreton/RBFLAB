@@ -100,7 +100,8 @@ def test_legacy_adapter_retains_interfaces_and_regions():
     from rbflab.geometry import MeshPoint
     mesh=SimpleNamespace(Points=[MeshPoint(.5,.5,"fluid",False)],
         Boundary_Points=[MeshPoint(0,0,"wall"),MeshPoint(1,0,"wall"),MeshPoint(.5,.2,"interface")])
-    cloud=rbf.from_rbfmeshgen(mesh,boundary_labels=["wall"],interface_labels=["interface"])
+    from rbflab.mesh_adapters import from_rbfmeshgen
+    cloud=from_rbfmeshgen(mesh,boundary_labels=["wall"],interface_labels=["interface"])
     assert list(cloud.regions["fluid"])==[0]
     assert list(cloud.interfaces["interface"])==[3]
     assert 3 in cloud.interior_indices

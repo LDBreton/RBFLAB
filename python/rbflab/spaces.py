@@ -17,14 +17,13 @@ class ScalarSpace:
     kernel: object
     polynomial_degree: object = 'auto'
 
-    def degree(self, *, legacy_unaugmented_hybrid=False):
+    def degree(self):
         if not isinstance(self.kernel,(ScalarKernel,PHS,Hybrid,BoundKernel)):raise TypeError("Expected a scalar radial kernel")
         minimum=getattr(self.kernel,'minimum_degree',-1)
         if isinstance(self,DivergenceFreeSpace):minimum=max(-1,minimum-1)
         degree=(minimum if minimum>=0 else None) if self.polynomial_degree=='auto' else self.polynomial_degree
         if degree is not None and (type(degree) is not int or degree<0):raise ValueError("Invalid polynomial degree")
-        legacy = legacy_unaugmented_hybrid and isinstance(self.kernel,Hybrid) and self.polynomial_degree is None
-        if minimum>=0 and not legacy and (degree is None or degree<minimum):raise ValueError(f"This space requires polynomial degree >= {minimum}")
+        if minimum>=0 and (degree is None or degree<minimum):raise ValueError(f"This space requires polynomial degree >= {minimum}")
         order=6 if isinstance(self,DivergenceFreeSpace) else 2
         phs=self.kernel.phs if isinstance(self.kernel,Hybrid) else self.kernel if isinstance(self.kernel,PHS) else None
         if phs and phs.power-1<order:raise ValueError(f"This space requires continuous kernel derivatives through order {order}")
@@ -73,7 +72,7 @@ class SpaceStokesProblem:
     def solve(self,cloud,method,**kwargs):return method.assemble(self,cloud).solve(**kwargs)
 
 
-class SymbolicFlow:
+class SymbolicStokes:
     """Declare coupled velocity and pressure fields for Stokes momentum.
 
     Accepts one vector velocity and one scalar pressure in Cartesian 2D
@@ -81,7 +80,7 @@ class SymbolicFlow:
     DivergenceFreeSpace handles incompressibility. The general stationary
     SymbolicSystem branch remains available for other coupled PDEs.
     """
-    def __init__(self,dimension=2,*,vector_fields=None,scalar_fields=None,transient=False):
+    def __init__(self,dimension=2,*,vector_fields=("U",),scalar_fields=("p",),transient=False):
         if vector_fields is None or scalar_fields is None or len(vector_fields)!=1 or len(scalar_fields)!=1:
             raise NotImplementedError("The vector space compiler currently accepts one velocity and one pressure field")
         names=tuple(vector_fields)+tuple(scalar_fields)

@@ -166,7 +166,7 @@ def refinement_study(kappa=1.0, final_time=0.05):
     """Separate spatial error from time error using a matrix-exponential reference."""
     print("spatial study: semidiscrete RBF-FD versus continuous exact solution")
     for cells in (4, 6, 8):
-        cloud = rbf.unit_box_grid(cells)
+        cloud = rbf.geometry.unit_box_grid(cells)
         lap, _ = rbf_fd_laplacian(cloud)
         interior = cloud.interior_indices
         lap_ii = lap[interior, :][:, interior]
@@ -177,7 +177,7 @@ def refinement_study(kappa=1.0, final_time=0.05):
               f"spatial_max_error={np.max(np.abs(semidiscrete-target)):.6e}")
 
     cells = 8
-    cloud = rbf.unit_box_grid(cells)
+    cloud = rbf.geometry.unit_box_grid(cells)
     lap, _ = rbf_fd_laplacian(cloud)
     interior = cloud.interior_indices
     reference = expm_multiply(final_time*kappa*lap[interior, :][:, interior],
@@ -193,7 +193,7 @@ def refinement_study(kappa=1.0, final_time=0.05):
 def run(cells=6, dt=0.01, steps=5, *, kappa=1.0, scheme="backward_euler",
         nonzero_boundary=False, plot=None, figure=None):
     """Compare direct RBF-FD time marching with symbolic RBF-FD assembly."""
-    cloud = rbf.unit_box_grid(cells)
+    cloud = rbf.geometry.unit_box_grid(cells)
     rbf_matrix, ops = rbf_fd_laplacian(cloud)
     rbf_states, rbf_factors = march(rbf_matrix, cloud, dt=dt, steps=steps, kappa=kappa,
                                     scheme=scheme, nonzero_boundary=nonzero_boundary)

@@ -17,7 +17,7 @@ def run(cells=5):
         sp.Eq(lhs, lhs.subs(u, exact).doit()),
         boundary=[model.bc("boundary", sp.Eq(u, 0))],
     )
-    cloud = rbf.unit_box_grid(cells)
+    cloud = rbf.geometry.unit_box_grid(cells)
     query = np.random.default_rng(19).uniform(.1, .9, (40, 2))
     target = np.sin(np.pi*query[:, 0])*np.sin(np.pi*query[:, 1])
     methods = {

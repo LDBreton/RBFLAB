@@ -8,7 +8,7 @@ import rbflab as rbf
 
 def run():
     # --8<-- [start:settings]
-    cloud = rbf.unit_box_grid(6)  # 49 nodes, including the boundary
+    cloud = rbf.geometry.unit_box_grid(6)  # 49 nodes, including the boundary
     dt, steps, kappa = .01, 5, 1.
     method = rbf.RBFFD(rbf.PHS(5), stencil_size=20, polynomial_degree=2)
     # --8<-- [end:settings]

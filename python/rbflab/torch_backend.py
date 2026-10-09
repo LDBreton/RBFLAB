@@ -3,6 +3,7 @@
 Importing RBFLAB does not import torch. Global sparse solves and off-node
 reconstruction continue to use the existing CPU implementation.
 """
+from .configuration import BackendSettings
 from collections import defaultdict
 from dataclasses import dataclass
 from functools import lru_cache
@@ -194,13 +195,12 @@ def _block(z, source, target, velocity, pressure, vp, pp, mu):
 
 
 @dataclass(frozen=True)
-class TorchBackend:
+class TorchBackend(BackendSettings):
     """CPU Float64, 2D unaugmented physical-coordinate Stokes local systems."""
     batch_size: int = 64
     threads: int = 1
     device: str = 'cpu'
     compute_condition: bool = False
-    shape_rule: str = 'fixed'
 
     def __post_init__(self):
         if type(self.batch_size) is not int or self.batch_size < 1:
@@ -211,7 +211,7 @@ class TorchBackend:
             raise NotImplementedError('The first Torch LHI backend supports CPU only')
         if type(self.compute_condition) is not bool:
             raise TypeError('compute_condition must be bool')
-        if self.shape_rule not in ('fixed', 'legacy_hardy'):
+        if self.shape_rule not in ('fixed', 'hardy'):
             raise ValueError('Unknown shape rule')
 
     def prepare(self, velocity, pressure, precision, dimension=2):

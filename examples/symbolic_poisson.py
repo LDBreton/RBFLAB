@@ -20,7 +20,7 @@ def run(method_name="global", cells=5):
         sp.Eq(lhs, lhs.subs(u, exact).doit()),
         boundary=[model.bc("boundary", sp.Eq(u, 0))],
     )
-    cloud = r.unit_box_grid(cells)
+    cloud = r.geometry.unit_box_grid(cells)
     methods = {
         "global": lambda: r.GlobalCollocation(r.IMQ(2), scheme="asymmetric"),
         "lhi": lambda: r.LHI(r.PHS(5), min(20, len(cloud.points)), polynomial_degree=2),

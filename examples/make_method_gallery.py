@@ -40,7 +40,7 @@ def bar(fig, image, label, ticks):
 
 
 def heat():
-    cloud = rbf.unit_box_grid(18)
+    cloud = rbf.geometry.unit_box_grid(18)
     matrix, _ = rbf_fd_laplacian(cloud, 25)
     states, _ = march(matrix, cloud, dt=.001, steps=20, scheme="bdf2")
     error = float(np.max(abs(states[-1]-exact(cloud.points,.02))))

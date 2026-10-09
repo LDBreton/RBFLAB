@@ -38,7 +38,7 @@ def run(backend="python", compile_kernel=False):
         assert artifact.directory == reused.directory
         print(f"Compiled derivative checked; cached artifact reused: {artifact.directory}")
     # --8<-- [start:interpolation]
-    centers = rbf.unit_box_grid(4).points
+    centers = rbf.geometry.unit_box_grid(4).points
     values = np.sin(centers[:, 0]) + np.cos(centers[:, 1])
     query = np.array([[.27, .42], [.61, .35]])
     interpolant = rbf.interpolate(kernel, centers, values, polynomial_degree=2)

@@ -17,7 +17,7 @@ def run(cells=3):
         sp.Eq(lhs, lhs.subs(u, exact).doit()),
         boundary=[model.bc("boundary", sp.Eq(u, exact))],
     )
-    cloud = rbf.unit_box_grid(cells, dimension=3)
+    cloud = rbf.geometry.unit_box_grid(cells, dimension=3)
     method = rbf.RBFFD(rbf.PHS(5), min(30, len(cloud.points)), polynomial_degree=2)
     solution = problem.solve(cloud, method)
     nodal = solution.evaluate(cloud.points)

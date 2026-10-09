@@ -190,6 +190,15 @@ class EvolutionSystem:
         self.spatial,self.mass,self.boundary_map=spatial,mass,boundary_map
         self.kind=kind;self._factors={};self._initial_factor=None
 
+    @property
+    def matrix(self):
+        """Spatial operator A in M*z_dot + A*z = rhs(t)."""
+        return self.spatial
+
+    @matrix.setter
+    def matrix(self,value):
+        self.spatial=value
+
     def data(self,time):
         a=self.arithmetic;p=self.problem.at(time)
         if a.ctx:

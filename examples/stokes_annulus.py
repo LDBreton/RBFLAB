@@ -15,7 +15,7 @@ def run(interior=70, seed=42, plot=None):
     """Solve in a divergence-free kernel space, with inner angular speed one."""
     domain=geometry.Annulus(.5,1.)
     cloud=meshgen.generate(domain,interior=interior,boundary={"inner":32,"outer":48},seed=seed)
-    model=rbf.SymbolicSystem(2,vector_fields=("U",),scalar_fields=("p",))
+    model=rbf.SymbolicStokes(2,vector_fields=("U",),scalar_fields=("p",))
     U,p=model.fields;x,y=model.coordinates
     # u_theta = A*r+B/r; u_theta(a)=a, u_theta(b)=0.
     factor=(1/(x*x+y*y)-1)/3

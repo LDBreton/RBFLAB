@@ -1,4 +1,5 @@
 """Dense global Hermite collocation and genuine local Hermite interpolation."""
+from .api_contracts import MethodContract, assembled, prepared
 from dataclasses import dataclass, field
 import numpy as np
 from scipy.spatial import cKDTree
@@ -7,13 +8,14 @@ from scipy.sparse.linalg import splu
 from .stencils import neighbors as stencil_neighbors, StencilPolicy, geometry_quality
 from .operators import Identity
 from .kernels import validate_polynomial_degree
+from .configuration import LocalSolver
 from .precision import Precision, MPBackend, MPFactor, local_weights
 from .problems import values, boundary_data
 from .assembly import functional_matrix, Factor, relative_residual
 
 
 @dataclass
-class GlobalCollocation:
+class GlobalCollocation(MethodContract):
     """Dense scalar collocation using a radial kernel.
 
     Args:
@@ -31,6 +33,7 @@ class GlobalCollocation:
     polynomial_degree: int | None = None
     spaces: dict | None = None
 
+    @prepared
     def prepare(self,problem,*,dimension=2,cache_dir=None):
         """Prepare and cache required derivatives of a symbolic kernel.
 
@@ -40,6 +43,7 @@ class GlobalCollocation:
         from .kernel_compiler import prepare_method
         return prepare_method(self,problem,dimension,cache_dir)
 
+    @assembled
     def assemble(self, problem, cloud):
         """Build a dense global collocation system.
 
@@ -133,36 +137,43 @@ class Stencil:
     precision_diagnostics: dict = field(default_factory=dict)
     basis: object = None
     geometry_diagnostics: dict = field(default_factory=dict)
+    known_data: object = None
+    groups: dict = field(default_factory=dict)
 
 
 @dataclass
-class LHI:
+class LHI(MethodContract):
     """Sparse local Hermite interpolation for scalar PDEs or Stokes spaces.
 
-    Local systems mix solution, boundary, and PDE functionals. A stencil's
-    PDE centers exclude its solution center. The sparse solve returns nodal
+    Local systems mix solution, boundary, and PDE functionals. By default a
+    stencil excludes its target from PDE centers; explicit groups select this rule. The sparse solve returns nodal
     values; off-node evaluation uses a nearby local stencil.
 
     Args:
         kernel: Radial kernel used in each local Hermite system.
         stencil_size: Number of nearby solution/boundary candidates.
         precision: Local and sparse-solve arithmetic policy.
-        pde_stencil_size: Optional number of additional PDE centers.
+        centers: Optional named CenterGroup mapping for independent scalar
+            stationary data layouts. None preserves combined-neighbor selection.
+        pde_stencil_size: Optional number of additional PDE centers in the default layout.
         polynomial_degree: Optional polynomial reproduction degree.
         stencil_policy: Neighbor selection and local scaling policy.
         spaces: Optional field-to-space mapping for divergence-free Stokes.
-        local_backend: Optional supported local-weight backend."""
+        local_backend: Optional supported local-weight backend.
+        local_solver: Backend-independent local factorization configuration."""
     kernel: object = None
     stencil_size: int = 15
     precision: Precision = field(default_factory=Precision)
+    centers: dict | None = None
     pde_stencil_size: int | None = None
     polynomial_degree: int | None = None
     stencil_policy: StencilPolicy = field(default_factory=StencilPolicy)
     spaces: dict | None = None
-    legacy_unaugmented_hybrid: bool = False
     min_boundary_centers: int = 0
     local_backend: object = None
+    local_solver: LocalSolver = field(default_factory=LocalSolver)
 
+    @prepared
     def prepare(self,problem,*,dimension=2,cache_dir=None):
         """Prepare and cache required derivatives of a symbolic kernel.
 
@@ -172,19 +183,20 @@ class LHI:
         from .kernel_compiler import prepare_method
         return prepare_method(self,problem,dimension,cache_dir)
 
+    @assembled
     def assemble(self, problem, cloud):
         """Construct local Hermite weights and the global sparse PDE system."""
         if self.spaces is not None:
             from .space_stokes import assemble_spaces
             return assemble_spaces(self,problem,cloud)
-        if self.legacy_unaugmented_hybrid or self.min_boundary_centers or self.local_backend is not None:
+        if self.min_boundary_centers:
             raise ValueError("These stencil options require divergence-free Stokes spaces")
         from .spaces import SpaceStokesProblem
         if isinstance(problem,SpaceStokesProblem):raise ValueError("Space Stokes requires a spaces mapping on the method")
         from .evolution import EvolutionPDE, assemble_evolution
         if isinstance(problem, EvolutionPDE):
             return assemble_evolution(self, problem, cloud)
-        if type(self.stencil_size) is not int or not 3 <= self.stencil_size <= len(cloud.points):
+        if self.centers is None and (type(self.stencil_size) is not int or not 3 <= self.stencil_size <= len(cloud.points)):
             raise ValueError("stencil_size must be between 3 and the point count")
         if not isinstance(self.precision, Precision):
             raise TypeError("precision must be a Precision object")
@@ -220,16 +232,17 @@ class LHI:
         rows, cols, data, stencils = [], [], [], []
         rhs = None if full_mp else forcing[ii].copy()
         for row, center in enumerate(ii):
-            neighbors = self.stencil_policy.select(tree, cloud.points[center], self.stencil_size,self.polynomial_degree)
+            neighbors = self.stencil_policy.select(tree, cloud.points[center], self.stencil_size,self.polynomial_degree) if self.centers is None else np.array([],int)
             sc = np.array([int(j) for j in neighbors if int(j) in interior_set], dtype=int)
             fc = np.array([int(j) for j in neighbors if int(j) in bd], dtype=int)
             pc = sc[sc != center]  # Default preserves the original selection.
             if pde_tree is not None:
                 candidates = ii[stencil_neighbors(pde_tree, cloud.points[center], self.pde_stencil_size+1)]
                 pc = candidates[candidates != center][:self.pde_stencil_size]
-            indices = np.r_[sc, fc, pc]
-            points = cloud.points[indices]
-            ops = [Identity(cloud.dimension)] * len(sc) + [bd[int(j)][0] for j in fc] + [problem.operator] * len(pc)
+            from .centers import select_groups
+            sc,fc,pc,points,ops,known,groups = select_groups(
+                self,problem,cloud,bd,row,int(center),neighbors,pc,
+                backend.ctx if full_mp else None)
             basis = None
             if arithmetic is not None:
                 from .hermite import augmented_local_weights
@@ -249,23 +262,22 @@ class LHI:
                 factor, w, wmp, residual, pd = local_weights(
                     self.kernel, points, ops, cloud.points[[center]], problem.operator,
                     self.precision, backend, round_weights=not full_mp)
-            quality=geometry_quality(cloud.points[np.r_[sc,fc]],cloud.points[center],
+            quality=geometry_quality(np.unique(points,axis=0),cloud.points[center],
                                      self.polynomial_degree if self.polynomial_degree is not None else 1)
             if full_mp:
                 stencils.append(Stencil(int(center), sc, fc, pc, points, ops, factor, w,
-                                        residual, wmp, pd, basis, quality))
+                                        residual, wmp, pd, basis, quality, known, groups))
                 continue
             for j, weight in zip(sc, w[:len(sc)]):
                 rows.append(row)
                 cols.append(interior_map[int(j)])
                 data.append(weight)
-            known = np.r_[[bd[int(j)][1] for j in fc], forcing[pc]]
             # Boundary and PDE-center data are prescribed. Move their
             # contribution right; only solution-center weights become
             # columns of the global interior matrix.
-            rhs[row] -= w[len(sc):] @ known
+            rhs[row] -= w[len(sc):] @ np.asarray(known)
             stencils.append(Stencil(int(center), sc, fc, pc, points, ops, factor, w,
-                                    residual, wmp, pd, basis, quality))
+                                    residual, wmp, pd, basis, quality, known, groups))
         if full_mp:
             from .sparse_precision import assemble_sparse_system
             return assemble_sparse_system(self.kernel,cloud,problem,stencils)
@@ -331,8 +343,8 @@ class LHISolution:
         self._coefficients = []
         for stencil in system.stencils:
             data = np.r_[[nodal[j] for j in stencil.solution_indices],
-                         [system.boundary_data[int(j)][1] for j in stencil.boundary_indices],
-                         values(system.problem.rhs, system.cloud.points[stencil.pde_indices])]
+                         stencil.known_data if stencil.known_data is not None else
+                         [system.boundary_data[int(j)][1] for j in stencil.boundary_indices]+list(values(system.problem.rhs, system.cloud.points[stencil.pde_indices]))]
             self._coefficients.append(stencil.factor.solve(stencil.basis.padded(data) if stencil.basis else data))
 
     def evaluate(self, points, operator=None):

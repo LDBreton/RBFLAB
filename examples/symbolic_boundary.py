@@ -19,7 +19,7 @@ def run():
             model.bc("boundary", sp.Eq(u, exact)),
         ],
     )
-    cloud = r.unit_box_grid(5)
+    cloud = r.geometry.unit_box_grid(5)
     solution = problem.solve(cloud, r.GlobalCollocation(r.IMQ(2), scheme="asymmetric"))
     query = np.random.default_rng(12).uniform(.1, .9, (30, 2))
     expected = np.exp(query[:, 0]) * (1 + query[:, 1])

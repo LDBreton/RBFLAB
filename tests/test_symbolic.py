@@ -28,7 +28,7 @@ def model_problem(dimension):
 @pytest.mark.parametrize('digits',[None,40])
 def test_custom_boundary_and_irrational_pde_all_methods(dimension,name,digits):
     model,problem,exact=model_problem(dimension)
-    cloud=r.unit_box_grid(2, dimension)
+    cloud=r.geometry.unit_box_grid(2, dimension)
     if name in ('symmetric','asymmetric'):
         method=r.GlobalCollocation(r.PHS(5),scheme=name,polynomial_degree=2,
                                     precision=r.Precision(global_digits=digits))
@@ -84,7 +84,7 @@ def test_symbolic_heat_normalization_and_extended_data(dimension,name):
     problem=m.evolution(sp.Eq(lhs,lhs.subs(u,exact).doit()),initial=exact.subs(t,0),
         boundary=[m.bc('boundary',sp.Eq(3*u,3*exact))])
     assert problem.operator==-Fraction(1,2)*r.Laplacian(dimension)
-    cloud=r.unit_box_grid(2, dimension)
+    cloud=r.geometry.unit_box_grid(2, dimension)
     if name in ('symmetric','asymmetric'):
         method=r.GlobalCollocation(r.PHS(5),scheme=name,polynomial_degree=2,precision=r.Precision(global_digits=35))
     else:
@@ -108,7 +108,7 @@ def test_reject_nonlinear_or_coupled_expression(kind):
 
 def test_boundary_data_errors_and_priority():
     m=r.SymbolicScalar();u=m.field;x,y=m.coordinates
-    cloud=r.unit_box_grid(2)
+    cloud=r.geometry.unit_box_grid(2)
     problem=m.stationary(sp.Eq(-m.laplacian(u),0),boundary=[
         m.bc('left',sp.Eq(u,1)),m.bc('boundary',sp.Eq(u,2))])
     bd=boundary_data(problem,cloud)
@@ -151,7 +151,7 @@ def test_standalone_operator_and_boundary_without_normals():
     assert op==-r.Laplacian()+Fraction(1,7)*(r.Derivative(0)@r.Derivative(1))
     with pytest.raises(ValueError,match='independent'):
         m.operator(-m.laplacian(u)+1)
-    cloud=r.unit_box_grid(2)
+    cloud=r.geometry.unit_box_grid(2)
     exact=1+x*x+y*y
     boundary_operator=(1+x)*u+sp.diff(u,y)
     problem=m.stationary(sp.Eq(-m.laplacian(u),-4),boundary=[

@@ -1,9 +1,11 @@
 """Polynomial-augmented RBF-FD with shared nodal stencils and sparse solvers."""
+from .api_contracts import MethodContract, assembled, prepared
 from dataclasses import dataclass,field
 import numpy as np
 from scipy.spatial import cKDTree
 from scipy.sparse import coo_matrix
 from scipy.sparse.linalg import splu
+from .configuration import LocalSolver
 from .precision import Precision
 from .operators import Identity
 from .assembly import relative_residual
@@ -13,7 +15,7 @@ from .sparse_precision import MPSparseMatrix,MPSparseLU
 
 
 @dataclass
-class RBFFD:
+class RBFFD(MethodContract):
     """Polynomial-augmented local finite differences on a point cloud.
 
     The standard scheme uses value-based local ansatz functions. Alternative
@@ -22,24 +24,45 @@ class RBFFD:
     Args:
         kernel: Radial basis function used for stencil weights.
         stencil_size: Number of points in each local stencil.
-        polynomial_degree: Highest total polynomial degree.
+        polynomial_degree: Highest total polynomial degree. The default auto
+            preserves degree 2 for kernel shorthand; spaces own their degree.
         precision: Local-weight and sparse-solve arithmetic policy.
         stencil_policy: Selection and scaling of local points.
         scheme: Local ansatz scheme; `"standard"` is the default.
         local_backend: Optional local-weight implementation.
+        local_solver: Backend-independent factorization selection (currently LU).
         spaces: Optional source/target approximation-space mapping.
 
     Use `operators(...)` for reusable discrete matrices or `assemble(...)`
     for a scalar PDE system."""
     kernel: object = None
     stencil_size: int = 15
-    polynomial_degree: int = 2
+    polynomial_degree: object = "auto"
     precision: Precision = field(default_factory=Precision)
     stencil_policy: StencilPolicy = field(default_factory=StencilPolicy)
 
     scheme: str = 'standard'
     local_backend: object = None
+    local_solver: LocalSolver = field(default_factory=LocalSolver)
     spaces: object = None
+
+    def weights(self, *, centers, target, operator, space=None):
+        """Compute one explicit stencil, preserving the supplied center order.
+
+        Returns local weights (source DOFs, output components), multipliers,
+        diagnostics, and reconstruct_local(). Uses the operators backend path.
+        """
+        from dataclasses import replace
+        from .discrete_operators import build_operators
+        points = np.asarray(centers, dtype=float)
+        method = replace(self, stencil_size=len(points))
+        method.preflight(operation="operators", space=space)
+        op = build_operators(method, source=points, targets=np.asarray(target)[None, :],
+                             operators={"value": operator}, space=space,
+                             _indices=[np.arange(len(points))])["value"]
+        local = op.local(0)
+        local.reconstruct_local = lambda: op.reconstruct_local(0)
+        return local
 
     def operators(self, *, source, targets=None, operators, space=None) -> "OperatorSet":
         """Return reusable named sparse differentiation operators.
@@ -54,9 +77,11 @@ class RBFFD:
             OperatorSet: Entries expose matrix, local(i), and
                 reconstruct_local(i). Only standard nodal RBF-FD is supported.
         """
+        self.preflight(operation="operators", space=space)
         from .discrete_operators import build_operators
         return build_operators(self, source=source, targets=targets, operators=operators, space=space)
 
+    @prepared
     def prepare(self,problem,*,dimension=2,cache_dir=None):
         """Prepare supported symbolic kernel derivatives for a problem.
 
@@ -73,6 +98,7 @@ class RBFFD:
         from .kernel_compiler import prepare_method
         return prepare_method(self,problem,dimension,cache_dir)
 
+    @assembled
     def assemble(self,problem,cloud):
         """Assemble scalar PDE/boundary rows or dispatch an evolution system.
 

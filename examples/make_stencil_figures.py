@@ -25,7 +25,7 @@ def save(fig, name):
 def rbf_fd():
     """Compute a real 20-node Laplacian stencil on a seeded irregular cloud."""
     rng = np.random.default_rng(17)
-    cloud = rbf.unit_box_grid(10)
+    cloud = rbf.geometry.unit_box_grid(10)
     points = cloud.points.copy()
     points[cloud.interior_indices] += rng.uniform(-0.025, 0.025,
                                                   (len(cloud.interior_indices), 2))

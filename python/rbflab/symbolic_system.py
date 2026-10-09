@@ -55,12 +55,6 @@ class SymbolicSystem:
     Interior equations are retained in every slot. LHI pressure constraints
     use the specified equation slot for an explicit compatibility multiplier.
     """
-    def __new__(cls,dimension=2,*,fields=('u','v','p'),vector_fields=None,scalar_fields=None,transient=False):
-        if vector_fields is not None or scalar_fields is not None or transient:
-            from .spaces import SymbolicFlow
-            return SymbolicFlow(dimension,vector_fields=vector_fields,scalar_fields=scalar_fields,transient=transient)
-        return super().__new__(cls)
-
     def __init__(self,dimension=2,*,fields=('u','v','p')):
         self._scalar=SymbolicScalar(dimension)
         if not fields or len(set(fields))!=len(fields) or any(not isinstance(f,str) or not f for f in fields):

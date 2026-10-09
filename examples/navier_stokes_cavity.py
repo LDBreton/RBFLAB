@@ -16,7 +16,7 @@ from rbflab import viz
 # --8<-- [start:clouds]
 def clouds(cells):
     """Vertices carry pressure; triangle edge midpoints carry velocity."""
-    pressure = r.unit_box_grid(cells)
+    pressure = r.geometry.unit_box_grid(cells)
     node = np.arange((cells + 1) ** 2).reshape(cells + 1, cells + 1)
     a, b = node[:-1, :-1].ravel(), node[1:, :-1].ravel()
     c, d = node[1:, 1:].ravel(), node[:-1, 1:].ravel()

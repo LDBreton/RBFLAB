@@ -69,6 +69,8 @@ def solve_lhi_reference(system, weight_source="unrounded", rounded_system=False,
     ctx=backend.ctx
     ii=system.cloud.interior_indices
     mapping={int(j):i for i,j in enumerate(ii)}
+    if extended_data and getattr(system,'recipe',{}).get('independent_centers',False):
+        raise NotImplementedError('For independent groups, assemble with full sparse extended precision instead of resampling reference data')
     if extended_data:
         bd=boundary_data(system.problem,system.cloud,ctx=ctx)
         forcing=mp_values(system.problem.rhs,system.cloud.points,ctx)
@@ -83,7 +85,7 @@ def solve_lhi_reference(system, weight_source="unrounded", rounded_system=False,
             mp_number(ctx,v) for v in s.weights]
         for j,w in zip(s.solution_indices,weights[:len(s.solution_indices)]):
             a[row,mapping[int(j)]]+=w
-        known=[bd[int(j)][1] for j in s.boundary_indices]+[forcing[j] for j in s.pde_indices]
+        known=[mp_number(ctx,v) for v in s.known_data] if s.known_data is not None and not extended_data else [bd[int(j)][1] for j in s.boundary_indices]+[forcing[j] for j in s.pde_indices]
         rhs[row]-=ctx.fsum(weights[len(s.solution_indices)+j]*v for j,v in enumerate(known))
     if rounded_system:
         a=ctx.matrix(system.matrix.toarray().tolist())
@@ -107,8 +109,7 @@ class MPLHIReferenceSolution:
         nodal=dict(zip(system.cloud.interior_indices,u))
         self._coefficients=[]
         for s in system.stencils:
-            data=[nodal[j] for j in s.solution_indices]+[bd[int(j)][1] for j in s.boundary_indices]+[
-                forcing[j] for j in s.pde_indices]
+            data=[nodal[j] for j in s.solution_indices]+(list(s.known_data) if s.known_data is not None and not diagnostics.get('extended_data',False) else [bd[int(j)][1] for j in s.boundary_indices]+[forcing[j] for j in s.pde_indices])
             self._coefficients.append(s.factor.solve(s.basis.padded(data) if s.basis else self.ctx.matrix(data)))
 
     def evaluate_mp(self,points,operator=None):

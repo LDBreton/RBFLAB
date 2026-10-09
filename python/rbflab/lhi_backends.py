@@ -3,6 +3,7 @@
 Python workers compute independent stencils in spawned processes. The owned C++
 backend computes smooth/hybrid stencils with MPFR/OpenMP. Global assembly stays shared.
 """
+from .configuration import BackendSettings
 from dataclasses import dataclass, replace
 from pathlib import Path
 from .native_paths import source_root
@@ -93,8 +94,8 @@ def _hardy_kernel(kernel, factor, arithmetic):
 
 def _prepare(method,problem,cloud,shape_rule):
     from .lhi_stokes import VectorHermiteStencil
-    if shape_rule not in ('fixed', 'legacy_hardy', 'radius_scaled', 'separation_scaled'):raise ValueError('Unknown shape rule')
-    if shape_rule == 'legacy_hardy':
+    if shape_rule not in ('fixed', 'hardy', 'radius_scaled', 'separation_scaled'):raise ValueError('Unknown shape rule')
+    if shape_rule == 'hardy':
         if method.stencil_policy.scaling != 'physical':raise ValueError('Hardy shape rule uses physical coordinates')
         if method.polynomial_degree is not None:raise NotImplementedError('Hardy scaling currently requires unaugmented kernels')
         if method.stencil_policy.selection != 'nearest' or method.min_boundary_centers or method.pde_stencil_size is not None:
@@ -123,7 +124,7 @@ def _prepare(method,problem,cloud,shape_rule):
                 points.extend(cloud.points[ids]);ops.extend([momentum[c] if name=='pde' else {c:Identity()}]*len(ids))
                 slots.extend([(name,mapping[j]+c*size) for j in ids]);codes.extend([c+5 if name=='pde' else c+1]*len(ids))
         points=np.array(points);local=a
-        if shape_rule=='legacy_hardy':
+        if shape_rule=='hardy':
             if method.stencil_policy.scaling!='physical':raise ValueError('Hardy shape rule uses physical coordinates')
             radius=float(tree.query(cloud.points[center],k=method.stencil_size)[0][-1]);factor=(a.ctx.sqrt if a.ctx else np.sqrt)(len(sc)+len(bc)+len(pc))*a.number('.815')/a.number(radius)
             local=StokesArithmetic(_hardy_kernel(method.kernel,factor,a),_hardy_kernel(pk,factor,a),method.precision.local_digits)
@@ -182,7 +183,7 @@ def _finish(method,problem,cloud,a,tasks,stencils,results,diagnostics):
 
 
 @dataclass(frozen=True)
-class PythonBackend:
+class PythonBackend(BackendSettings):
     """Python local-weight backend for supported scalar and vector stencils.
 
     Used by divergence-free LHI Stokes and reusable RBF-FD operators.
@@ -192,12 +193,12 @@ class PythonBackend:
     Args:
         workers: Number of local-assembly worker processes.
         compute_condition: Whether to estimate each local condition number.
-        shape_rule: Shape-parameter policy for each stencil."""
+
+    Numerical policies are specified on the method and StencilPolicy."""
     workers: int = 1
     compute_condition: bool = True
-    shape_rule: str = 'fixed'
     def __post_init__(self):
-        if self.shape_rule not in ('fixed','legacy_hardy','radius_scaled','separation_scaled'):raise ValueError('Unknown shape rule')
+        if self.shape_rule not in ('fixed','hardy','radius_scaled','separation_scaled'):raise ValueError('Unknown shape rule')
         if type(self.workers) is not int or self.workers<1:raise ValueError('workers must be a positive integer')
         if type(self.compute_condition) is not bool:raise TypeError('compute_condition must be bool')
     def assemble(self,method,problem,cloud):
@@ -213,7 +214,7 @@ class PythonBackend:
 
 
 @dataclass(frozen=True)
-class CppBackend:
+class CppBackend(BackendSettings):
     """Compiled local-weight backend for supported scalar and vector stencils.
 
     Used by supported LHI Stokes and reusable RBF-FD operator paths.
@@ -225,25 +226,21 @@ class CppBackend:
     Args:
         threads: OpenMP thread count for local systems.
         compute_condition: Whether to estimate local condition numbers.
-        shape_rule: Stencil shape-parameter policy.
-        local_solver: `"lu"` or Float64-only `"svd"`.
-        svd_rcond: Optional Float64 SVD cutoff."""
+
+    Use LocalSolver on the method to select local factorization."""
     threads: int = 1
     compute_condition: bool = True
-    shape_rule: str = 'fixed'
     executable: str | None = None
     distribution: str = 'Ubuntu'
     timeout: float = 300
     cache_dir: str | None = None
-    local_solver: str = 'lu'
-    svd_rcond: float | None = None
     def __post_init__(self):
         if self.local_solver not in ('lu','svd'):raise ValueError('local_solver must be lu or svd')
         if self.svd_rcond is not None and (not np.isfinite(self.svd_rcond) or not 0 <= self.svd_rcond < 1):raise ValueError('svd_rcond must be finite in [0,1)')
         if self.local_solver!='svd' and self.svd_rcond is not None:raise ValueError('svd_rcond requires local_solver=svd')
         if type(self.threads) is not int or self.threads<1:raise ValueError('threads must be positive integer')
         if type(self.compute_condition) is not bool:raise TypeError('compute_condition must be bool')
-        if self.shape_rule not in ('fixed','legacy_hardy','radius_scaled','separation_scaled'):raise ValueError('Unknown shape rule')
+        if self.shape_rule not in ('fixed','hardy','radius_scaled','separation_scaled'):raise ValueError('Unknown shape rule')
     def assemble(self,method,problem,cloud):
         start=time.perf_counter();pk=method.pressure_kernel or method.kernel
         if method.stencil_policy.scaling!='physical':
@@ -252,7 +249,7 @@ class CppBackend:
             if not isinstance(k,(ScalarKernel,Hybrid,BoundKernel)):raise NotImplementedError('Compiled kernels: IMQ, Gaussian, and their supported PHS hybrids')
         native = method.precision.local_digits is None
         if not native and self.local_solver=='svd':raise NotImplementedError('SVD local solver currently requires Float64')
-        if self.shape_rule=='legacy_hardy' and (method.stencil_policy.selection!='nearest' or method.min_boundary_centers or method.pde_stencil_size is not None):
+        if self.shape_rule=='hardy' and (method.stencil_policy.selection!='nearest' or method.min_boundary_centers or method.pde_stencil_size is not None):
             raise NotImplementedError('Historical Hardy scaling requires the original nearest-stencil layout')
         custom=any(isinstance(k,BoundKernel) for k in (method.kernel,pk))
         custom_executable=None
