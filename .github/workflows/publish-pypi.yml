@@ -36,6 +36,8 @@ jobs:
           assert os.environ['RELEASE_TAG'] == f'v{version}', 'Release tag must match pyproject.toml'
           PY
       - run: python -m pip install ".[test]" build twine
+      - name: Prepare dependencies for kernel compilation tests
+        run: bash cpp/prepare_dependencies.sh
       - name: Test installed package with matching native sources
         env:
           RBFLAB_SOURCE_ROOT: ${{ github.workspace }}
