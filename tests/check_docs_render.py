@@ -88,3 +88,8 @@ cavity = (root / "site/tutorials/cavity/index.html").read_text(encoding="utf-8")
 for name in ("convection", "coupled", "continuity_equation_max", "factor"):
     assert name in cavity, name
 assert "--8<--" not in cavity
+
+
+for page in (root / "docs").rglob("*.md"):
+    content = page.read_text(encoding="utf-8")
+    assert not any(ord(ch) < 32 and ch not in ("\n", "\r", "\t") for ch in content), page

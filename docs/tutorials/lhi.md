@@ -1,20 +1,17 @@
 # Solve a PDE with local Hermite interpolation
 
-For the canonical explicit local API, see [functionals to operators](local-approximation.md)
-and [LHI and heat from matrices](lhi-matrices.md). This page explains the retained
-PDE convenience interface.
+**Goal:** construct Hermite trial functions, extract their named weight blocks,
+and assemble the PDE yourself. Read [one stencil](one-stencil.md) first.
 
-**Goal:** understand which data enter an LHI patch and which weights enter the
-sparse PDE equation. Read [one stencil](one-stencil.md) and the
-[global construction](global-collocation.md) first.
+## 1. Separate unknown values and known data
 
-## 1. Reuse the equation, change the local information
-
-Use the same unit-square Poisson problem as the global lesson:
+For $Lu=f$ with Dirichlet boundary data $u=g$, use three point sets:
+$X_u$ for unknown solution samples, $X_b$ for boundary samples, and $X_f$ for
+PDE samples. Here $X_f=X_u$, but their functionals differ.
 
 ```python
 import numpy as np
-import sympy as sp
+from scipy.sparse.linalg import spsolve
 import rbflab as rbf
 ```
 
@@ -22,117 +19,108 @@ import rbflab as rbf
 --8<-- "examples/tutorials/lhi_construction.py:problem"
 ```
 
-Unlike nodal RBF-FD, LHI incorporates nearby PDE and boundary data into the local
-approximation. For each target $x_i$, distinguish three groups:
-
-| Group | Functional | Data |
+| Source block | Sampled functional | Values supplied after assembly |
 |---|---|---|
-| $S_i$: solution centers | $s(x_j)$ | Unknown interior values $U_j$ |
-| $B_i$: boundary centers | $\mathcal Bs(x_j)$ | Prescribed $g_j$ |
-| $F_i$: PDE centers | $\mathcal Ls(x_j)$ | Prescribed $f_j$ |
+| `u` | $s(X_u)$ | Unknown $U$ |
+| `boundary` | $s(X_b)$ | Prescribed $g_b$ |
+| `pde` | $Ls(X_f)$ | Prescribed $f_f$ |
 
-A physical location may appear in $S_i$ and $F_i$ because these are different
-functionals. The target remains a solution center and is excluded from its own
-PDE-center group.
+A point may occur in both the value and PDE groups. Exclude a target from its
+own PDE data: otherwise the requested $Ls(x_i)$ is already a supplied datum,
+giving a tautology instead of a useful equation for $U$.
 
-![Global cloud and actual LHI center groups for the first interior row](../assets/teaching_centers.png)
+![Solution, boundary and PDE samples on the square](../assets/teaching_centers.png)
 
-The right panel shows the patch used below: 12 solution centers, 8 boundary
-centers and 11 PDE centers. Open triangles overlay solution points that also
-carry PDE data. The target has no triangle.
+This illustration shows the original combined-neighbor selection: 12 solution,
+8 boundary and 11 PDE samples at the first target. Below the counts are explicit
+for every target, with independent nearest-neighbor selection in each group.
+Tied distances can give different memberships from the illustration.
 
-## 2. Assemble and solve with LHI
+## 2. Translate the Hermite ansatz into code
+
+Stack the selected functionals as $\ell=(I_u,I_b,L_f)$. Write
+
+$$s_i(x)=\sum_j a_j\ell_j^y K(x,y_j)+\sum_m b_mp_m(x).$$
+
+Then
+
+$$H_i=\begin{bmatrix}G_i&P_i\\P_i^T&0\end{bmatrix},\qquad
+(G_i)_{kj}=\ell_k^x\ell_j^yK,\qquad(P_i)_{km}=\ell_kp_m.$$
+
+The target-functional weight equation is
+
+$$H_i^T\begin{bmatrix}w_i\\\eta_i\end{bmatrix}
+=\begin{bmatrix}(L_x\ell_j^yK)(x_i,y_j)\\(Lp_m)(x_i)\end{bmatrix}.$$
+
+`space.representers(source)` encodes the source-side $\ell_j^y$. The requested
+target operator supplies $L_x$. The same engine used in RBF-FD now builds
+Hermite weights; no separate local solve implementation is needed.
 
 ```python
 --8<-- "examples/tutorials/lhi_construction.py:solve"
 ```
 
-`stencil_size=20` selects solution/boundary candidates, not the final Hermite
-matrix dimension. By default, the other interior candidates also supply PDE
-functionals. The first patch has 31 data functionals plus six quadratic
-polynomial terms. The global system has only 16 interior value unknowns.
+The three sparse blocks express
 
-`interior_values[k]` belongs to `cloud.interior_indices[k]`. It is not an RBF
-expansion coefficient. This scalar lesson uses the Python LHI assembler; do not
-assume the scalar RBF-FD backend options apply to it.
+$$Lu(X_u)\approx S_uU+S_bg_b+S_ff_f.$$
 
-## 3. Identify the local approximation
+Therefore the stationary system is
 
-Stack the local functionals as $\lambda=(I_S,\mathcal B_B,\mathcal L_F)$ and write
+$$\boxed{S_uU=f_u-S_bg_b-S_ff_f.}$$
 
-$$s_i(x)=\sum_j a_j\lambda_j^yK(x,y)+\sum_m b_mp_m(x),$$
+There are 16 global solution unknowns. Each patch uses $12+8+11=31$ functionals
+and six polynomial terms, giving a $37\times37$ local system.
+The `Samples` objects do not store forcing or decide which values are unknown:
+that interpretation belongs to the equation you assemble.
 
-$$H_i=\begin{bmatrix}G_i&P_i\\P_i^T&0\end{bmatrix},\quad
-(G_i)_{kj}=\lambda_k^x\lambda_j^yK,\quad (P_i)_{km}=\lambda_kp_m.$$
-
-Applying $\mathcal L$ at the target yields weights by the transpose solve
-$H_i^T[w_i;\eta_i]=q_i$. The polynomial rows of $q_i$ contain
-$\mathcal Lp_m(x_i)$. See the [full derivation](../theory/lhi.md) for the blocks.
-The library performs this construction during assembly.
-
-The current scalar result exposes the center groups and functional weights:
+## 3. Inspect one local and one global equation
 
 ```python
 --8<-- "examples/tutorials/lhi_construction.py:patch"
 ```
 
-`row` indexes an interior equation. `patch.center` is its original cloud index.
-The weights follow solution, boundary, PDE order. Polynomial multipliers are
-not included in `patch.weights` and do not become global unknowns.
-These are inspection records; editing them is not a supported way to rebuild a
-solved system. There is no generic scalar-LHI `reconstruct_local()` interface
-matching RBF-FD's. Reassemble after changing method settings.
-
-## 4. Form one sparse equation
-
-The local identity is
-
-$$\mathcal Ls_i(x_i)=(w_i^S)^TU_{S_i}+(w_i^B)^Tg_{B_i}+(w_i^F)^Tf_{F_i}.$$
-
-Enforcing $\mathcal Ls_i(x_i)=f(x_i)$ gives
-
-$$\boxed{(w_i^S)^TU_{S_i}=f(x_i)-(w_i^B)^Tg_{B_i}-(w_i^F)^Tf_{F_i}.}$$
-
-Only the solution weights enter the sparse matrix. Known terms move right:
+`patch.groups` contains indices into each group's own point array. Weights
+follow the source dictionary's insertion order. Polynomial multipliers are
+separate from the data weights and do not become global solution unknowns.
+`reconstruct_local` returns the actual local matrix and target column on demand.
 
 ```python
 --8<-- "examples/tutorials/lhi_construction.py:row"
 ```
 
-The index dictionary maps original cloud indices into the shorter vector of
-interior unknowns. Here $g=0$, but its contribution is shown explicitly. For
-Neumann/Robin boundaries, $g$ means the prescribed boundary-functional value,
-not necessarily the solution value itself.
+Here `S` already indexes the interior unknown vector. No conversion from
+whole-cloud indices is needed. The complete script checks this row against
+`Su` and checks its right-hand side against `rhs`.
 
-## 5. Reconstruct the field
+## 4. Evaluate between solution nodes
+
+At query points, request identity and derivative maps from the same trial recipe:
 
 ```python
 --8<-- "examples/tutorials/lhi_construction.py:evaluate"
 ```
 
-The solution fills each local data vector with computed $U$ and prescribed
-$g,f$, obtains its expansion, and uses the nearest interior target's patch at a
-query point. That patchwise reconstruction need not be continuous across patch
-ownership boundaries. A derivative query differentiates the selected local
-expansion, not the sparse solution vector directly.
+The query construction relaxes `target="require"` for the solution samples:
+an off-node target cannot be a member of the solution cloud. Each query selects
+its own neighborhoods and applies its map to computed $U$ and prescribed $g,f$.
+This differs from reusing the nearest assembled patch. Changing memberships
+can still produce nonsmooth transitions; this is not a globally smooth interpolant.
 
-## Modify the idea
+## Modify the construction
 
-- Change the equation and boundary objects to change the local functionals.
-- Set `pde_stencil_size` to control the number of nearby PDE centers separately.
-- Change the kernel and augmentation degree together.
-- Keep center counts distinct from functional counts when designing a new patch.
-
-### A quick check
-
-The script reconstructs the first sparse row and its right-hand side from the
-three weight groups and compares them with `system.matrix` and `system.rhs`.
+- Change `operator=L` and the target operator together for another PDE.
+- Supply a boundary functional and its measured/prescribed data for Neumann or
+  Robin data; normal-dependent operators also need sample normals.
+- Change each group's `size`, or specify exact memberships with `indices`.
+- Choose `backend=rbf.CppBackend()` or `rbf.TorchBackend()` on the approximation
+  for supported local assembly. Export blocks with `to_scipy()` if using a SciPy
+  solve, as in [LHI and heat from matrices](lhi-matrices.md).
+- For time dependence, PDE samples contain $f-u_t$; use the mass-matrix derivation
+  in that lesson rather than inserting $f$ as stationary data.
 
 ## Complete example
 
-Run `python -m examples.tutorials.lhi_construction` from a [source checkout](../INSTALL.md).
-The short API fragments above also work with an installed package when combined
-with their imports and preceding steps.
+Run `python -m examples.tutorials.lhi_construction` from a source checkout.
 
 ??? example "Complete runnable script"
 
@@ -142,6 +130,5 @@ with their imports and preceding steps.
 
 [Download the script](https://raw.githubusercontent.com/LDBreton/RBFLAB/main/examples/tutorials/lhi_construction.py).
 
-## Independent functional centers
-
-Use [named center groups](lhi-centers.md) to choose solution, boundary, PDE, and derivative-data points separately.
+**Next:** [independent functional centers](lhi-centers.md), then
+[LHI heat matrices](lhi-matrices.md).

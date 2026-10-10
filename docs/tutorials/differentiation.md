@@ -53,8 +53,11 @@ $$D_x d\approx (\partial_x u(q_k))_{k=1}^M,\qquad D_x\in\mathbb R^{M\times N}.$$
 --8<-- "examples/tutorials/differentiation.py:maps"
 ```
 
-`source` gives the locations of the supplied values; `targets` gives locations
-where derivatives are requested. Here each matrix has shape `(3, 64)`.
+`Samples(centers, size=20)` declares value data and the per-target neighbor count.
+`space.representers(source)` forms ordinary kernel translates because these
+source functionals are point evaluations. `targets` gives locations where
+derivatives are requested. With one source block, `ops.dx @ values` and
+`ops.dx["u"] @ values` are equivalent. Here each matrix has shape `(3, 64)`.
 Every target uses 20 neighboring samples and quadratic polynomial augmentation.
 The names `dx`, `dy`, and `lap` are keys you choose; attribute and dictionary
 access refer to the same operators.

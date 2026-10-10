@@ -1,79 +1,80 @@
-# Choose LHI functional centers
+# Choose independent functional centers
 
-For the canonical explicit local API, see [functionals to operators](local-approximation.md)
-and [LHI and heat from matrices](lhi-matrices.md). This page explains the retained
-PDE convenience interface.
+An LHI patch combines solution values and PDE/boundary data. These functionals
+need not share one point cloud. For $Lu=f$ with Dirichlet data:
 
-An LHI patch combines unknown solution values, prescribed boundary data and
-prescribed PDE data. These functionals need not share one point cloud:
+$$Lu(X_u)\approx S_uU+S_bg(X_b)+S_ff(X_f),$$
 
-$$d_i=(u(X_{S,i}),\;g(X_{B,i}),\;f(X_{F,i})).$$
+$$S_uU=f(X_u)-S_bg(X_b)-S_ff(X_f).$$
 
-A local Hermite approximation gives
-
-$$\mathcal L u(x_i)\approx w_{S,i}^T u(X_{S,i})
-+w_{B,i}^Tg(X_{B,i})+w_{F,i}^Tf(X_{F,i}).$$
-
-Only the solution weights become columns of the global unknown vector:
-
-$$w_{S,i}^T U=f(x_i)-w_{B,i}^Tg(X_{B,i})-w_{F,i}^Tf(X_{F,i}).$$
+Only $U$ is unknown. Additional PDE samples increase the local functional system
+without adding global unknowns. Read [the LHI construction](lhi.md) first.
 
 ![Independent solution, boundary and PDE center clouds](../assets/figures/lhi-centers.png)
 
-## Express the groups
+## Declare the groups, then assign their numerical meaning
 
-This complete example reproduces $u=1+x^2+y^2$. The PDE centers are independent
-of the solution grid; changing them does not introduce extra global unknowns.
+The complete example below uses `Samples` and `LocalApproximation` to reproduce
+$u=1+x^2+y^2$. Five independent PDE locations supply $Lu=-4$.
+The source dictionary defines available data; the right-hand side determines
+which data are prescribed.
 
 ```python
 --8<-- "examples/tutorials/lhi_centers.py"
 ```
 
-`cloud.interior` defines the global solution DOFs and equation targets.
-Solution groups select from those DOFs. Boundary and PDE groups may contain
-independent coordinates. `problem.boundary` still describes the domain's boundary
-conditions; explicit boundary groups supply the functionals actually used in
-patches. They can sample the same conditions at other points.
+`ops.L["u"].matrix` has four columns, one per interior unknown. The boundary
+and forcing blocks have their own column counts and are multiplied by arrays
+on their own sample sets. Source groups never need a shared global point index.
 
-## Selection and operators
+## Choose memberships deliberately
 
-- `size=n` chooses n eligible nearest centers in that group.
-- `size=None` includes the whole group.
-- `indices=[...]` supplies one row of group-local indices per interior target,
-  preserving its order. It is exclusive with size and selection policy.
-- `target="exclude"` excludes exact coordinate matches from that group.
-- `target="require"` verifies that the target is included.
-- `policy=StencilPolicy(selection="quality", ...)` selects an independent
-  neighborhood. Kernel scaling remains on the method.
+- `size=n`: select $n$ eligible nearest points in that group.
+- `size=None` (the default): use all eligible points.
+- `indices=rows`: exact group-local indices for each target, in the given order.
+  Do not also specify a size or selection policy.
+- `target="exclude"`: remove exact coordinate matches.
+- `target="require"`: require the target among the selected points; useful at
+  solution nodes but inappropriate for off-node reconstruction.
+- `policy=StencilPolicy(selection="quality", ...)`: choose the group's selection
+  rule. Kernel scaling belongs to `LocalApproximation.stencil_policy`.
 
-PDE groups default to the problem operator and forcing. Boundary or `role="data"`
-groups specify their operator and data explicitly. For example, a derivative
-observation uses `operator=rbf.Derivative(0)` and data for $u_x$. Normal-dependent
-boundary operators accept one normal per group point through `normals=`.
+Coincident locations with different functionals are valid; identical duplicated
+functionals are rejected. The polynomial functionals must have full column rank.
+A larger nominal stencil does not by itself guarantee independent information.
 
-Coincident points carrying different functionals are valid. Duplicated identical
-functionals are rejected; polynomial rank and factorization checks detect other
-dependent local constraints. Do not fix rank failure by silently adding jitter.
+## Add derivative or boundary observations
 
-## Inspect the actual stencil
+For measured $u_x$ values at $X_d$, add
+`"dx_data": rbf.Samples(Xd, operator=rbf.Derivative(0), size=4)` before constructing
+the trial. The resulting map has a corresponding `"dx_data"` block, which you
+multiply by the observed derivative values. The field being interpolated is
+still the same scalar function.
 
-`system.stencils[i].groups` contains indices into each named group. For the default
-layout, legacy `solution_indices`, `boundary_indices`, and `pde_indices` refer to
-the common cloud. With explicit groups, use the named groups and their point
-arrays instead. `points` and `operators` give the local functional order;
-solution functionals precede prescribed functionals. `known_data` gives the
-prescribed values in that order. The recipe records functional and polynomial
-counts so a neighbor count cannot conceal the actual matrix size.
+For boundary normals, pass `normals=...` with `NormalDerivative` or a
+normal-dependent Robin operator. The arrays must follow the group's point
+ordering. A `Samples` object has no hidden PDE role or automatic forcing.
 
-## Supported scope
+## Inspect and reuse
 
-Independent groups support **scalar stationary Python LHI**, in 2D/3D and with
-supported local/full sparse extended precision. The ordinary configuration uses
-the same group normalization and weight assembly. Omitting `centers` retains the
-combined-neighbor baseline and excludes the target from its PDE centers.
+`ops.L.local(i).groups` gives the selected indices in each named group.
+`ops.L.reconstruct_local(i)` reconstructs the local augmented equation.
+New data on unchanged samples reuse the same maps. New query locations need
+new target maps, as the example shows.
 
-Independent groups for transient or coupled problems are rejected before
-assembly. For an evolution equation, PDE data contain $f-u_t$, so changing the
-PDE cloud also requires a map for unknown time derivatives. Such data cannot be
-inserted as fixed forcing. Existing default-layout heat and Stokes paths remain
-available.
+The functional engine supports Python, C++ Float64/MPFR and Torch Float64 for
+its documented scalar and componentwise divergence-free paths. Native matrices
+retain their backend storage; `to_scipy()` explicitly converts to Float64.
+
+## Independent centers in an evolution problem
+
+For $u_t+Lu=f$, PDE samples are $f(X_f)-u_t(X_f)$. If $X_f=X_u$ in the same order,
+
+$$(I-S_f)\dot U+S_uU=f_u-S_ff_f-S_bg.$$
+
+If the point sets differ, you must provide the map from unknown time derivatives
+to $X_f$, including derivatives of prescribed terms when appropriate. A stationary
+forcing array cannot supply those unknown time derivatives. See
+[LHI and heat matrices](lhi-matrices.md) for the precise construction.
+
+Run `python -m examples.tutorials.lhi_centers` from the source checkout.

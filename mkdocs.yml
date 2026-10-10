@@ -90,15 +90,15 @@ nav:
           - Differentiate a field: tutorials/differentiation.md
           - Define a custom kernel: tutorials/custom-kernel.md
       - Construct PDE methods:
-          - Write a symbolic PDE: tutorials/symbolic-pde.md
-          - Global collocation: tutorials/global-collocation.md
           - From functionals to operators: tutorials/local-approximation.md
-          - LHI and heat from matrices: tutorials/lhi-matrices.md
           - One RBF-FD stencil: tutorials/one-stencil.md
+          - Global collocation: tutorials/global-collocation.md
           - Assemble your own PDE: tutorials/custom-assembly.md
           - Local Hermite interpolation: tutorials/lhi.md
           - Choose LHI functional centers: tutorials/lhi-centers.md
+          - LHI and heat from matrices: tutorials/lhi-matrices.md
           - Heat time stepping: tutorials/heat-equation.md
+          - Symbolic PDE convenience: tutorials/symbolic-pde.md
           - Coupled Stokes fields: tutorials/annular-stokes.md
           - Build a cavity algorithm: tutorials/cavity.md
       - Other domains and boundaries:

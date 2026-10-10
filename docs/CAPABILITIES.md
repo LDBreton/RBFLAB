@@ -29,7 +29,7 @@ C++ Float64 and PyTorch CPU Float64. See [the validation record](guides/curved-v
 Core geometry includes 2D parametric domains/holes, 3D implicit regions and
 parametric surfaces. Staggering remains explicit 2D triangle-based geometry.
 
-## Explicit functional approximation (development API)
+## Explicit functional approximation (available in 0.5)
 
 `LocalApproximation` exposes sampled source functionals and an explicit trial.
 Use its named matrix blocks to construct RBF-FD and scalar LHI algorithms with

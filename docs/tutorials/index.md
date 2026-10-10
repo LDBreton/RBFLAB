@@ -5,6 +5,14 @@ method from local weights and sparse operators. These lessons assume some
 familiarity with RBFs and explain how the mathematics maps to Python objects.
 They can be followed independently or used as a sequence for teaching.
 
+**Version:** these lessons target **RBFLAB 0.5.0 or newer**:
+`python -m pip install --upgrade "rbflab>=0.5"`.
+
+For local research methods the common vocabulary is **space → source samples
+and trial functions → target operators → sparse matrices → your algorithm**.
+The local lessons use `Samples` and `LocalApproximation`. Global interpolation
+and collocation retain their separate, coefficient-based interfaces.
+
 ## Choose what you want to build
 
 <div class="rbf-examples">
@@ -48,14 +56,23 @@ constructions easy to follow. [Compare the methods](global-lhi.md) afterward.
 
 Start with [functionals to sparse operators](local-approximation.md), then
 [LHI and heat from matrices](lhi-matrices.md). These are the canonical local
-research interfaces. [One stencil](one-stencil.md) and
-[assemble your own PDE](custom-assembly.md) also explain the retained RBF-FD
-convenience interface.
+research interfaces. [One stencil](one-stencil.md) and [assemble your own PDE](custom-assembly.md)
+use this same API to expose the local equations and control the global solve.
 This path shows where ordinary NumPy/SciPy code takes over: combining derivative
 maps, eliminating prescribed values, solving matrices and writing update loops.
 Continue with [heat](heat-equation.md) before the advanced [cavity algorithm](cavity.md).
 The cavity is an explained experimental flow construction, not a validated
 benchmark or a general Navier–Stokes solver.
+
+## Equation-driven and specialized examples
+
+`LocalApproximation` builds maps; it does not own forcing, boundary equations,
+or time integration. The symbolic PDE and curved-domain examples also show the
+supported `RBFFD`/`LHI` assembly adapters when an equation-driven solve is useful.
+They use the current API, but are not alternative trial-space declarations.
+Specialized Stokes and the experimental cavity algorithm have additional
+coupled-system machinery; the shared functional engine does not yet replace
+every coupled solver.
 
 ## Apply the ideas on other domains
 

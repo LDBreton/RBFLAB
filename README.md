@@ -76,7 +76,7 @@ fig.savefig("solution.png", dpi=180)
 
 ## Construct your own numerical method
 
-The development API exposes **sampled functionals, trial functions and named
+RBFLAB 0.5 exposes **sampled functionals, trial functions and named
 sparse blocks** through `LocalApproximation`. Ordinary RBF-FD and local Hermite
 interpolation use the same mathematical construction. Assemble stiffness, mass,
 forcing and boundary contributions yourself, then write a SciPy solve or time
@@ -86,8 +86,22 @@ loop. Existing PDE convenience interfaces remain available.
 - [LHI and heat from matrices](https://ldbreton.github.io/RBFLAB/tutorials/lhi-matrices/)
 - [Architecture and research API](https://ldbreton.github.io/RBFLAB/guides/research-api/)
 
-These additions are unreleased; use the current source checkout. The installed
-PyPI release may not yet provide these names.
+These interfaces are included in **RBFLAB 0.5.0**. Upgrade with
+`python -m pip install --upgrade "rbflab>=0.5"`.
+
+```python
+import numpy as np
+import rbflab as rbf
+
+X = rbf.geometry.unit_box_grid(5).points
+space = rbf.ScalarSpace(rbf.PHS(5), polynomial_degree=2)
+source = {"u": rbf.Samples(X, size=20)}
+local = rbf.LocalApproximation(source=source, trial=space.representers(source))
+ops = local.operators(targets=X, operators={"lap": rbf.Laplacian(2)})
+U = np.sum(X**2, axis=1)
+print(ops.lap["u"] @ U)  # approximately 4 at every target
+D = ops.lap["u"].matrix  # reusable sparse matrix
+```
 
 ## See the methods at work
 

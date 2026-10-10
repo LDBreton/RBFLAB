@@ -3,7 +3,7 @@
 **Goal:** describe a local approximation explicitly, then use its matrices in your
 own numerical algorithm. No PDE or evolution object is required.
 
-This interface is available in the development checkout. Existing `RBFFD` and
+This interface is included in **RBFLAB 0.5.0 and newer**. Existing `RBFFD` and
 `LHI` convenience interfaces remain supported. Standard RBF-FD operator/weight
 construction and scalar LHI weight assembly already delegate to this shared
 engine; specialized coupled/Stokes routes remain separate.

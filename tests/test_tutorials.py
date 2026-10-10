@@ -110,3 +110,14 @@ def test_teaching_symbolic_boundary_variations():
 def test_teaching_coupled_spaces_and_pressure_reference():
     from examples.tutorials.stokes_construction import run
     assert run() < .02
+
+
+def test_functional_api_tutorials_and_independent_centers():
+    from examples.tutorials import local_approximation, lhi_matrices, lhi_centers
+    maps = local_approximation.run()
+    assert maps["interpolation_error"] < 1e-10
+    assert maps["laplacian_error"] < 1e-10
+    lhi = lhi_matrices.run()
+    assert lhi["stationary_error"] < 1e-10
+    assert lhi["heat_error"] < .004
+    assert lhi_centers.run() < 1e-10

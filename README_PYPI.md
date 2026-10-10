@@ -11,7 +11,7 @@ weights and sparse matrices when you want to go beyond the high-level API.
 [Mathematical foundations](https://ldbreton.github.io/RBFLAB/theory/) ·
 [API reference](https://ldbreton.github.io/RBFLAB/api/discretizations/)
 
-![Actual generated clouds: obstacles, curved holes, a concave polygon and a 3D volume](https://raw.githubusercontent.com/LDBreton/RBFLAB/v0.4.0/docs/assets/geometry_gallery.png)
+![Actual generated clouds: obstacles, curved holes, a concave polygon and a 3D volume](https://raw.githubusercontent.com/LDBreton/RBFLAB/v0.5.0/docs/assets/geometry_gallery.png)
 
 ## Install and start
 
@@ -59,7 +59,7 @@ solution = problem.solve(cloud, method)
 print(solution.evaluate([[0., 0.], [0., .5]]))
 ```
 
-![Generated labeled nodes and the computed solution on a perforated ellipse](https://raw.githubusercontent.com/LDBreton/RBFLAB/v0.4.0/docs/assets/perforated_poisson.png)
+![Generated labeled nodes and the computed solution on a perforated ellipse](https://raw.githubusercontent.com/LDBreton/RBFLAB/v0.5.0/docs/assets/perforated_poisson.png)
 
 With this 692-node recipe, the Float64 Python run gives maximum nodal error
 **3.77 × 10⁻⁵** and independent off-node error **3.86 × 10⁻⁵**. Read the
@@ -76,7 +76,7 @@ fig.savefig("solution.png", dpi=180)
 
 ## Construct your own numerical method
 
-The development API exposes **sampled functionals, trial functions and named
+RBFLAB 0.5 exposes **sampled functionals, trial functions and named
 sparse blocks** through `LocalApproximation`. Ordinary RBF-FD and local Hermite
 interpolation use the same mathematical construction. Assemble stiffness, mass,
 forcing and boundary contributions yourself, then write a SciPy solve or time
@@ -86,15 +86,29 @@ loop. Existing PDE convenience interfaces remain available.
 - [LHI and heat from matrices](https://ldbreton.github.io/RBFLAB/tutorials/lhi-matrices/)
 - [Architecture and research API](https://ldbreton.github.io/RBFLAB/guides/research-api/)
 
-These additions are unreleased; use the current source checkout. The installed
-PyPI release may not yet provide these names.
+These interfaces are included in **RBFLAB 0.5.0**. Upgrade with
+`python -m pip install --upgrade "rbflab>=0.5"`.
+
+```python
+import numpy as np
+import rbflab as rbf
+
+X = rbf.geometry.unit_box_grid(5).points
+space = rbf.ScalarSpace(rbf.PHS(5), polynomial_degree=2)
+source = {"u": rbf.Samples(X, size=20)}
+local = rbf.LocalApproximation(source=source, trial=space.representers(source))
+ops = local.operators(targets=X, operators={"lap": rbf.Laplacian(2)})
+U = np.sum(X**2, axis=1)
+print(ops.lap["u"] @ U)  # approximately 4 at every target
+D = ops.lap["u"].matrix  # reusable sparse matrix
+```
 
 ## See the methods at work
 
 <table>
 <tr>
-<td width="50%"><a href="https://ldbreton.github.io/RBFLAB/tutorials/flower-heat/"><img src="https://raw.githubusercontent.com/LDBreton/RBFLAB/v0.4.0/docs/assets/flower_heat.gif" alt="Computed heat evolution on a flower-shaped domain"></a></td>
-<td width="50%"><a href="https://ldbreton.github.io/RBFLAB/tutorials/annular-stokes/"><img src="https://raw.githubusercontent.com/LDBreton/RBFLAB/v0.4.0/docs/assets/method_stokes.png" alt="Computed velocity streamlines between rotating cylinders"></a></td>
+<td width="50%"><a href="https://ldbreton.github.io/RBFLAB/tutorials/flower-heat/"><img src="https://raw.githubusercontent.com/LDBreton/RBFLAB/v0.5.0/docs/assets/flower_heat.gif" alt="Computed heat evolution on a flower-shaped domain"></a></td>
+<td width="50%"><a href="https://ldbreton.github.io/RBFLAB/tutorials/annular-stokes/"><img src="https://raw.githubusercontent.com/LDBreton/RBFLAB/v0.5.0/docs/assets/method_stokes.png" alt="Computed velocity streamlines between rotating cylinders"></a></td>
 </tr>
 <tr>
 <td><b>Heat on a flower</b><br>Symbolic forcing, BDF2 time stepping and animation.</td>
@@ -175,7 +189,7 @@ not necessarily run faster with extra threads or a tensor backend.
 
 Source code lives in `python/rbflab`, runnable examples in `examples`, and focused
 regression tests in `tests`. Gallery figures are reproducible from
-[geometry_gallery.py](https://github.com/LDBreton/RBFLAB/blob/v0.4.0/examples/geometry_gallery.py) and
-[make_method_gallery.py](https://github.com/LDBreton/RBFLAB/blob/v0.4.0/examples/make_method_gallery.py).
+[geometry_gallery.py](https://github.com/LDBreton/RBFLAB/blob/v0.5.0/examples/geometry_gallery.py) and
+[make_method_gallery.py](https://github.com/LDBreton/RBFLAB/blob/v0.5.0/examples/make_method_gallery.py).
 
-[Maintaining the documentation](https://ldbreton.github.io/RBFLAB/MAINTAINING_DOCS/) · [Changelog](https://github.com/LDBreton/RBFLAB/blob/v0.4.0/CHANGELOG.md) · [MIT license](https://github.com/LDBreton/RBFLAB/blob/v0.4.0/LICENSE)
+[Maintaining the documentation](https://ldbreton.github.io/RBFLAB/MAINTAINING_DOCS/) · [Changelog](https://github.com/LDBreton/RBFLAB/blob/v0.5.0/CHANGELOG.md) · [MIT license](https://github.com/LDBreton/RBFLAB/blob/v0.5.0/LICENSE)

@@ -14,7 +14,7 @@ hide:
 <a class="rbf-button" href="tutorials/local-approximation/">Build your operators</a>
 <a class="rbf-button" href="INSTALL/">Install Python or C++</a>
 </div>
-<div class="rbf-install"><code>pip install rbflab</code><span>Python 3.11+ · Open source · Version 0.4.0</span></div>
+<div class="rbf-install"><code>pip install rbflab</code><span>Python 3.11+ · Open source · Version 0.5.0</span></div>
 </section>
 
 <figure class="rbf-feature">
@@ -43,7 +43,7 @@ hide:
 </div>
 
 <h2 id="local-api">From approximation to your algorithm</h2>
-<p>The development API makes ordinary RBF-FD and Hermite constructions explicit through <code>LocalApproximation</code>. <a href="tutorials/local-approximation/">Declare source functionals and target operators</a>, then <a href="tutorials/lhi-matrices/">assemble LHI and a heat time loop with sparse matrices</a>. These additions require the current source checkout until the next release.</p>
+<p>RBFLAB 0.5 makes ordinary RBF-FD and Hermite constructions explicit through <code>LocalApproximation</code>. <a href="tutorials/local-approximation/">Declare source functionals and target operators</a>, then <a href="tutorials/lhi-matrices/">assemble LHI and a heat time loop with sparse matrices</a>. Install or upgrade to <code>rbflab&gt;=0.5</code> to use these interfaces.</p>
 <figure class="rbf-feature"><a href="guides/research-api/"><img src="assets/local-architecture.svg" alt="Spaces and sampled functionals become local systems, named sparse blocks and user-written algorithms"></a></figure>
 
 <h2 id="methods">One problem, several numerical methods</h2>

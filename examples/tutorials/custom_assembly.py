@@ -19,17 +19,23 @@ def run(backend="python"):
     local = {"python": rbf.PythonBackend, "cpp": rbf.CppBackend,
              "torch": rbf.TorchBackend}[backend](compute_condition=False)
     # --8<-- [start:operators]
-    method = rbf.RBFFD(rbf.PHS(5), stencil_size=35, polynomial_degree=3,
-                       stencil_policy=rbf.StencilPolicy(scaling="local"),
-                       local_backend=local)
-    ops = method.operators(source=X, operators={"dx": rbf.Derivative(0),
-                           "dy": rbf.Derivative(1), "lap": rbf.Laplacian()})
+    space = rbf.ScalarSpace(rbf.PHS(5), polynomial_degree=3)
+    source = {"u": rbf.Samples(X, size=35)}
+    approximation = rbf.LocalApproximation(
+        source=source, trial=space.representers(source), backend=local,
+        stencil_policy=rbf.StencilPolicy(scaling="local"),
+    )
+    ops = approximation.operators(targets=X, operators={"dx": rbf.Derivative(0),
+                                  "dy": rbf.Derivative(1), "lap": rbf.Laplacian()})
+    # Explicitly export Float64 matrices for the SciPy algorithm below.
+    # With Torch this detaches tensors; with MP storage it rounds entries.
+    Dx, Dy, Lap = (ops[name]["u"].to_scipy() for name in ("dx", "dy", "lap"))
     # --8<-- [end:operators]
     # --8<-- [start:combine]
     kappa = 1 + .2*x
     bx, by, reaction = .4, -.2, 1.
-    A = (-sparse.diags(kappa) @ ops.lap.matrix
-         + bx*ops.dx.matrix + by*ops.dy.matrix
+    A = (-sparse.diags(kappa) @ Lap
+         + bx*Dx + by*Dy
          + reaction*sparse.eye(len(X))).tocsr()
     # --8<-- [end:combine]
     # --8<-- [start:data]
@@ -48,7 +54,7 @@ def run(backend="python"):
     local_row = ops.lap.local(int(I[0]))
     local_system = ops.lap.reconstruct_local(int(I[0]))
     # Work on a copy if experimenting with a matrix; .local() returns copies too.
-    experimental_laplacian = ops.lap.matrix.copy()
+    experimental_laplacian = Lap.copy()
     # --8<-- [end:inspect]
     # --8<-- [start:symbolic]
     model = rbf.SymbolicScalar(2)
@@ -58,6 +64,10 @@ def run(backend="python"):
     lhs = -(1+.2*sx)*model.laplacian(u) + bx*sp.diff(u, sx) + by*sp.diff(u, sy) + reaction*u
     problem = model.stationary(sp.Eq(lhs, lhs.subs(u, truth).doit()),
                                boundary=[model.bc("wall", sp.Eq(u, truth))])
+    # Optional equation-to-system convenience route, using the same numerical recipe.
+    method = rbf.RBFFD(rbf.PHS(5), stencil_size=35, polynomial_degree=3,
+                       stencil_policy=rbf.StencilPolicy(scaling="local"),
+                       local_backend=local)
     symbolic = problem.solve(cloud, method)
     # --8<-- [end:symbolic]
     difference = float(np.max(np.abs(U-symbolic.evaluate(X))))

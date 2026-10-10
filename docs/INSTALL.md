@@ -30,7 +30,7 @@ PowerShell, substitute `.\.venv\Scripts\python.exe` if it is not activated.
 
 ```sh
 python -m pip install --upgrade pip
-python -m pip install "rbflab[examples]"
+python -m pip install --upgrade "rbflab[examples]>=0.5"
 python -c "from importlib.metadata import version; import rbflab; print(version('rbflab')); print(rbflab.__file__)"
 ```
 
@@ -51,13 +51,28 @@ There is no `rbflab[cpp]` extra that installs a compiler or prebuilt native back
 PyTorch is an optional local-weight backend; it does not turn the global SciPy
 solver into a GPU solver. The documented path is CPU Float64.
 
+### Check that the new local API is installed
+
+The current manual targets **RBFLAB 0.5.0**. If an older environment is active,
+upgrade using the same Python interpreter that runs your code:
+
+```sh
+python -m pip install --upgrade "rbflab>=0.5"
+python -c "from rbflab import Samples, LocalApproximation; from importlib.metadata import version; print(version('rbflab'))"
+```
+
+Release 0.5 also includes breaking research-API cleanup from 0.4. Consult the
+[changelog](https://github.com/LDBreton/RBFLAB/blob/v0.5.0/CHANGELOG.md) when adapting
+older scripts. The supported symbolic PDE examples still use the explicit
+`RBFFD`/`LHI` adapters; these are distinct from the matrix-building interface.
+
 ## 3. Get the runnable examples
 
 Library snippets can run anywhere after installation. Commands beginning with
 `python -m examples...` need the repository's example files:
 
 ```sh
-git clone https://github.com/LDBreton/RBFLAB.git
+git clone --branch v0.5.0 https://github.com/LDBreton/RBFLAB.git
 cd RBFLAB
 python -m pip install -e ".[examples]"
 python -m examples.tutorials.first_problem
@@ -167,34 +182,44 @@ one backend field does not reconfigure every compiler helper.
 
 ## 6. Select the backend in Python
 
-For a scalar problem already described by `problem`:
+For local matrices, the backend belongs to `LocalApproximation`:
 
 ```python
 import rbflab as rbf
 
-method = rbf.RBFFD(
-    rbf.PHS(5), stencil_size=35, polynomial_degree=3,
-    local_backend=rbf.CppBackend(threads=4, compute_condition=False),
+cloud = rbf.geometry.unit_box_grid(6)
+space = rbf.ScalarSpace(rbf.PHS(5), polynomial_degree=2)
+source = {"u": rbf.Samples(cloud.points, size=20)}
+local = rbf.LocalApproximation(
+    source=source, trial=space.representers(source),
+    backend=rbf.CppBackend(threads=4, compute_condition=False),
     stencil_policy=rbf.StencilPolicy(scaling="local"),
 )
-method = method.prepare(problem, dimension=2)
-solution = method.assemble(problem, cloud).solve()
+ops = local.operators(targets=cloud.points, operators={"lap": rbf.Laplacian(2)})
+D = ops.lap["u"].to_scipy()
 ```
 
-This fragment follows the equation/cloud definitions in the [first problem](getting-started.md).
-`scaling="local"` sets the kernel's distance unit to the stencil radius; it is
-independent of choosing C++. See [local stencil scaling](theory/conditioning.md#local-stencil-scaling).
-`prepare` performs kernel/operator preparation and compilation; assembly computes
-local weights. The final sparse solve still uses SciPy Float64. Substitute
-`PythonBackend(...)` or `TorchBackend(...)` on a supported method; PyTorch needs its
-extra installed. C++ does not accelerate the global dense collocation assembler.
+Substitute `PythonBackend(...)` or `TorchBackend(...)` to keep the same
+mathematical construction. C++ prepares the required compiled kernel derivatives
+and local solves; the first invocation may include compilation.
+`scaling="local"` uses the stencil radius as the kernel's distance unit, with
+derivatives returned in physical units. See [local scaling](theory/conditioning.md#local-stencil-scaling).
 
-For supported extended-precision local methods, pass
-`precision=rbf.Precision(local_digits=80)` to the **method**, keeping `CppBackend`.
-This selects MPFR local arithmetic; it does not increase coordinate precision or
-automatically change the global sparse solve. MPFR currently uses LU; the optional
-native SVD solver is Float64-only. See [precision](theory/conditioning.md) and the
-[capability table](CAPABILITIES.md).
+The `.matrix` property retains backend storage. `to_scipy()` explicitly exports
+Float64 CSR matrices and detaches Torch tensors. Your global SciPy solve remains
+separate from local weight construction.
+
+For extended-precision local construction, pass
+`precision=rbf.Precision(local_digits=80)` to `LocalApproximation` with
+`CppBackend` (MPFR) or `PythonBackend`. To retain those digits in sparse maps
+also set `global_dtype="mpmath"`; exporting them with `to_scipy()` rounds them.
+Geometry is still Float64. The new functional engine currently supports LU
+local solves and fixed kernel parameters; Torch supports Float64.
+See [precision](theory/conditioning.md) and [capabilities](CAPABILITIES.md).
+
+The optional symbolic equation adapter instead accepts
+`RBFFD(..., local_backend=rbf.CppBackend(...))`. It builds and solves the PDE
+system for you. C++ does not accelerate the global dense collocation assembler.
 
 ## Installed wheel with a separate native checkout
 

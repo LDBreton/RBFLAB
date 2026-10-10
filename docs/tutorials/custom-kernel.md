@@ -84,6 +84,10 @@ local = rbf.PythonBackend(compute_condition=False)
 --8<-- "examples/tutorials/custom_kernel.py:operators"
 ```
 
+The bound kernel belongs to `ScalarSpace`. `Samples` supplies the values,
+and `LocalApproximation` builds maps for the requested derivatives. Replacing
+the kernel therefore leaves the source/target contract unchanged.
+
 `kernel_dx` in step 2 differentiates the **kernel**; `field_dx` differentiates the
 **sampled field through RBF-FD weights**. Changing the kernel does not change the
 meaning of `Laplacian()` or the data arrays.

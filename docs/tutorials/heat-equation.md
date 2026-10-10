@@ -1,11 +1,9 @@
 # Time-step the heat equation
 
-For an entirely matrix-first Hermite construction, start with
-[LHI and heat from matrices](lhi-matrices.md). The comparison below retains the
-optional symbolic evolution convenience; a time integrator object is not required.
-
-**Goal:** express heat diffusion with the symbolic API, then build exactly the
-same update from an RBF-FD Laplacian and ordinary SciPy algebra. Read
+**Goal:** build a spatial operator with `LocalApproximation`, then implement
+backward Euler and BDF2 using ordinary SciPy matrices. An optional symbolic
+comparison follows the complete time loop. For the Hermite version, see
+[LHI and heat from matrices](lhi-matrices.md). Read
 [custom matrix assembly](custom-assembly.md) first if sparse slicing is new.
 
 ## 1. Fix one mathematical problem and one recipe
@@ -27,24 +25,13 @@ import rbflab as rbf
 --8<-- "examples/tutorials/heat_equation.py:settings"
 ```
 
-Both routes below use these exact objects: 49 nodes, PHS5, quadratic polynomials,
+Both routes below use the same numerical recipe: 49 nodes, PHS5, quadratic polynomials,
 20-node stencils, Float64, and default physical kernel scaling. Five steps reach
 $t=0.05$. The point grid supplies locations; all spatial weights are RBF-FD.
 
 ![The square cloud, initial temperature, and computed BDF2 temperature](../assets/teaching_heat.png)
 
-## 2. Declare an evolution problem
-
-```python
---8<-- "examples/tutorials/heat_equation.py:symbolic"
-```
-
-`transient=True` adds the time symbol. `initial` gives the field at $t=0$;
-boundary equations supply values at subsequent times. `scheme="bdf2"` requests
-BDF2 with a backward-Euler startup. The returned trajectory stores computed
-states; `.final` supplies the final field reconstruction.
-
-## 3. Construct the same spatial operator explicitly
+## 2. Construct the spatial operator explicitly
 
 ```python
 --8<-- "examples/tutorials/heat_equation.py:operators"
@@ -60,7 +47,7 @@ interior equations. The present problem has $g=f=0$; keeping the terms visible
 shows where nonzero data enter. You can also inspect `ops.lap.local(i)` and
 `ops.lap.reconstruct_local(i)` as in [one stencil](one-stencil.md).
 
-## 4. Translate the time formula into factors
+## 3. Translate the time formula into factors
 
 Let $q^{n+1}=\kappa L_{IB}g_B^{n+1}+f_I^{n+1}$. The first step is
 
@@ -81,7 +68,7 @@ The RBF construction determines $L$. Backward Euler and BDF2 determine the time
 formula. They are separate choices, which is why another time integrator can
 reuse these spatial operators.
 
-## 5. Advance and restore the full field
+## 4. Advance and restore the full field
 
 ```python
 --8<-- "examples/tutorials/heat_equation.py:loop"
@@ -91,6 +78,20 @@ At each step, the code supplies boundary data and forcing, solves for interior
 values, then fills the full vector in original cloud order. `states` has shape
 `(steps+1, 49)`, including the initial condition. No RBF coefficient solve occurs
 inside this loop: the spatial weights were assembled beforehand.
+
+## 5. Optional symbolic convenience route
+
+```python
+--8<-- "examples/tutorials/heat_equation.py:symbolic"
+```
+
+`transient=True` adds the time symbol. `initial` gives the field at $t=0$;
+boundary equations supply values at subsequent times. `scheme="bdf2"` requests
+BDF2 with a backward-Euler startup. The returned trajectory stores computed
+states; `.final` supplies the final field reconstruction.
+
+The `RBFFD` adapter keeps equation-driven assembly available; the explicit
+spatial construction above uses `Samples` and `LocalApproximation`.
 
 ## Modify the problem
 

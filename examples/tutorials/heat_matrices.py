@@ -34,13 +34,14 @@ def forcing(points, time, kappa=1.0, nonzero_boundary=False):
 # --8<-- [start:rbf_fd_laplacian]
 def rbf_fd_laplacian(cloud, stencil_size=20):
     """Assemble reusable RBF-FD Laplacian weights at every node."""
-    method = rbf.RBFFD(
-        spaces={"temperature": rbf.ScalarSpace(rbf.PHS(5), 2)},
-        stencil_size=min(stencil_size, len(cloud.points)),
-        local_backend=rbf.PythonBackend(compute_condition=False),
+    space = rbf.ScalarSpace(rbf.PHS(5), polynomial_degree=2)
+    source = {"temperature": rbf.Samples(cloud.points, size=min(stencil_size, len(cloud.points)))}
+    approximation = rbf.LocalApproximation(
+        source=source, trial=space.representers(source),
+        backend=rbf.PythonBackend(compute_condition=False),
     )
-    ops = method.operators(
-        source=cloud.points, targets=cloud.points, space="temperature",
+    ops = approximation.operators(
+        targets=cloud.points,
         operators={"lap": rbf.Laplacian(2)},
     )
     return ops.lap.matrix.tocsr(), ops

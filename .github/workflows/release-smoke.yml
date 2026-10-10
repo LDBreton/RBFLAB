@@ -39,6 +39,12 @@ jobs:
           python stokes_spaces.py
           python operators_3d.py
           python custom_kernel.py
+          python -m examples.tutorials.local_approximation
+          python -m examples.tutorials.lhi_matrices
+          python -m examples.tutorials.one_stencil
+          python -m examples.tutorials.lhi_centers
+          python -m examples.tutorials.custom_assembly
+          python -m examples.tutorials.heat_equation
           python -c 'import sys; from rbflab import geometry, meshgen; assert len(meshgen.generate(geometry.Sphere(), interior=10, boundary=12).points) == 22; assert not any(m in sys.modules for m in ("torch", "gmsh", "matplotlib"))'
           python -c 'import sympy as s; from rbflab import geometry as g, meshgen as m; t=s.Symbol("t"); b=g.Border((s.cos(t),s.sin(t)),"wall",0,2*s.pi); assert len(m.generate([b(32)],interior=10).points)==42; c=g.ParametricBoundary((s.cos(t),s.sin(t)),interval=(0,2*s.pi)); assert len(m.generate(g.ParametricDomain(c),interior=10,boundary=32).points)==42'
           python -c 'from examples.annulus import run; assert run()[3]["off_node_max"] < .015'
@@ -62,7 +68,7 @@ jobs:
       - run: bash cpp/prepare_dependencies.sh
       - run: python -m examples.build_cpp_backend
       - name: Verify native local operators
-        run: RBFLAB_CPP_TESTS=1 python -m pytest tests/test_discrete_operators.py tests/test_symbolic_kernel.py tests/test_curved_examples.py::test_optional_curved_backend_parity -q
+        run: RBFLAB_CPP_TESTS=1 python -m pytest tests/test_discrete_operators.py tests/test_functional_backends.py tests/test_symbolic_kernel.py tests/test_curved_examples.py::test_optional_curved_backend_parity -q
 
   gallery-ubuntu:
     runs-on: ubuntu-24.04
@@ -108,3 +114,6 @@ jobs:
       - run: python -m pip install -e '.[test]'
       - run: python -m pytest tests/test_curved_examples.py::test_optional_curved_backend_parity -q
       - run: python -m examples.ball_poisson --backend torch
+      - run: python -m examples.tutorials.local_approximation --backend torch
+      - run: python -m examples.tutorials.lhi_matrices --backend torch
+      - run: python -m examples.tutorials.custom_assembly --backend torch

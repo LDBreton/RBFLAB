@@ -43,7 +43,11 @@ local = rbf.PythonBackend(compute_condition=False)
 --8<-- "examples/tutorials/custom_assembly.py:operators"
 ```
 
-Targets default to source nodes, so all three matrices have shape $(N,N)$.
+We explicitly set `targets=X`, so all three matrices have shape $(N,N)$.
+`Samples` describes the supplied values and selects 35 neighbors per target;
+`space.representers(source)` makes the trial functions visible.
+`to_scipy()` exports each source block for the SciPy algebra below. On Torch
+this detaches tensors; arbitrary-precision entries would be rounded to Float64.
 Their rows approximate $u_x$, $u_y$, and $\Delta u$. The recipe uses PHS5 and cubic
 polynomials. [Local scaling](../theory/conditioning.md#local-stencil-scaling)
 normalizes kernel distances while preserving physical derivative units.
@@ -99,15 +103,17 @@ assemble boundary-functional rows instead of reusing this elimination unchanged.
 `local_system` reconstructs the augmented local weight equation on demand.
 Editing these inspection outputs does not update the operator.
 
-The `.matrix` attribute exposes SciPy storage. Copy it before experimenting if
-other code needs the original operator. Changing that matrix does not update
-cached local inspection records.
+The `.matrix` attribute retains backend storage (SciPy, Torch, or MP sparse).
+Here `Lap` is an explicit SciPy export. Copy matrices before experimenting;
+changing a matrix does not update cached local inspection records.
 
-For custom neighborhoods, choose indices and call
-`method.weights(centers=selected_points, target=target, operator=operator)`,
-then scatter the weights into your own sparse matrix. There is currently no
-generic public callback to replace every method's local ansatz or solver; use
-this explicit construction when the existing method settings do not express your idea.
+For custom neighborhoods, use `Samples(points, indices=rows)`, where each row
+contains that target's selected group-local indices. Alternatively create an
+approximation from `Samples(selected_points)` and call
+`approximation.weights(target=target, operator=operator)`.
+The [one-stencil lesson](one-stencil.md) shows this complete construction.
+Choose `space.translates(...)` or `space.representers(...)` explicitly when
+experimenting with the trial basis.
 
 ## 6. Express the same problem symbolically
 
@@ -115,7 +121,10 @@ this explicit construction when the existing method settings do not express your
 --8<-- "examples/tutorials/custom_assembly.py:symbolic"
 ```
 
-This reuses the same cloud and method. The symbolic route applies the same PDE
+This optional comparison constructs the supported `RBFFD` equation-assembly
+adapter with the same cloud, kernel, polynomial degree, stencil size and scaling.
+`LocalApproximation` itself supplies maps, not a `problem.solve` method.
+The symbolic route applies the same PDE
 and boundary equations, although its boundary unknowns need not be eliminated
 in the same algebraic form. A quick check compares `U` with `symbolic.evaluate(X)`.
 
@@ -128,7 +137,7 @@ in the same algebraic form. A quick check compares `U` with `symbolic.evaluate(X
 | New boundary model | Boundary rows or elimination |
 | New solver/preconditioner | The `spsolve` call |
 | New time integrator | A loop around the spatial matrices |
-| New neighbor rule | Explicit points supplied to `method.weights` |
+| New neighbor rule | Memberships in `Samples`, then `approximation.weights` |
 
 New values on fixed nodes can reuse fixed weights. Changing nodes, kernel or
 stencil settings requires rebuilding. With [backend setup](../INSTALL.md), the

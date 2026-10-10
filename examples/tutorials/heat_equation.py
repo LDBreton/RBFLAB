@@ -10,23 +10,12 @@ def run():
     # --8<-- [start:settings]
     cloud = rbf.geometry.unit_box_grid(6)  # 49 nodes, including the boundary
     dt, steps, kappa = .01, 5, 1.
-    method = rbf.RBFFD(rbf.PHS(5), stencil_size=20, polynomial_degree=2)
+    space = rbf.ScalarSpace(rbf.PHS(5), polynomial_degree=2)
     # --8<-- [end:settings]
-    # --8<-- [start:symbolic]
-    model = rbf.SymbolicScalar(2, transient=True)
-    u, t = model.field, model.time
-    x, y = model.coordinates
-    initial = sp.sin(sp.pi*x)*sp.sin(sp.pi*y)
-    problem = model.evolution(
-        sp.Eq(sp.diff(u, t)-kappa*model.laplacian(u), 0),
-        initial=initial,
-        boundary=[model.bc("boundary", sp.Eq(u, 0))],
-    )
-    trajectory = problem.solve(cloud, method, str(dt), steps, scheme="bdf2")
-    symbolic_values = trajectory.final.evaluate(cloud.points)
-    # --8<-- [end:symbolic]
     # --8<-- [start:operators]
-    ops = method.operators(source=cloud.points, operators={"lap": rbf.Laplacian()})
+    samples = {"u": rbf.Samples(cloud.points, size=20)}
+    approximation = rbf.LocalApproximation(source=samples, trial=space.representers(samples))
+    ops = approximation.operators(targets=cloud.points, operators={"lap": rbf.Laplacian()})
     matrix = ops.lap.matrix.tocsr()
     I, B = cloud.interior_indices, cloud.boundary_indices
     lap_ii, lap_ib = matrix[I, :][:, I], matrix[I, :][:, B]
@@ -57,6 +46,20 @@ def run():
         older, previous = previous, current
     states = np.asarray(states)
     # --8<-- [end:loop]
+    # --8<-- [start:symbolic]
+    method = rbf.RBFFD(rbf.PHS(5), stencil_size=20, polynomial_degree=2)
+    model = rbf.SymbolicScalar(2, transient=True)
+    u, t = model.field, model.time
+    x, y = model.coordinates
+    initial = sp.sin(sp.pi*x)*sp.sin(sp.pi*y)
+    problem = model.evolution(
+        sp.Eq(sp.diff(u, t)-kappa*model.laplacian(u), 0),
+        initial=initial,
+        boundary=[model.bc("boundary", sp.Eq(u, 0))],
+    )
+    trajectory = problem.solve(cloud, method, str(dt), steps, scheme="bdf2")
+    symbolic_values = trajectory.final.evaluate(cloud.points)
+    # --8<-- [end:symbolic]
     result = {"route_difference": float(np.max(np.abs(states[-1]-symbolic_values))),
               "error": float(np.max(np.abs(states[-1]-np.exp(-2*kappa*np.pi**2*steps*dt)*initial_values)))}
     print(f"states={states.shape}, final time={steps*dt}, interior matrix={lap_ii.shape}")

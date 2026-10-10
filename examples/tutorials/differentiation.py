@@ -19,8 +19,10 @@ def run():
     laplacian = interpolant.evaluate(query, rbf.Laplacian(2))
     # --8<-- [end:derivatives]
     # --8<-- [start:maps]
-    method = rbf.RBFFD(rbf.PHS(5), stencil_size=20, polynomial_degree=2)
-    ops = method.operators(source=centers, targets=query,
+    space = rbf.ScalarSpace(rbf.PHS(5), polynomial_degree=2)
+    source = {"u": rbf.Samples(centers, size=20)}
+    local = rbf.LocalApproximation(source=source, trial=space.representers(source))
+    ops = local.operators(targets=query,
                            operators={"dx": dx, "dy": dy, "lap": rbf.Laplacian(2)})
     local_gradient = np.column_stack((ops.dx @ values, ops["dy"] @ values))
     local_laplacian = ops.lap @ values

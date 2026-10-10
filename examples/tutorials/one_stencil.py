@@ -13,13 +13,14 @@ def run(cells=5, stencil_size=20):
     target = cloud.points[[target_index]]
     # --8<-- [end:geometry]
     # --8<-- [start:operator]
-    method = rbf.RBFFD(
-        spaces={"u": rbf.ScalarSpace(rbf.PHS(5), 2)},
-        stencil_size=min(stencil_size, len(cloud.points)),
-        local_backend=rbf.PythonBackend(compute_condition=False),
+    space = rbf.ScalarSpace(rbf.PHS(5), polynomial_degree=2)
+    source = {"u": rbf.Samples(cloud.points, size=min(stencil_size, len(cloud.points)))}
+    approximation = rbf.LocalApproximation(
+        source=source, trial=space.representers(source),
+        backend=rbf.PythonBackend(compute_condition=False),
     )
-    op = method.operators(
-        source=cloud.points, targets=target, space="u",
+    op = approximation.operators(
+        targets=target,
         operators={"lap": rbf.Laplacian(2)},
     ).lap
     # --8<-- [end:operator]
@@ -39,9 +40,10 @@ def run(cells=5, stencil_size=20):
     quadratic_response = float(weights @ np.sum(points**2, axis=1))
     # --8<-- [end:weights]
     # --8<-- [start:direct]
-    direct = method.weights(
-        centers=points, target=target[0], operator=rbf.Laplacian(2),
-    ).weights[:, 0]
+    chosen = {"u": rbf.Samples(points)}  # all supplied points, in their given order
+    direct = rbf.LocalApproximation(
+        source=chosen, trial=space.representers(chosen),
+    ).weights(target=target[0], operator=rbf.Laplacian(2)).weights[:, 0]
     # --8<-- [end:direct]
     direct_difference = float(np.max(np.abs(weights - np.asarray(direct).reshape(-1))))
     radius = float(np.max(np.linalg.norm(points - target[0], axis=1)))

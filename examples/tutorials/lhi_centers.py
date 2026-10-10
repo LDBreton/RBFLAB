@@ -1,37 +1,33 @@
-"""Independent solution, PDE and boundary centers for scalar stationary LHI."""
+"""Independent solution, PDE and boundary samples in a scalar Hermite construction."""
 import numpy as np
-import sympy as sp
+from scipy.sparse.linalg import spsolve
 import rbflab as rbf
 
 
 def run():
     cloud = rbf.geometry.unit_box_grid(3)
-    model = rbf.SymbolicScalar()
-    u = model.field
-    x, y = model.coordinates
-    exact = 1 + x*x + y*y
-    truth = model.data(exact)
-    problem = model.stationary(
-        sp.Eq(-model.laplacian(u), -4),
-        boundary=[model.bc("boundary", sp.Eq(u, exact))],
-    )
-    pde_points = np.array([[.2, .3], [.7, .3], [.3, .7], [.7, .7], [.5, .5]])
-    groups = {
-        "values": rbf.CenterGroup(cloud.interior, role="solution", target="require"),
-        "wall": rbf.CenterGroup(
-            cloud.points[cloud.boundary_indices], role="boundary",
-            operator=rbf.Identity(), data=truth,
-        ),
-        "forcing": rbf.CenterGroup(pde_points, role="pde", size=3, target="exclude"),
+    Xu = cloud.interior
+    Xb = cloud.points[cloud.boundary_indices]
+    Xf = np.array([[.2, .3], [.7, .3], [.3, .7], [.7, .7], [.5, .5]])
+    L = -rbf.Laplacian(2)
+    exact = lambda X: 1 + np.sum(X**2, axis=1)
+    source = {
+        "u": rbf.Samples(Xu),  # all four solution values
+        "wall": rbf.Samples(Xb),
+        "forcing": rbf.Samples(Xf, operator=L, size=3, target="exclude"),
     }
-    method = rbf.LHI(spaces={"u": rbf.ScalarSpace(rbf.PHS(5), 2)}, centers=groups)
-    method.preflight(problem, cloud)
-    system = method.assemble(problem, cloud)
-    solution = system.solve()
+    space = rbf.ScalarSpace(rbf.PHS(5), polynomial_degree=2)
+    approximation = rbf.LocalApproximation(source=source, trial=space.representers(source))
+    ops = approximation.operators(targets=Xu, operators={"L": L})
+    ff, gb = np.full(len(Xf), -4.), exact(Xb)
+    rhs = np.full(len(Xu), -4.) - ops.L["wall"] @ gb - ops.L["forcing"] @ ff
+    U = spsolve(ops.L["u"].matrix, rhs)
     query = np.array([[.31, .47], [.68, .57]])
-    error = float(np.max(np.abs(solution.evaluate(query) - truth(query))))
+    evaluate = approximation.operators(targets=query, operators={"value": rbf.Identity(2)})
+    predicted = evaluate.value @ {"u": U, "wall": gb, "forcing": ff}
+    error = float(np.max(np.abs(predicted-exact(query))))
     print("Independent-center error:", error)
-    print("First stencil groups:", system.stencils[0].groups)
+    print("First stencil groups:", ops.L.local(0).groups)
     return error
 
 

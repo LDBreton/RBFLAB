@@ -1,8 +1,8 @@
 # Build one RBF-FD stencil
 
-For the canonical explicit local API, see [functionals to operators](local-approximation.md)
-and [LHI and heat from matrices](lhi-matrices.md). This page explains the retained
-PDE convenience interface.
+This lesson uses the explicit local API introduced in
+[functionals to operators](local-approximation.md): samples describe the data,
+a space describes the trial functions, and targets describe what to evaluate.
 
 **You will learn:** to turn local kernel interpolation into one sparse Laplacian row, inspect its weights, and check polynomial reproduction. Prerequisite: basic NumPy.
 
@@ -55,9 +55,10 @@ separate irregular cloud, not this 36-node demonstration.
 ```
 
 `ScalarSpace(PHS(5), 2)` selects the trial family and quadratic polynomials.
-The name `u` labels a space here; it is not a symbolic field. Requesting
-`Laplacian(2)` produces one row of weights. `op` is a `DiscreteOperator` with a
-`(1, 36)` sparse matrix.
+The name `u` labels the source-value block; it is not a symbolic field.
+`space.representers(source)` constructs the basis from those value functionals.
+Requesting `Laplacian(2)` produces a `FunctionalOperator` with a `(1, 36)`
+sparse matrix. `op["u"]` selects its only source block.
 
 This example retains physical kernel scaling. Other lessons choose
 [local scaling](../theory/conditioning.md#local-stencil-scaling); scaling is a

@@ -47,9 +47,11 @@ def run(backend="python", compile_kernel=False):
     local = {"python": rbf.PythonBackend, "cpp": rbf.CppBackend,
              "torch": rbf.TorchBackend}[backend](compute_condition=False)
     # --8<-- [start:operators]
-    method = rbf.RBFFD(kernel, stencil_size=20, polynomial_degree=2,
-                       local_backend=local)
-    ops = method.operators(source=centers, targets=query,
+    space = rbf.ScalarSpace(kernel, polynomial_degree=2)
+    source = {"u": rbf.Samples(centers, size=20)}
+    approximation = rbf.LocalApproximation(
+        source=source, trial=space.representers(source), backend=local)
+    ops = approximation.operators(targets=query,
                            operators={"dx": rbf.Derivative(0), "lap": rbf.Laplacian()})
     field_dx = ops.dx @ values
     field_laplacian = ops.lap @ values
