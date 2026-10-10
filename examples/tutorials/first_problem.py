@@ -1,16 +1,15 @@
-"""A first symbolic Poisson problem on an ellipse; no helper module required."""
+"""A first symbolic Poisson problem on the unit square; no helper module required."""
 import argparse
 from pathlib import Path
 import numpy as np
 import sympy as sp
 import rbflab as rbf
-from rbflab import geometry, meshgen
+from rbflab import geometry
 
 
 def run(plot=None):
     # --8<-- [start:geometry]
-    domain = geometry.Ellipse(a=1.3, b=.8, labels=("wall",))
-    cloud = meshgen.generate(domain, interior=200, boundary=80, seed=42)
+    cloud = geometry.unit_box_grid(10)  # 121 nodes: 81 interior, 40 boundary
     # --8<-- [end:geometry]
 
     # --8<-- [start:equation]
@@ -20,7 +19,7 @@ def run(plot=None):
     exact = sp.sin(x)*sp.cos(y)
     problem = model.stationary(
         sp.Eq(-model.laplacian(u), 2*exact),
-        boundary=[model.bc("wall", sp.Eq(u, exact))],
+        boundary=[model.bc("boundary", sp.Eq(u, exact))],
     )
     # --8<-- [end:equation]
 
@@ -32,7 +31,7 @@ def run(plot=None):
     # --8<-- [end:solve]
 
     # --8<-- [start:check]
-    query = meshgen.generate(domain, interior=100, boundary=24, seed=17).interior
+    query = np.random.default_rng(17).uniform(.05, .95, (100, 2))
     reference = np.sin(query[:, 0])*np.cos(query[:, 1])
     error = float(np.max(np.abs(solution.evaluate(query)-reference)))
     print(f"nodes={len(cloud.points)}, sampled maximum error={error:.6e}")
@@ -42,8 +41,8 @@ def run(plot=None):
         import matplotlib.pyplot as plt
         fig, axes = plt.subplots(1, 2, figsize=(11, 4.5), facecolor="#0b1220",
                                  constrained_layout=True)
-        viz.plot_cloud(cloud, ax=axes[0], title="280 nodes / labeled wall")
-        viz.plot_scalar(solution, domain=domain, resolution=140, ax=axes[1],
+        viz.plot_cloud(cloud, ax=axes[0], title="121 nodes / square boundary")
+        viz.plot_scalar(solution, bounds=((0, 1), (0, 1)), resolution=140, ax=axes[1],
                         title="Computed Poisson solution")
         output = Path(plot)
         output.parent.mkdir(parents=True, exist_ok=True)

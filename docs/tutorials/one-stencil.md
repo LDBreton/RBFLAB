@@ -7,10 +7,10 @@ a space describes the trial functions, and targets describe what to evaluate.
 **You will learn:** to turn local kernel interpolation into one sparse Laplacian row, inspect its weights, and check polynomial reproduction. Prerequisite: basic NumPy.
 
 
-<figure class="stencil-figure">
-<a href="../../assets/rbf_fd_stencil.svg" aria-label="Open the stencil diagram at full size"><img src="../../assets/rbf_fd_stencil.svg" alt="An irregular 121-node cloud with 20 selected neighbors around a target, followed by their signed Laplacian weights in a sparse matrix row"></a>
-<figcaption>One computed RBF-FD row on an irregular cloud. Blue nodes form the 20-point stencil; the orange star is the target. The dashed circle marks its radius R, not compact kernel support. The right panel shows R<sup>2</sup> times the Laplacian weights in global node order; unselected columns are zero. The figure uses PHS5, degree-two polynomials, and a seeded 121-node cloud; the runnable one-stencil tutorial defaults to 36 nodes.</figcaption>
-</figure>
+![The 36-node square cloud, selected 20-point stencil, and its sparse Laplacian row](../assets/tutorial_stencil.png)
+
+The highlighted target has one 20-node neighborhood. Its weights occupy
+20 of the 36 columns in the assembled row; other columns are zero.
 
 For the complete coefficient-elimination argument, read [from approximation to weights](../theory/local-weights.md).
 
@@ -45,8 +45,7 @@ cells, stencil_size = 5, 20
 ```
 
 `cloud.points` has 36 rows. `target` has shape `(1, 2)`: one evaluation location
-near $(0.5,0.5)$. The introductory figure shows the same construction on a
-separate irregular cloud, not this 36-node demonstration.
+near $(0.5,0.5)$. The figure uses the same 36-node construction.
 
 ## 2. Describe the local space and target functional
 
@@ -113,4 +112,5 @@ Run `python -m examples.tutorials.one_stencil` from a source checkout.
 
 [Download the script](https://raw.githubusercontent.com/LDBreton/RBFLAB/main/examples/tutorials/one_stencil.py).
 
-**Next:** [Assemble a PDE](custom-assembly.md) or [include PDE data through LHI](lhi.md).
+**Next:** [Assemble a PDE](custom-assembly.md) or return to the
+[main route](index.md).

@@ -1,125 +1,214 @@
-"""Regenerate the tutorial illustrations from the documented numerical recipes."""
+"""Generate teaching figures by executing the same snippet sections as the manual.
+
+Run: python -m examples.make_teaching_figures
+Only trusted, repository-owned tutorial source is executed. Numerical recipes
+remain in the example files; plotting does not maintain a second implementation.
+"""
 from pathlib import Path
+from textwrap import dedent
+import hashlib
+import json
 import numpy as np
 import sympy as sp
+import scipy.sparse as sparse
+from scipy.sparse.linalg import spsolve, splu
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from matplotlib.colors import LinearSegmentedColormap, Normalize
 import rbflab as rbf
 from rbflab import geometry, meshgen
 
-OUT = Path(__file__).resolve().parents[1] / "docs/assets"
-BLUE, TEAL, ORANGE = "#254e78", "#00897b", "#d87930"
+ROOT = Path(__file__).resolve().parents[1]
+OUT = ROOT / "docs/assets"
+INK, BLUE, TEAL, ORANGE = "#16324f", "#2765b0", "#008c86", "#e27b3d"
+CMAP = LinearSegmentedColormap.from_list("rbflab_field", ["#e6f5ed", "#31b8a6", "#247eb1", "#192e66"])
 
 
-def style(ax, title):
-    ax.set_title(title, loc="left", fontsize=11, fontweight="bold", pad=12)
-    ax.set(xlabel="x", ylabel="y", aspect="equal")
+def lesson(name, sections, **values):
+    """Run the exact named snippets used by MkDocs, in the requested order."""
+    path = ROOT / "examples/tutorials" / (name + ".py")
+    text = path.read_text(encoding="utf-8")
+    state = dict(np=np, sp=sp, sparse=sparse, spsolve=spsolve, splu=splu,
+                 rbf=rbf, geometry=geometry, meshgen=meshgen)
+    state.update(values)
+    for section in sections:
+        start = "# --8<-- [start:" + section + "]"
+        end = "# --8<-- [end:" + section + "]"
+        code = text.split(start, 1)[1].split(end, 1)[0]
+        exec(compile(dedent(code), str(path) + ":" + section, "exec"), state)
+    return state
+
+
+def style(ax, title, square=True):
+    ax.set_title(title, loc="left", fontsize=12, weight="bold", pad=14, color=INK)
     ax.spines[["top", "right"]].set_visible(False)
+    ax.spines[["bottom", "left"]].set_color("#bacbda")
+    ax.tick_params(colors="#577086", labelsize=9)
+    if square:
+        ax.set(xlabel="x", ylabel="y", aspect="equal",
+               xlim=(-.04, 1.04), ylim=(-.04, 1.04))
+        ax.set_xticks([0, .5, 1]); ax.set_yticks([0, .5, 1])
+
+
+def save(fig, name):
+    fig.savefig(OUT / name, dpi=180, facecolor="white", bbox_inches="tight")
+    plt.close(fig)
+
+
+def nodes(ax, cloud, title):
+    ax.scatter(*cloud.interior.T, color=BLUE, s=26, zorder=3, label="interior values")
+    ax.scatter(*cloud.points[cloud.boundary_indices].T, color=ORANGE, s=28,
+               marker="s", zorder=3, label="boundary values")
+    style(ax, title)
+    ax.legend(loc="upper center", bbox_to_anchor=(.5, -.18), ncol=2,
+              fontsize=9, frameon=False)
+
+
+def field(ax, X, U, title, levels=None, cmap=CMAP):
+    im = ax.tricontourf(*X.T, U, levels=levels if levels is not None else 24, cmap=cmap)
+    ax.tricontour(*X.T, U, levels=7, colors="white", linewidths=.45, alpha=.5)
+    style(ax, title)
+    return im
 
 
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
-    plt.rcParams.update({"font.size": 10, "axes.labelcolor": BLUE, "text.color": BLUE,
-                         "axes.edgecolor": "#c5cdd6", "figure.facecolor": "white"})
-    rng = np.random.default_rng(7)
-    X = rng.uniform(-1., 1., (64, 2))
-    X_card = X.copy()
-    d = np.sin(X[:, 0])+np.cos(X[:, 1])
-    fit = rbf.interpolate(rbf.PHS(5), X, d, polynomial_degree=2)
-    gx, gy = np.meshgrid(np.linspace(-.7, .7, 85), np.linspace(-.7, .7, 85))
+    plt.rcParams.update({"font.family": "DejaVu Sans", "font.size": 10,
+                         "text.color": INK, "axes.labelcolor": INK,
+                         "figure.facecolor": "white", "axes.facecolor": "#f7fafc"})
+    # Data and reconstruction are exactly those of the interpolation tutorial.
+    data = lesson("interpolation", ["data", "interpolants", "evaluate"])
+    X, fit, U = data["centers"], data["phs"], data["values"]
+    g = np.linspace(0, 1, 70); gx, gy = np.meshgrid(g, g)
     Q = np.column_stack((gx.ravel(), gy.ravel()))
-    values = fit.evaluate(Q).reshape(gx.shape)
-    dx = fit.evaluate(Q, rbf.Derivative(0)).reshape(gx.shape)
-    fig, axes = plt.subplots(1, 3, figsize=(12, 3.6), constrained_layout=True)
-    im = axes[0].scatter(*X.T, c=d, cmap="viridis", s=33, edgecolor="white", linewidth=.5)
-    fig.colorbar(im, ax=axes[0], shrink=.75, label="sample value")
-    for ax, field, label in zip(axes[1:], (values, dx), ("s(x, y)", "partial s / partial x")):
-        im = ax.contourf(gx, gy, field, levels=22, cmap="viridis")
-        fig.colorbar(im, ax=ax, shrink=.75, label=label)
-    for ax, title in zip(axes, ("01  Supplied samples", "02  PHS reconstruction", "03  Differentiate the expansion")):
+    predicted = fit.evaluate(Q).reshape(gx.shape)
+    derivative = fit.evaluate(Q, rbf.Derivative(0)).reshape(gx.shape)
+    fig, axes = plt.subplots(1, 2, figsize=(9, 4.5), layout="constrained")
+    for ax, Z, title in zip(axes, (predicted, derivative), ("Interpolated field", "Derivative in x")):
+        im = ax.contourf(gx, gy, Z, levels=24, cmap=CMAP)
+        ax.scatter(*X.T, s=14, c="white", edgecolors=INK, linewidths=.35)
         style(ax, title)
-    fig.savefig(OUT/"teaching_interpolation.png", dpi=170); plt.close(fig)
+        fig.colorbar(im, ax=ax, shrink=.74, pad=.025)
+    save(fig, "teaching_interpolation.png")
+    fig, ax = plt.subplots(figsize=(4.5, 4), layout="constrained")
+    ax.contourf(gx, gy, predicted, levels=24, cmap=CMAP)
+    ax.scatter(*X.T, s=24, c="white", edgecolors=INK, linewidths=.5)
+    style(ax, "64 scattered samples")
+    save(fig, "teaching_data_card.png")
 
-    s=sp.Symbol("s",nonnegative=True);c=sp.Symbol("c",positive=True);beta=sp.Symbol("beta",nonnegative=True)
-    family=rbf.Kernel((1+c*s)**sp.Rational(-1,2)+beta*sp.exp(-c*s),s,(c,beta))
-    k=family(c="2",beta="0.1");r=np.linspace(0,2.5,240);z=np.column_stack((r,np.zeros_like(r)))
-    fig,axes=plt.subplots(1,2,figsize=(9,3.3),constrained_layout=True)
-    for ax,alpha,title,color in zip(axes,((0,0),(1,0)),("01  IMQ + Gaussian", "02  Cartesian derivative at (r, 0)"),(BLUE,TEAL)):
-        val=k.derivative(z,alpha);ax.plot(r,val,color=color,lw=2.5)
-        ax.scatter([0],[val[0]],color=ORANGE,zorder=3,s=35)
-        ax.axhline(0,color="#c5cdd6",lw=.8)
-        ax.set(title=title,xlabel="r",ylabel="kernel value" if alpha==(0,0) else "partial / partial z1")
-        ax.spines[["top","right"]].set_visible(False)
-    fig.savefig(OUT/"teaching_kernel.png",dpi=170);plt.close(fig)
+    custom = lesson("custom_kernel", ["family", "mixture"])
+    kernel = custom["kernel"]
+    r = np.linspace(0, 2.5, 250); offsets = np.column_stack((r, np.zeros_like(r)))
+    fig, axes = plt.subplots(1, 2, figsize=(9, 3.7), layout="constrained")
+    for ax, alpha, title, color in zip(axes, ((0, 0), (1, 0)),
+                                      ("IMQ + Gaussian", "Derivative along (r, 0)"), (BLUE, TEAL)):
+        val = kernel.derivative(offsets, alpha)
+        ax.plot(r, val, lw=2.8, color=color)
+        ax.fill_between(r, val, 0, color=color, alpha=.08)
+        ax.scatter([0], [val[0]], color=ORANGE, s=40, zorder=4)
+        ax.axhline(0, color="#bacbda", lw=.8)
+        style(ax, title, square=False); ax.set(xlabel="r", ylabel="value")
+    save(fig, "teaching_kernel.png")
 
-    cloud=rbf.geometry.unit_box_grid(5);model=rbf.SymbolicScalar(2);u=model.field;x,y=model.coordinates
-    exact=sp.sin(sp.pi*x)*sp.sin(sp.pi*y)
-    problem=model.stationary(sp.Eq(-model.laplacian(u),2*sp.pi**2*exact),boundary=[model.bc("boundary",sp.Eq(u,0))])
-    system=rbf.LHI(rbf.PHS(5),20,polynomial_degree=2).assemble(problem,cloud)
-    patch=system.stencils[0];X=cloud.points
-    fig,axes=plt.subplots(1,2,figsize=(10,4.5),constrained_layout=True)
-    axes[0].scatter(*cloud.interior.T,c=BLUE,s=45,label="16 PDE rows")
-    axes[0].scatter(*cloud.points[cloud.boundary_indices].T,c=ORANGE,marker="s",s=40,label="20 Dirichlet rows")
-    axes[1].scatter(*X.T,c="#dce1e7",s=25)
-    axes[1].scatter(*X[patch.solution_indices].T,c=BLUE,s=45,label="12 solution values")
-    axes[1].scatter(*X[patch.boundary_indices].T,c=ORANGE,marker="s",s=45,label="8 boundary data")
-    axes[1].scatter(*X[patch.pde_indices].T,facecolors="none",edgecolors=TEAL,marker="^",s=140,lw=1.4,label="11 PDE data")
-    axes[1].scatter(*X[patch.center],c=ORANGE,marker="*",s=160,edgecolors="white",zorder=4,label="target")
-    for ax,title in zip(axes,("01  Global collocation centers", "02  First LHI neighborhood")):
-        style(ax,title);ax.set(xlim=(-.08,1.08),ylim=(-.08,1.08));ax.legend(fontsize=8,loc="upper left",bbox_to_anchor=(1,1),frameon=False)
-    fig.savefig(OUT/"teaching_centers.png",dpi=170);plt.close(fig)
+    # Actual group membership, including coincident PDE/solution locations.
+    lhi = lesson("lhi_construction", ["problem", "solve", "patch"])
+    fig, axes = plt.subplots(1, 2, figsize=(9, 4.7), layout="constrained")
+    nodes(axes[0], lhi["cloud"], "36 nodes on the square")
+    ax = axes[1]; cloud = lhi["cloud"]
+    ax.scatter(*cloud.points.T, c="#d7e1e8", s=25)
+    for points, indices, color, marker, size, label in (
+        (lhi["Xu"], lhi["S"], BLUE, "o", 40, "12 solution values"),
+        (lhi["Xb"], lhi["B"], ORANGE, "s", 40, "8 boundary data"),
+    ):
+        ax.scatter(*points[indices].T, c=color, marker=marker, s=size, label=label)
+    ax.scatter(*lhi["Xf"][lhi["F"]].T, facecolors="none", edgecolors=TEAL,
+               marker="^", s=130, lw=1.5, label="11 PDE data")
+    ax.scatter(*lhi["Xu"][0], c="#a33150", marker="*", s=180, edgecolors="white",
+               zorder=5, label="target")
+    style(ax, "One Hermite neighborhood")
+    ax.legend(loc="upper center", bbox_to_anchor=(.5, -.18), ncol=2,
+              fontsize=8.5, frameon=False)
+    save(fig, "teaching_centers.png")
 
-    domain=geometry.Ellipse(a=1.2,b=.8,labels=("wall",))
-    cloud=meshgen.generate(domain,interior=140,boundary=60,seed=42)
-    ops=rbf.RBFFD(rbf.PHS(5),35,polynomial_degree=3,stencil_policy=rbf.StencilPolicy(scaling="local"),local_backend=rbf.PythonBackend(compute_condition=False)).operators(source=cloud.points,operators={"lap":rbf.Laplacian()})
-    fig,axes=plt.subplots(1,2,figsize=(9,3.6),constrained_layout=True)
-    axes[0].scatter(*cloud.interior.T,c=BLUE,s=15,label="140 interior values")
-    axes[0].scatter(*cloud.points[cloud.boundary_indices].T,c=ORANGE,s=20,label="60 prescribed wall values")
-    style(axes[0],"01  Locations and equation roles");axes[0].legend(fontsize=8,loc="lower center",frameon=False)
-    axes[1].spy(ops.lap.matrix,markersize=1,color=TEAL)
-    axes[1].set(title="02  Sparse Laplacian: 35 entries per row",xlabel="source value index",ylabel="target index")
+    stencil = lesson("one_stencil", ["geometry", "operator", "inspect", "weights"],
+                     cells=5, stencil_size=20)
+    fig, axes = plt.subplots(1, 2, figsize=(9, 4.4), layout="constrained")
+    ax = axes[0]
+    ax.scatter(*stencil["cloud"].points.T, c="#d7e1e8", s=32)
+    ax.scatter(*stencil["points"].T, c=BLUE, s=45)
+    ax.scatter(*stencil["target"][0], c=ORANGE, marker="*", s=180,
+               edgecolors="white", zorder=5)
+    radius = np.max(np.linalg.norm(stencil["points"] - stencil["target"][0], axis=1))
+    ax.add_patch(plt.Circle(stencil["target"][0], radius, fill=False,
+                           color=TEAL, ls="--", lw=1.3))
+    style(ax, "20 selected / 36 available")
+    weights = stencil["op"].matrix.toarray()[0] * radius**2
+    axes[1].bar(np.arange(len(weights)), weights,
+                color=np.where(weights < 0, ORANGE, BLUE), width=.85)
+    axes[1].axhline(0, color=INK, lw=.7)
+    style(axes[1], "One signed Laplacian row", square=False)
+    axes[1].set(xlabel="source node index", ylabel="weight × radius²")
+    save(fig, "tutorial_stencil.png")
+
+    assembly = lesson("custom_assembly", ["cloud", "operators", "combine", "data", "solve"],
+                      local=rbf.PythonBackend(compute_condition=False))
+    cloud, X, values = assembly["cloud"], assembly["X"], assembly["U"]
+    fig, axes = plt.subplots(1, 3, figsize=(12.3, 4.4), layout="constrained")
+    nodes(axes[0], cloud, "01  Sample the square")
+    axes[1].spy(assembly["A"], color=TEAL, markersize=1.3)
     axes[1].xaxis.tick_bottom()
-    fig.savefig(OUT/"teaching_operators.png",dpi=170);plt.close(fig)
-    from examples.tutorials.heat_matrices import rbf_fd_laplacian, march
-    cloud=rbf.geometry.unit_box_grid(6);matrix,_=rbf_fd_laplacian(cloud)
-    states,_=march(matrix,cloud,dt=.01,steps=5,scheme="bdf2")
-    fig,axes=plt.subplots(1,3,figsize=(11,3.5),constrained_layout=True)
-    axes[0].scatter(*cloud.interior.T,c=BLUE,s=28,label="interior")
-    axes[0].scatter(*cloud.points[cloud.boundary_indices].T,c=ORANGE,s=28,label="Dirichlet")
-    axes[0].legend(frameon=False,fontsize=8)
-    for ax,field in zip(axes[1:],(states[0],states[-1])):
-        im=ax.tricontourf(*cloud.points.T,field,levels=np.linspace(0,1,21),cmap="inferno")
-        fig.colorbar(im,ax=ax,shrink=.75,label="temperature")
-    for ax,title in zip(axes,("01  Same 49 nodes in both routes", "02  Initial values", "03  BDF2 at t = 0.05")):
-        style(ax,title)
-    fig.savefig(OUT/"teaching_heat.png",dpi=170);plt.close(fig)
-    # Single-panel previews remain legible on narrow learning-path cards.
-    fig,ax=plt.subplots(figsize=(4.8,3.6),constrained_layout=True)
-    ax.contourf(gx,gy,values,levels=20,cmap="viridis")
-    ax.scatter(*X_card.T,s=22,c="white",edgecolors=BLUE,linewidths=.7)
-    ax.set(xlim=(-.75,.75),ylim=(-.75,.75),aspect="equal",xlabel="x",ylabel="y")
-    ax.spines[["top","right"]].set_visible(False)
-    fig.savefig(OUT/"teaching_data_card.png",dpi=160);plt.close(fig)
+    style(axes[1], "02  Build the operator", square=False)
+    axes[1].set(xlabel="source column", ylabel="equation row")
+    im = field(axes[2], X, values, "03  Solve for the field")
+    fig.colorbar(im, ax=axes[2], shrink=.7, pad=.025, label="u")
+    save(fig, "tutorial_overview.png")
+    fig, axes = plt.subplots(1, 2, figsize=(9, 4.6), layout="constrained")
+    nodes(axes[0], cloud, "81 unknown / 40 boundary")
+    axes[1].spy(assembly["Lap"], color=TEAL, markersize=1.8)
+    axes[1].xaxis.tick_bottom()
+    style(axes[1], "Laplacian / 35-node stencils", square=False)
+    axes[1].set(xlabel="source column", ylabel="target row")
+    save(fig, "teaching_operators.png")
+    fig, ax = plt.subplots(figsize=(4.5, 4), layout="constrained")
+    ax.spy(assembly["A"], color=TEAL, markersize=1.8); ax.xaxis.tick_bottom()
+    style(ax, "Sparse equations", square=False)
+    ax.set(xlabel="source column", ylabel="equation row")
+    save(fig, "teaching_algorithm_card.png")
 
-    domain=geometry.Ellipse(a=1.3,b=.8,labels=("wall",))
-    cloud=meshgen.generate(domain,interior=200,boundary=80,seed=42)
-    m=rbf.SymbolicScalar(2);u=m.field;x,y=m.coordinates
-    problem=m.stationary(sp.Eq(-m.laplacian(u),2*sp.sin(x)*sp.cos(y)),boundary=[m.bc("wall",sp.Eq(u,sp.sin(x)*sp.cos(y)))])
-    sol=problem.solve(cloud,rbf.RBFFD(rbf.PHS(5),35,polynomial_degree=3,stencil_policy=rbf.StencilPolicy(scaling="local")))
-    fig,ax=plt.subplots(figsize=(4.8,3.6),constrained_layout=True)
-    ax.tricontourf(*cloud.points.T,sol.evaluate(cloud.points),levels=22,cmap="inferno")
-    ax.scatter(*cloud.points[cloud.boundary_indices].T,c=ORANGE,s=8)
-    ax.set(aspect="equal",xlabel="x",ylabel="y")
-    ax.spines[["top","right"]].set_visible(False)
-    fig.savefig(OUT/"teaching_pde_card.png",dpi=160);plt.close(fig)
+    first = lesson("first_problem", ["geometry", "equation", "solve"])
+    values = first["solution"].evaluate(first["cloud"].points)
+    fig, axes = plt.subplots(1, 2, figsize=(9, 4.7), layout="constrained")
+    nodes(axes[0], first["cloud"], "121 labeled nodes")
+    im = field(axes[1], first["cloud"].points, values, "Computed Poisson field")
+    fig.colorbar(im, ax=axes[1], shrink=.72, label="u")
+    save(fig, "first_problem.png")
+    fig, ax = plt.subplots(figsize=(4.5, 4), layout="constrained")
+    field(ax, first["cloud"].points, values, "Poisson on the square")
+    save(fig, "teaching_pde_card.png")
 
-    fig,ax=plt.subplots(figsize=(4.8,3.6),constrained_layout=True)
-    ax.spy(ops.lap.matrix,markersize=1.5,color=TEAL)
-    ax.set(xlabel="source values",ylabel="target equations");ax.xaxis.tick_bottom()
-    fig.savefig(OUT/"teaching_algorithm_card.png",dpi=160);plt.close(fig)
-    print("Wrote five teaching figures and three card previews to",OUT)
+    heat = lesson("heat_equation", ["settings", "operators", "factors", "loop"])
+    fig, axes = plt.subplots(1, 2, figsize=(9, 4.4), layout="constrained")
+    for ax, state, title in zip(axes, (heat["states"][0], heat["states"][-1]),
+                                ("Initial field / t = 0", "BDF2 field / t = 0.05")):
+        im = field(ax, heat["X"], state, title, levels=np.linspace(0, 1, 26), cmap="magma")
+        ax.scatter(*heat["X"].T, s=8, c="white", alpha=.55)
+    fig.colorbar(im, ax=axes, shrink=.75, label="temperature (shared scale)")
+    save(fig, "teaching_heat.png")
+
+    names = ("interpolation", "custom_kernel", "one_stencil", "lhi_construction",
+             "custom_assembly", "first_problem", "heat_equation")
+    manifest = {
+        "source_sha256": {name: hashlib.sha256((ROOT / "examples/tutorials" / (name+".py")).read_text(encoding="utf-8").encode("utf-8")).hexdigest()
+                          for name in names},
+        "square_nodes": len(cloud.points), "stencil_nodes": len(stencil["points"]),
+        "lhi_groups": {name: len(ids) for name, ids in lhi["patch"].groups.items()},
+        "nodal_pde_error": float(np.max(np.abs(assembly["U"]-assembly["boundary_data"]))),
+        "heat_peak": [float(np.max(heat["states"][0])), float(np.max(heat["states"][-1]))],
+    }
+    (OUT / "tutorial_figures.json").write_text(json.dumps(manifest, indent=2)+"\n", encoding="utf-8")
+    print(json.dumps(manifest, indent=2))
 
 
-if __name__=="__main__":
+if __name__ == "__main__":
     main()

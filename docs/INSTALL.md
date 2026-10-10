@@ -68,11 +68,15 @@ older scripts. The supported symbolic PDE examples still use the explicit
 
 ## 3. Get the runnable examples
 
-Library snippets can run anywhere after installation. Commands beginning with
+Library snippets can run anywhere after installation. The online manual's
+tutorial scripts follow the current repository; use its main checkout below
+for the latest lessons (the library API requires 0.5 or newer).
+For an archived release, check out its matching tag instead.
+Commands beginning with
 `python -m examples...` need the repository's example files:
 
 ```sh
-git clone --branch v0.5.0 https://github.com/LDBreton/RBFLAB.git
+git clone https://github.com/LDBreton/RBFLAB.git
 cd RBFLAB
 python -m pip install -e ".[examples]"
 python -m examples.tutorials.first_problem

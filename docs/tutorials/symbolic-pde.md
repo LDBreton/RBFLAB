@@ -1,13 +1,15 @@
 # Write a PDE as a symbolic problem
 
 **Goal:** translate an equation, boundary data, and an approximation choice into
-separate Python objects. The [first problem](../getting-started.md) is a shorter introduction.
+separate Python objects. This optional equation-driven route follows the
+[first problem](../getting-started.md); the main tutorials construct local
+operators explicitly.
 
 ## 1. State the problem
 
-On an ellipse, solve
+On the unit square, solve
 
-$$-\Delta u+\alpha u=f\quad\text{in }\Omega,\qquad u=g\quad\text{on }\Gamma_{\rm wall}.$$
+$$-\Delta u+\alpha u=f\quad\text{in }\Omega,\qquad u=g\quad\text{on }\partial\Omega.$$
 
 Choose $\alpha=2$, $g=\sin x\cos y$, and $f=(2+\alpha)\sin x\cos y$.
 A known solution makes this example concrete; ordinary applications supply their
@@ -17,7 +19,7 @@ own forcing and boundary expressions without knowing the solution.
 import numpy as np
 import sympy as sp
 import rbflab as rbf
-from rbflab import geometry, meshgen
+from rbflab import geometry
 ```
 
 ## 2. Give the geometry a named boundary
@@ -26,13 +28,13 @@ from rbflab import geometry, meshgen
 --8<-- "examples/tutorials/symbolic_pde.py:geometry"
 ```
 
-The cloud contains 200 interior and 80 boundary nodes. `wall` connects the
+The cloud contains 81 interior and 40 boundary nodes. `boundary` connects the
 geometric subset to its boundary equation; it is not an unknown field name.
 Generation also supplies the outward normals needed for flux conditions.
 
-![Ellipse nodes and the introductory field](../assets/first_problem.png)
+![Square nodes and the introductory field](../assets/first_problem.png)
 
-The left panel shows the same 280-node cloud. The right panel illustrates the
+The left panel shows the same 121-node cloud. The right panel illustrates the
 same analytic field in the introductory Poisson example. See
 [mesh generation](../geometry/index.md) for composing shapes and boundary groups.
 
@@ -93,7 +95,7 @@ the method's reconstruction.
 
 ```python
 from rbflab import viz
-fig, ax = viz.plot_scalar(solution, domain=domain, title="Reaction-diffusion")
+fig, ax = viz.plot_scalar(solution, bounds=((0, 1), (0, 1)), title="Reaction-diffusion")
 ```
 
 Plotting needs `rbflab[examples]`. Its display grid does not change the numerical cloud.
@@ -104,7 +106,8 @@ Plotting needs `rbflab[examples]`. Its display grid does not change the numerica
 side. Supply the forcing for your new problem; changing an operator does not
 automatically change an independently supplied forcing.
 
-**Robin data:** replace `wall` before constructing `problem`:
+**Robin data:** replace the Dirichlet boundary definition before constructing
+`problem`:
 
 ```python
 --8<-- "examples/tutorials/symbolic_pde.py:robin"
@@ -120,7 +123,10 @@ replace the right-hand side. Multiple labels accept different `model.bc(...)` en
 
 ### A quick check
 
-Evaluate a few points against $\sin x\cos y$ to check the entered equation and data.
+At the script's three queries, the Dirichlet solve has maximum error about
+$1.75\times10^{-5}$; the Robin variant reports about
+$3.41\times10^{-4}$. These sampled checks help catch mistakes in the
+equation and boundary data, without bounding error over the square.
 
 ## Complete example
 
@@ -134,4 +140,5 @@ Run `python -m examples.tutorials.symbolic_pde` from a [source checkout](../INST
 
 [Download the script](https://raw.githubusercontent.com/LDBreton/RBFLAB/main/examples/tutorials/symbolic_pde.py).
 
-**Next:** [Construct the sparse equation yourself](custom-assembly.md), or use [mixed boundaries](ellipse.md).
+**Next:** [Construct the sparse equation yourself](custom-assembly.md), or
+explore [mixed boundaries on an ellipse](../gallery/index.md).

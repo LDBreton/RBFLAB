@@ -1,102 +1,46 @@
-# From mathematical ideas to working code
+# Six tutorials, one route
 
-Use RBFLAB to interpolate your data, express a PDE, or construct a numerical
-method from local weights and sparse operators. These lessons assume some
-familiarity with RBFs and explain how the mathematics maps to Python objects.
-They can be followed independently or used as a sequence for teaching.
+These lessons start with scattered values and end with a heat-equation time loop.
+The introductory PDE and the principal examples use points in the unit square,
+so changes in the **numerical construction** are easier to see. Read in order or
+enter at the step you need. Each lesson gives the mathematical idea, the API
+construction, a concrete result, and something to change.
 
-**Version:** these lessons target **RBFLAB 0.5.0 or newer**:
+Install **RBFLAB 0.5.0 or newer** with
 `python -m pip install --upgrade "rbflab>=0.5"`.
+The short code fragments use the installed library. Module commands for complete
+scripts run from a [source checkout](../INSTALL.md); those scripts are not
+installed as a Python package.
 
-For local research methods the common vocabulary is **space → source samples
-and trial functions → target operators → sparse matrices → your algorithm**.
-The local lessons use `Samples` and `LocalApproximation`. Global interpolation
-and collocation retain their separate, coefficient-based interfaces.
-
-## Choose what you want to build
-
-<div class="rbf-examples">
-<article class="rbf-example"><a href="interpolation/"><img src="../assets/teaching_data_card.png" alt="Scattered samples over the interpolated field"></a><div class="rbf-example-body"><h3><a href="interpolation/">A field from data</a></h3><p>Supply arrays, choose a kernel, evaluate and differentiate.</p></div></article>
-<article class="rbf-example"><a href="symbolic-pde/"><img src="../assets/teaching_pde_card.png" alt="Computed field on an ellipse with marked wall nodes"></a><div class="rbf-example-body"><h3><a href="symbolic-pde/">A PDE from equations</a></h3><p>Connect geometry, symbolic fields, boundary equations and approximation.</p></div></article>
-<article class="rbf-example"><a href="custom-assembly/"><img src="../assets/teaching_algorithm_card.png" alt="Sparsity structure of the local derivative map"></a><div class="rbf-example-body"><h3><a href="custom-assembly/">Your own algorithm</a></h3><p>Inspect weights, combine sparse maps, and control the solve.</p></div></article>
-</div>
-
-Start with [installation](../INSTALL.md), or [your first RBF problem](../getting-started.md)
-for a compact introduction. To construct domains without solving a PDE, use
-[mesh generation](../geometry/index.md).
-
-## Path A — Interpolate and differentiate
-
-| Lesson | Mathematical construction | What you can change afterward |
+| Step | Build | Key distinction |
 |---|---|---|
-| [Interpolate scattered data](interpolation.md) | Values become an RBF expansion | Your samples, kernel, query locations |
-| [Differentiate a field](differentiation.md) | Functionals act on an interpolant or local maps | Derivative, source/target points, sampled field |
-| [Define a custom kernel](custom-kernel.md) | A symbolic radial family becomes an evaluable kernel | Formula, parameters, requested derivatives |
+| **1. [Interpolate scattered data](interpolation.md)** | Fit a field from sample values and evaluate it. | Coefficients are not sample values. |
+| **2. [From samples to operators](local-approximation.md)** | Declare a space, source samples, a trial, and target functionals. | Local square solves produce rows of a potentially rectangular sparse map. |
+| **3. [Assemble a stationary PDE](custom-assembly.md)** | Combine local derivative maps, apply boundary data, and solve. | The PDE matrix is assembled from weights; it is not a local interpolation matrix. |
+| **4. [Global collocation](global-collocation.md)** | Impose PDE and boundary rows on a global trial expansion. | Its dense unknown vector contains expansion coefficients. |
+| **5. [Local Hermite interpolation](lhi.md)** | Include value, PDE, and boundary functionals in each patch. | Known forcing enters the right-hand side; solution values remain the unknowns. |
+| **6. [Time-step heat](heat-equation.md)** | Reuse a spatial operator in backward Euler and BDF2. | Time integration is ordinary matrix algebra after spatial assembly. |
 
-No PDE is required for this path. Array shapes and the distinction between
-coefficients, values, and derivative weights are introduced as they are used.
+The local steps use the release 0.5 `Samples` and `LocalApproximation` interface.
+[One stencil](one-stencil.md) opens the weight solve in detail. Global
+[interpolation](interpolation.md) and [collocation](global-collocation.md) use
+their own dense, coefficient-based interfaces. The optional
+[symbolic PDE](symbolic-pde.md) lesson shows an equation-driven `RBFFD`
+adapter; it does not replace the explicit operator construction.
 
-## Path B — Solve a PDE
+## Go deeper where it helps
 
-| Lesson | Mathematical construction | What you can change afterward |
-|---|---|---|
-| [Write a symbolic PDE](symbolic-pde.md) | Equation and boundary expressions become a problem | Differential expression and boundary model |
-| [Global collocation](global-collocation.md) | Trial expansion becomes dense PDE rows | Ordinary or source-functional trial basis |
-| [Functionals to operators](local-approximation.md) | Space, sampled data and trial become named sparse maps | Trial construction, source groups, target operators |
-| [LHI and heat from matrices](lhi-matrices.md) | Hermite maps become stiffness, mass and forcing blocks | Center layout, equations, time integrator |
-| [One RBF-FD stencil](one-stencil.md) | Local interpolation becomes derivative weights | Space, target functional, chosen neighbors |
-| [Local Hermite interpolation](lhi.md) | Values and PDE/boundary data become a local identity | Local center roles and PDE-center count |
-| [Heat time stepping](heat-equation.md) | A spatial matrix becomes an evolution equation | Initial data, boundary values, time formula |
-| [Coupled Stokes fields](annular-stokes.md) | Velocity/pressure spaces become a coupled problem | Body force, walls, and approximation spaces |
+- After step 1: [differentiate a field](differentiation.md) and
+  [define a custom kernel](custom-kernel.md).
+- After step 2: [inspect one RBF-FD stencil](one-stencil.md) and read the
+  [weight derivation](../theory/local-weights.md).
+- After step 5: [choose independent LHI centers](lhi-centers.md) and
+  [build LHI heat matrices](lhi-matrices.md).
+- For classes: use the [teaching guide](teaching.md).
+- For domains beyond the square and coupled equations: open the
+  [gallery and advanced applications](../gallery/index.md).
 
-The global and LHI lessons use the same small Poisson problem to make their
-constructions easy to follow. [Compare the methods](global-lhi.md) afterward.
-
-## Path C — Implement your own ideas
-
-Start with [functionals to sparse operators](local-approximation.md), then
-[LHI and heat from matrices](lhi-matrices.md). These are the canonical local
-research interfaces. [One stencil](one-stencil.md) and [assemble your own PDE](custom-assembly.md)
-use this same API to expose the local equations and control the global solve.
-This path shows where ordinary NumPy/SciPy code takes over: combining derivative
-maps, eliminating prescribed values, solving matrices and writing update loops.
-Continue with [heat](heat-equation.md) before the advanced [cavity algorithm](cavity.md).
-The cavity is an explained experimental flow construction, not a validated
-benchmark or a general Navier–Stokes solver.
-
-## Equation-driven and specialized examples
-
-`LocalApproximation` builds maps; it does not own forcing, boundary equations,
-or time integration. The symbolic PDE and curved-domain examples also show the
-supported `RBFFD`/`LHI` assembly adapters when an equation-driven solve is useful.
-They use the current API, but are not alternative trial-space declarations.
-Specialized Stokes and the experimental cavity algorithm have additional
-coupled-system machinery; the shared functional engine does not yet replace
-every coupled solver.
-
-## Apply the ideas on other domains
-
-- [Poisson with holes](perforated-poisson.md): label an obstacle boundary and solve.
-- [Mixed boundaries on an ellipse](ellipse.md): assign Dirichlet, Neumann and Robin equations to arcs.
-- [Heat on a flower](flower-heat.md): nonzero transient boundary data on a curved domain.
-- [Poisson inside a 3D ball](ball.md): move geometry and operators into three dimensions.
-
-Each application supplies a domain/node image. The same API concepts carry over;
-you do not need a separate numerical method for each shape.
-
-## Use a lesson in your project or classroom
-
-Every main lesson introduces the mathematics, constructs the code in visible
-steps, explains the resulting objects, and suggests specific modifications.
-Full scripts are available at the end. The [teaching guide](teaching.md) gives
-short lesson sequences and exercises for students.
-
-Short fragments use an installed `rbflab` package. `python -m examples...` runs
-from a source checkout; examples are not an installed Python subpackage.
-Plotting requires `rbflab[examples]`. Python is the default; C++ and PyTorch are
-optional for supported local paths, with setup and limitations in
-[installation](../INSTALL.md) and [capabilities](../CAPABILITIES.md).
-
-Each lesson includes a short check where useful. Detailed error, conditioning,
-and refinement discussions remain in [mathematical foundations](../theory/index.md)
-and the [validation guide](../guides/curved-validation.md).
+The baseline uses the Python backend. C++ and PyTorch support depends on the
+construction; check [installation](../INSTALL.md) and
+[capabilities](../CAPABILITIES.md) before changing backends. Reported checks
+in these lessons are examples, not convergence guarantees.

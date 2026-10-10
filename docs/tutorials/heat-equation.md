@@ -29,7 +29,7 @@ Both routes below use the same numerical recipe: 49 nodes, PHS5, quadratic polyn
 20-node stencils, Float64, and default physical kernel scaling. Five steps reach
 $t=0.05$. The point grid supplies locations; all spatial weights are RBF-FD.
 
-![The square cloud, initial temperature, and computed BDF2 temperature](../assets/teaching_heat.png)
+![Initial and computed BDF2 temperature on the same square cloud and color scale](../assets/teaching_heat.png)
 
 ## 2. Construct the spatial operator explicitly
 
@@ -79,19 +79,15 @@ values, then fills the full vector in original cloud order. `states` has shape
 `(steps+1, 49)`, including the initial condition. No RBF coefficient solve occurs
 inside this loop: the spatial weights were assembled beforehand.
 
-## 5. Optional symbolic convenience route
+??? info "Optional: compare symbolic time stepping"
 
-```python
---8<-- "examples/tutorials/heat_equation.py:symbolic"
-```
+    ```python
+    --8<-- "examples/tutorials/heat_equation.py:symbolic"
+    ```
 
-`transient=True` adds the time symbol. `initial` gives the field at $t=0$;
-boundary equations supply values at subsequent times. `scheme="bdf2"` requests
-BDF2 with a backward-Euler startup. The returned trajectory stores computed
-states; `.final` supplies the final field reconstruction.
-
-The `RBFFD` adapter keeps equation-driven assembly available; the explicit
-spatial construction above uses `Samples` and `LocalApproximation`.
+    `transient=True` adds time, and `scheme="bdf2"` requests BDF2 with a
+    backward-Euler startup. The `RBFFD` adapter supplies an equation-driven
+    comparison to the explicit spatial matrices above.
 
 ## Modify the problem
 
@@ -116,12 +112,11 @@ solution is $e^{-2\kappa\pi^2t}\sin(\pi x)\sin(\pi y)$ if you want a separate ch
 
 Run `python -m examples.tutorials.heat_equation` from a source checkout.
 
-??? example "Complete runnable script"
-
-    ```python
-    --8<-- "examples/tutorials/heat_equation.py"
-    ```
-
 [Download the script](https://raw.githubusercontent.com/LDBreton/RBFLAB/main/examples/tutorials/heat_equation.py).
 
-**Next:** [Heat on a curved domain](flower-heat.md), or [coupled Stokes fields](annular-stokes.md).
+The computed peak falls from 1 to about 0.38459 at $t=0.05$; the exact
+peak is about 0.37271. The maximum nodal error is about 0.01188 for this
+short recipe.
+
+**Next:** Try [LHI heat matrices](lhi-matrices.md), or move to
+[gallery applications](../gallery/index.md) for curved domains and coupled fields.

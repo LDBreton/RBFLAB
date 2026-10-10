@@ -9,7 +9,7 @@ import rbflab as rbf
 def run():
     # --8<-- [start:data]
     rng = np.random.default_rng(7)
-    centers = rng.uniform(-1., 1., (64, 2))  # shape (N, dimension)
+    centers = rng.uniform(0., 1., (64, 2))  # shape (N, dimension)
     values = np.sin(centers[:, 0]) + np.cos(centers[:, 1])  # shape (N,)
     # --8<-- [end:data]
     # --8<-- [start:interpolants]
@@ -17,7 +17,7 @@ def run():
     phs = rbf.interpolate(rbf.PHS(5), centers, values, polynomial_degree=2)
     # --8<-- [end:interpolants]
     # --8<-- [start:evaluate]
-    query = np.array([[.1, .2], [-.3, .4], [.5, -.2]])  # shape (M, 2)
+    query = np.array([[.2, .3], [.45, .6], [.75, .4]])  # shape (M, 2)
     predicted = phs.evaluate(query)  # shape (M,)
     kernel_matrix = rbf.IMQ(2).matrix(centers, centers)  # shape (N, N)
     # --8<-- [end:evaluate]

@@ -1,0 +1,23 @@
+{
+  "source_sha256": {
+    "interpolation": "96b932fc55d62614b73ff5e1510ecfbc37027b6f90c760fbad309cf5eebeb695",
+    "custom_kernel": "292ee354d30f39c599197a2f65bc65699a02ba69f23f359b48f0f5ee19e178ed",
+    "one_stencil": "611d846d9319e0ae41249b099d427dc73138d1ed2316083d98d60f0de8a92d89",
+    "lhi_construction": "2d60111a351650c3307deea4e0aad8f90fc2b5049e64585bd8540619ab72f5a7",
+    "custom_assembly": "0bb683fa9d0147515f437bf096419278599d788bc5868ecabb545cd5ad02c93f",
+    "first_problem": "8900ba08acf1ad4ff1b15ce5f56ee3a6b76aa42881353b971c0a8635d2ef734f",
+    "heat_equation": "1400f30d503474d3a6f1af6fd855fe44a9cb87e541f9be66532d8774f715bfe0"
+  },
+  "square_nodes": 121,
+  "stencil_nodes": 20,
+  "lhi_groups": {
+    "u": 12,
+    "boundary": 8,
+    "pde": 11
+  },
+  "nodal_pde_error": 2.0962275715907808e-05,
+  "heat_peak": [
+    1.0,
+    0.3845899721627896
+  ]
+}

@@ -1,7 +1,8 @@
 # Solve a PDE with local Hermite interpolation
 
 **Goal:** construct Hermite trial functions, extract their named weight blocks,
-and assemble the PDE yourself. Read [one stencil](one-stencil.md) first.
+and assemble the PDE yourself. Read [local operators](local-approximation.md)
+first; [one stencil](one-stencil.md) is optional detail.
 
 ## 1. Separate unknown values and known data
 
@@ -31,10 +32,9 @@ giving a tautology instead of a useful equation for $U$.
 
 ![Solution, boundary and PDE samples on the square](../assets/teaching_centers.png)
 
-This illustration shows the original combined-neighbor selection: 12 solution,
-8 boundary and 11 PDE samples at the first target. Below the counts are explicit
-for every target, with independent nearest-neighbor selection in each group.
-Tied distances can give different memberships from the illustration.
+The left panel shows the whole 36-node cloud. The right panel shows the actual
+independent selection at one target: 12 solution, 8 boundary, and 11 PDE samples.
+The point sets overlap geometrically, but each group represents different data.
 
 ## 2. Translate the Hermite ansatz into code
 
@@ -92,19 +92,16 @@ Here `S` already indexes the interior unknown vector. No conversion from
 whole-cloud indices is needed. The complete script checks this row against
 `Su` and checks its right-hand side against `rhs`.
 
-## 4. Evaluate between solution nodes
+??? info "Optional: evaluate between solution nodes"
 
-At query points, request identity and derivative maps from the same trial recipe:
+    ```python
+    --8<-- "examples/tutorials/lhi_construction.py:evaluate"
+    ```
 
-```python
---8<-- "examples/tutorials/lhi_construction.py:evaluate"
-```
-
-The query construction relaxes `target="require"` for the solution samples:
-an off-node target cannot be a member of the solution cloud. Each query selects
-its own neighborhoods and applies its map to computed $U$ and prescribed $g,f$.
-This differs from reusing the nearest assembled patch. Changing memberships
-can still produce nonsmooth transitions; this is not a globally smooth interpolant.
+    An off-node query relaxes `target="require"` for solution samples and
+    selects its own neighborhood. Its map applies to computed $U$ and
+    prescribed $g,f$. Membership changes can make the reconstruction
+    nonsmooth; it is not a globally smooth interpolant.
 
 ## Modify the construction
 
@@ -122,13 +119,8 @@ can still produce nonsmooth transitions; this is not a globally smooth interpola
 
 Run `python -m examples.tutorials.lhi_construction` from a source checkout.
 
-??? example "Complete runnable script"
-
-    ```python
-    --8<-- "examples/tutorials/lhi_construction.py"
-    ```
-
 [Download the script](https://raw.githubusercontent.com/LDBreton/RBFLAB/main/examples/tutorials/lhi_construction.py).
 
-**Next:** [independent functional centers](lhi-centers.md), then
+**Next:** [Time-step heat with RBF-FD matrices](heat-equation.md). For more
+Hermite detail, study [independent functional centers](lhi-centers.md) and
 [LHI heat matrices](lhi-matrices.md).

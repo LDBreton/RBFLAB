@@ -144,7 +144,10 @@ API routes. Do not imply that inspection records are solver-editing hooks.
 Keep source/target ordering and coefficient-versus-value distinctions explicit.
 
 The new teaching illustrations are regenerated with
-`python -m examples.make_teaching_figures`. Each figure uses its lesson's recipe;
-caption any deliberately different geometry or illustrative schematic. Course
+`python -m examples.make_teaching_figures`. It executes the same named snippet
+sections embedded in the manual, so figures show the actual sample memberships,
+operators and solutions. The generated `docs/assets/tutorial_figures.json`
+records normalized source hashes; the render check rejects stale figures.
+Use square domains in the main route, and keep other applications in the gallery. Course
 sequences and modification exercises live in tutorials/teaching.md. Avoid exposing
 private planning notes or historical implementation discussions in the manual.
