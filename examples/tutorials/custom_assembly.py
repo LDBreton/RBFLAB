@@ -5,12 +5,13 @@ import scipy.sparse as sparse
 from scipy.sparse.linalg import spsolve
 import sympy as sp
 import rbflab as rbf
-from rbflab import geometry
+from rbflab import geometry, meshgen
 
 
 def run(backend="python"):
     # --8<-- [start:cloud]
-    cloud = geometry.unit_box_grid(10)  # 121 nodes on the unit square
+    domain = geometry.Ellipse(a=1.2, b=.8, labels=("wall",))
+    cloud = meshgen.generate(domain, interior=140, boundary=60, seed=42)
     X = cloud.points
     x, y = X.T
     I, B = cloud.interior_indices, cloud.boundary_indices
@@ -62,7 +63,7 @@ def run(backend="python"):
     truth = sp.sin(sx)*sp.cos(sy)
     lhs = -(1+.2*sx)*model.laplacian(u) + bx*sp.diff(u, sx) + by*sp.diff(u, sy) + reaction*u
     problem = model.stationary(sp.Eq(lhs, lhs.subs(u, truth).doit()),
-                               boundary=[model.bc("boundary", sp.Eq(u, truth))])
+                               boundary=[model.bc("wall", sp.Eq(u, truth))])
     # Optional equation-to-system convenience route, using the same numerical recipe.
     method = rbf.RBFFD(rbf.PHS(5), stencil_size=35, polynomial_degree=3,
                        stencil_policy=rbf.StencilPolicy(scaling="local"),

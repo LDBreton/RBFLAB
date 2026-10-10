@@ -3,12 +3,13 @@ import argparse
 import numpy as np
 import sympy as sp
 import rbflab as rbf
-from rbflab import geometry
+from rbflab import geometry, meshgen
 
 
 def run(robin=False):
     # --8<-- [start:geometry]
-    cloud = geometry.unit_box_grid(10)  # 121 nodes: 81 interior, 40 boundary
+    domain = geometry.Ellipse(a=1.3, b=.8, labels=("wall",))
+    cloud = meshgen.generate(domain, interior=200, boundary=80, seed=42)
     # --8<-- [end:geometry]
     # --8<-- [start:field]
     model = rbf.SymbolicScalar(2)
@@ -18,12 +19,12 @@ def run(robin=False):
     source = (2+alpha)*sp.sin(x)*sp.cos(y)
     # --8<-- [end:field]
     # --8<-- [start:boundary]
-    wall = model.bc("boundary", sp.Eq(u, sp.sin(x)*sp.cos(y)))
+    wall = model.bc("wall", sp.Eq(u, sp.sin(x)*sp.cos(y)))
     # --8<-- [end:boundary]
     if robin:
         # --8<-- [start:robin]
         known_field = sp.sin(x)*sp.cos(y)
-        wall = model.bc("boundary", sp.Eq(model.normal_derivative(u)+u,
+        wall = model.bc("wall", sp.Eq(model.normal_derivative(u)+u,
                          model.normal_derivative(known_field)+known_field))
         # --8<-- [end:robin]
     # --8<-- [start:problem]
@@ -37,7 +38,7 @@ def run(robin=False):
     solution = system.solve()
     # --8<-- [end:solve]
     # --8<-- [start:evaluate]
-    query = np.array([[.2, .3], [.45, .6], [.75, .4]])
+    query = np.array([[0., 0.], [.3, .2], [-.4, .1]])
     values = solution.evaluate(query)
     dx = solution.evaluate(query, rbf.Derivative(0))
     # --8<-- [end:evaluate]

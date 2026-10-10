@@ -81,11 +81,8 @@ weights. Changing source/target locations, kernel, or stencil policy does.
 
 ### A quick check
 
-For $x^2+y^2$, the Laplacian is 4. This local map's maximum error on that
-check is about $3.02\times10^{-13}$. On the separate smooth-field query,
-the maximum gradient errors are about $1.46\times10^{-4}$ for the global
-interpolant and $6.00\times10^{-4}$ for the local map. These compare
-approximations with different source sets, not universal accuracy.
+For $x^2+y^2$, the Laplacian is 4. Quadratic reproduction makes this a convenient
+check of the operator and array ordering.
 
 ## Complete example
 
@@ -101,5 +98,4 @@ with their imports and preceding steps.
 
 [Download the script](https://raw.githubusercontent.com/LDBreton/RBFLAB/main/examples/tutorials/differentiation.py).
 
-**Next:** [Build local operators](local-approximation.md), or inspect
-[one stencil](one-stencil.md).
+**Next:** [Build one stencil](one-stencil.md), then [assemble your own PDE](custom-assembly.md).

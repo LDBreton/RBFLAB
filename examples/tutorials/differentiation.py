@@ -6,9 +6,9 @@ import rbflab as rbf
 def run():
     # --8<-- [start:data]
     rng = np.random.default_rng(7)
-    centers = rng.uniform(0., 1., (64, 2))
+    centers = rng.uniform(-1., 1., (64, 2))
     values = np.sin(centers[:, 0]) + np.cos(centers[:, 1])
-    query = np.array([[.2, .3], [.45, .6], [.75, .4]])
+    query = np.array([[.1, .2], [-.3, .4], [.5, -.2]])
     interpolant = rbf.interpolate(rbf.PHS(5), centers, values, polynomial_degree=2)
     # --8<-- [end:data]
     # --8<-- [start:derivatives]

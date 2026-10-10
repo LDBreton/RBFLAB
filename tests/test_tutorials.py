@@ -51,7 +51,7 @@ def test_global_local_comparison_and_custom_kernel():
     assert custom_kernel.run() < 0.01
 
 
-def test_first_problem_on_square():
+def test_first_problem_on_ellipse():
     from examples.tutorials.first_problem import run
     assert run() < 2e-4
 

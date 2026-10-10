@@ -17,26 +17,34 @@ For example, switching $\partial_x$ to $\Delta$ changes the target functional
 and weights, while switching the sampled data keeps a reusable operator fixed.
 Changing from RBF-FD to LHI changes the local information, not just a solver name.
 
-## One route with optional extensions
+## Three suggested lesson sequences
 
-Use the [six-tutorial sequence](index.md) as the course spine:
-[interpolation](interpolation.md) →
-[local operators](local-approximation.md) →
-[stationary assembly](custom-assembly.md) →
-[global collocation](global-collocation.md) →
-[LHI](lhi.md) →
-[heat](heat-equation.md).
-The primary examples use the unit square. Ask students to identify the
-unknown vector before looking at its length: global collocation solves for
-expansion coefficients, while stationary RBF-FD and LHI solve for nodal values.
+### Interpolation and approximation
 
-Choose one extension only when the topic calls for it:
-[differentiation](differentiation.md) or
-[custom kernels](custom-kernel.md) after interpolation;
-[one stencil](one-stencil.md) after local operators;
-[independent LHI centers](lhi-centers.md) or
-[LHI heat matrices](lhi-matrices.md) after LHI.
-Use the [gallery](../gallery/index.md) for curved domains, 3D, and coupled fields.
+[Scattered data](interpolation.md) → [derivatives](differentiation.md) → [custom kernels](custom-kernel.md).
+
+Students supply `(N, 2)` points and `(N,)` values, fit a field, differentiate it,
+and modify a radial family. An exercise can keep the same data and change only
+the kernel, or keep the kernel and change only the target functional.
+
+### From a PDE to a discrete equation
+
+[Symbolic PDE](symbolic-pde.md) → [global collocation](global-collocation.md) →
+[one stencil](one-stencil.md) → [custom assembly](custom-assembly.md) → [LHI](lhi.md).
+
+Ask students to identify the meaning of an unknown vector before looking at its
+length. Have them construct a PDE row, then a boundary row. In LHI, ask why known
+forcing values contribute to the right-hand side even though they were used in
+the local approximation.
+
+### Evolution and coupled fields
+
+[Heat](heat-equation.md) → [Stokes spaces](annular-stokes.md) → [cavity algorithm](cavity.md).
+
+Students replace a time formula while retaining a spatial matrix, then distinguish
+incompressibility built into a trial space from incompressibility imposed through
+block equations. Use the small cavity startup configuration for code discussion;
+a long animation is not required to understand the update.
 
 ## Modification exercises
 
@@ -50,6 +58,7 @@ Use the [gallery](../gallery/index.md) for curved domains, 3D, and coupled field
 | RBF-FD | Choose one neighborhood explicitly | Weight construction and scattering |
 | LHI | Change the PDE-center count | Data functionals versus physical locations |
 | Heat | Supply nonzero time-dependent boundary data | Boundary contribution to the update |
+| Stokes | Change the inner wall angular speed | Vector boundary data and spaces |
 
 Keep one simple check, such as polynomial reproduction or comparison at a few
 known points, to reveal indexing/sign mistakes. Detailed convergence experiments

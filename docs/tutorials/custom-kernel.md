@@ -148,5 +148,4 @@ with their imports and preceding steps.
 
 [Download the script](https://raw.githubusercontent.com/LDBreton/RBFLAB/main/examples/tutorials/custom_kernel.py).
 
-**Next:** Return to [local operators](local-approximation.md), or
-[assemble your own matrix](custom-assembly.md).
+**Next:** [Write a symbolic PDE](symbolic-pde.md) or [assemble your own matrix](custom-assembly.md).

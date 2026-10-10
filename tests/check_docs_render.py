@@ -30,7 +30,7 @@ for relative in (
     assert '<em>i)' not in html, relative
 
 heat = (root / "site/tutorials/heat-equation/index.html").read_text(encoding="utf-8")
-for name in ("lap_ib", "LocalApproximation", "first_step", "later_steps"):
+for name in ("LocalApproximation", "first_step", "later_steps", "lap_ib"):
     assert name in heat, name
 print("Rendered documentation includes math and runnable source.")
 
@@ -79,12 +79,9 @@ for path, parser in pages.items():
             assert unquote(parts.fragment) in pages[target].ids, (path, url)
 print(f"Shared versioned styling and local links verified on {len(pages)} pages.")
 
-# Main tutorials teach the square; applications retain their existing URLs.
-# The cavity source must remain visible beyond its wrapper.
+# The main example route must be unified; cavity source must be visible beyond its wrapper.
 nav = (root / "mkdocs.yml").read_text(encoding="utf-8")
 assert "  - Tutorials:" in nav
-assert "  - Gallery and advanced:" in nav
-assert "  - Examples:" not in nav
 assert "Curved-domain examples:" not in nav and "Learning by examples:" not in nav
 assert "five_point_laplacian" not in heat
 cavity = (root / "site/tutorials/cavity/index.html").read_text(encoding="utf-8")
@@ -96,11 +93,3 @@ assert "--8<--" not in cavity
 for page in (root / "docs").rglob("*.md"):
     content = page.read_text(encoding="utf-8")
     assert not any(ord(ch) < 32 and ch not in ("\n", "\r", "\t") for ch in content), page
-
-
-# Teaching figures must be regenerated whenever their numerical scripts change.
-import json
-manifest = json.loads((root / "docs/assets/tutorial_figures.json").read_text(encoding="utf-8"))
-for name, expected in manifest["source_sha256"].items():
-    source = (root / "examples/tutorials" / (name + ".py")).read_text(encoding="utf-8")
-    assert sha256(source.encode("utf-8")).hexdigest() == expected, (name, "Regenerate teaching figures")

@@ -64,11 +64,11 @@ field at `query[k]`; the query locations need not be sample centers.
 `kernel_matrix` exposes the unaugmented IMQ block $\Phi$, not the PHS augmented
 matrix. Building it separately is optional when using `interpolate`.
 
-![PHS reconstruction and its x derivative on the unit square, with the 64 samples overlaid](../assets/teaching_interpolation.png)
+![Scattered samples, the PHS reconstruction, and its x derivative](../assets/teaching_interpolation.png)
 
-The two panels use the same 64 samples and PHS recipe. The display grid covers
-$[0,1]^2$; it adds no interpolation constraints. The derivative panel is
-constructed in the optional [differentiation lesson](differentiation.md).
+The picture uses the same 64 samples and PHS recipe. The display grid covers
+$[-0.7,0.7]^2$; it adds no interpolation constraints. The derivative panel is
+constructed in the [next lesson](differentiation.md).
 
 ## 4. Use polynomials deliberately
 
@@ -96,10 +96,9 @@ beyond the sampled region needs care; the API does not supply an uncertainty bou
 
 ### A quick check
 
-On this seeded example, the maximum error at the three query points is
-$3.74\times10^{-5}$ for IMQ and $7.82\times10^{-6}$ for PHS. The separate
-quadratic reproduction check is $1.78\times10^{-15}$. These are checks for
-this recipe, not a ranking of kernels or a general accuracy guarantee.
+Evaluate at `centers` and compare with `values`. For the quadratic example,
+compare `reproduced` with `1 + query[:, 0] + query[:, 1]**2`. These checks help
+catch data-order mistakes; they are not a substitute for knowing your data.
 
 ## Complete example
 
@@ -107,8 +106,12 @@ Run `python -m examples.tutorials.interpolation` from a [source checkout](../INS
 The short API fragments above also work with an installed package when combined
 with their imports and preceding steps.
 
+??? example "Complete runnable script"
+
+    ```python
+    --8<-- "examples/tutorials/interpolation.py"
+    ```
+
 [Download the script](https://raw.githubusercontent.com/LDBreton/RBFLAB/main/examples/tutorials/interpolation.py).
 
-**Next:** [Build local operators](local-approximation.md). For more on this
-interpolant, [differentiate it](differentiation.md) or
-[define a custom kernel](custom-kernel.md).
+**Next:** [Differentiate a field](differentiation.md) or [define a kernel](custom-kernel.md).

@@ -1,8 +1,7 @@
 # Solve a PDE with global collocation
 
 **Goal:** follow a global trial expansion through PDE rows, boundary rows,
-coefficients, and evaluation. After the [local stationary equation](custom-assembly.md),
-this lesson shows what changes when one expansion spans the whole domain.
+coefficients, and evaluation. Read [interpolation](interpolation.md) first.
 
 ## 1. State the equation and choose centers
 
@@ -89,19 +88,14 @@ record that ordering. Do not assume array layouts from a different scheme.
   the resulting system also includes polynomial coefficients and side conditions.
 - Use `solution.evaluate(query, rbf.Derivative(0))` for a derivative of the solution.
 
-Global collocation uses dense storage. The local
-[RBF-FD stencil](one-stencil.md) instead contributes a row of a sparse operator;
-[LHI](lhi.md) adds PDE and boundary functionals to each local patch.
+Global collocation uses dense storage. For local constructions, continue with
+[RBF-FD](one-stencil.md) or [LHI](lhi.md). These are not just different dense solvers.
 
 ### A quick check
 
 The script verifies that the explicitly constructed asymmetric matrix and
 expansion agree with their assembled counterparts, then evaluates both methods.
-Both manual comparisons are zero to the script's reported precision.
-At its two off-node queries, the maximum errors are about
-$1.10\times10^{-2}$ for asymmetric and $1.38\times10^{-2}$ for symmetric
-collocation. The 36-node exercise teaches matrix meaning, not a ranking
-of the methods or a convergence claim.
+This teaches matrix meaning rather than ranking the two recipes.
 
 ## Complete example
 
@@ -109,6 +103,10 @@ Run `python -m examples.tutorials.global_collocation` from a [source checkout](.
 The short API fragments above also work with an installed package when combined
 with their imports and preceding steps.
 
-[Download the script](https://raw.githubusercontent.com/LDBreton/RBFLAB/main/examples/tutorials/global_collocation.py).
+??? example "Complete runnable script"
 
-**Next:** [Construct local Hermite interpolation](lhi.md).
+    ```python
+    --8<-- "examples/tutorials/global_collocation.py"
+    ```
+
+[Download the script](https://raw.githubusercontent.com/LDBreton/RBFLAB/main/examples/tutorials/global_collocation.py).

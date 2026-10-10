@@ -114,7 +114,7 @@ example; no image should imply a benchmark that has not been checked.
 
 ## Curated learning route
 
-Keep a single Examples chapter. Select one leading geometry/problem for each
+Keep a single Tutorials chapter. Select one leading geometry/problem for each
 concept, with foundational operator lessons before coupled flow. Supplementary
 regression pages can remain linked without expanding the main navigation.
 Heat teaches RBF matrices; its source no longer includes classical five-point FD.
@@ -125,7 +125,7 @@ solver. Run the first-problem, heat and cavity tests after changing these sectio
 
 ## Mathematics-to-code teaching route
 
-The Examples chapter serves RBF researchers adapting methods and instructors
+The Tutorials chapter serves RBF researchers adapting methods and instructors
 teaching students. Its paths cover data approximation, PDE construction, and
 custom algorithms. Keep the main route focused on writing mathematics with the
 API; diagnostics and convergence studies remain supporting guides.
@@ -144,10 +144,12 @@ API routes. Do not imply that inspection records are solver-editing hooks.
 Keep source/target ordering and coefficient-versus-value distinctions explicit.
 
 The new teaching illustrations are regenerated with
-`python -m examples.make_teaching_figures`. It executes the same named snippet
-sections embedded in the manual, so figures show the actual sample memberships,
-operators and solutions. The generated `docs/assets/tutorial_figures.json`
-records normalized source hashes; the render check rejects stale figures.
-Use square domains in the main route, and keep other applications in the gallery. Course
+`python -m examples.make_teaching_figures`. Each figure uses its lesson's recipe;
+caption any deliberately different geometry or illustrative schematic. Course
 sequences and modification exercises live in tutorials/teaching.md. Avoid exposing
 private planning notes or historical implementation discussions in the manual.
+
+Preserve the curved-domain examples and their scientific visualizations when
+clarifying the tutorial text. Do not standardize the learning route on square
+domains. Explain each chosen geometry, boundary label and numerical object in
+place; captions must distinguish schematic illustrations from computed results.

@@ -84,33 +84,29 @@ nav:
           - Gmsh triangles: geometry/gmsh.md
           - Staggered clouds explained: geometry/staggered.md
   - Tutorials:
-      - Learning route: tutorials/index.md
-      - 1. Interpolate scattered data: tutorials/interpolation.md
-      - 2. From samples to operators: tutorials/local-approximation.md
-      - 3. Assemble a stationary PDE: tutorials/custom-assembly.md
-      - 4. Global collocation: tutorials/global-collocation.md
-      - 5. Local Hermite interpolation: tutorials/lhi.md
-      - 6. Time-step the heat equation: tutorials/heat-equation.md
-      - Extensions:
+      - Choose a learning path: tutorials/index.md
+      - Interpolation and kernels:
+          - Interpolate scattered data: tutorials/interpolation.md
           - Differentiate a field: tutorials/differentiation.md
-          - One RBF-FD stencil: tutorials/one-stencil.md
           - Define a custom kernel: tutorials/custom-kernel.md
-          - Independent LHI centers: tutorials/lhi-centers.md
+      - Construct PDE methods:
+          - From functionals to operators: tutorials/local-approximation.md
+          - One RBF-FD stencil: tutorials/one-stencil.md
+          - Global collocation: tutorials/global-collocation.md
+          - Assemble your own PDE: tutorials/custom-assembly.md
+          - Local Hermite interpolation: tutorials/lhi.md
+          - Choose LHI functional centers: tutorials/lhi-centers.md
           - LHI and heat from matrices: tutorials/lhi-matrices.md
+          - Heat time stepping: tutorials/heat-equation.md
           - Symbolic PDE convenience: tutorials/symbolic-pde.md
-          - Teach and adapt: tutorials/teaching.md
-  - Gallery and advanced:
-      - Choose an application: gallery/index.md
-      - Poisson with holes: tutorials/perforated-poisson.md
-      - Mixed boundaries on an ellipse: tutorials/ellipse.md
-      - Heat on a flower: tutorials/flower-heat.md
-      - Poisson inside a 3D ball: tutorials/ball.md
-      - Coupled Stokes fields: tutorials/annular-stokes.md
-      - Cavity flow algorithm: tutorials/cavity.md
-      - Compare global and local methods: tutorials/global-lhi.md
-      - Stokes velocity: tutorials/stokes.md
-      - Mixed-boundary application: tutorials/mixed-boundary.md
-      - Scalar 3D application: tutorials/scalar-3d.md
+          - Coupled Stokes fields: tutorials/annular-stokes.md
+          - Build a cavity algorithm: tutorials/cavity.md
+      - Other domains and boundaries:
+          - Poisson with holes: tutorials/perforated-poisson.md
+          - Mixed boundaries on an ellipse: tutorials/ellipse.md
+          - Heat on a flower: tutorials/flower-heat.md
+          - Poisson inside a 3D ball: tutorials/ball.md
+      - Teach and adapt the examples: tutorials/teaching.md
   - Mathematical foundations:
       - Reading route: theory/index.md
       - Notation and model problem: theory/notation.md
