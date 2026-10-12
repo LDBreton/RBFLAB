@@ -24,6 +24,7 @@ class GlobalCollocation(MethodContract):
         scheme: `"symmetric"` Hermite or `"asymmetric"` nodal collocation.
         polynomial_degree: Optional polynomial augmentation degree.
         spaces: Optional field-to-space mapping for coupled Stokes problems.
+        backend: Optional CppGlobalBackend for native stationary scalar solves.
 
     Use `assemble(problem, cloud)` to obtain a system with a matrix and RHS;
     then call `system.solve()`."""
@@ -32,14 +33,18 @@ class GlobalCollocation(MethodContract):
     scheme: str = "symmetric"
     polynomial_degree: int | None = None
     spaces: dict | None = None
+    backend: object = None
 
     @prepared
     def prepare(self,problem,*,dimension=2,cache_dir=None):
         """Prepare and cache required derivatives of a symbolic kernel.
 
-        Returns a method using the prepared kernel. Native compilation
-        needs an optional source build and is not part of core pip install.
+        Returns a method with compiled kernel support. With CppGlobalBackend,
+        this warms the native worker executable and retains the bound kernel.
         """
+        if self.backend is not None:
+            from .global_backend import prepare_cpp_global
+            return prepare_cpp_global(self,problem,dimension,cache_dir)
         from .kernel_compiler import prepare_method
         return prepare_method(self,problem,dimension,cache_dir)
 
@@ -52,6 +57,9 @@ class GlobalCollocation(MethodContract):
         basis. Both solve for expansion coefficients, not nodal values.
         Coupled spaces and evolution problems dispatch to their systems.
         """
+        if self.backend is not None:
+            from .global_backend import assemble_cpp_global
+            return assemble_cpp_global(self, problem, cloud)
         if self.spaces is not None:
             from .space_stokes import assemble_spaces
             return assemble_spaces(self,problem,cloud)

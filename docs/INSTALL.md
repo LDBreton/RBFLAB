@@ -223,7 +223,24 @@ See [precision](theory/conditioning.md) and [capabilities](CAPABILITIES.md).
 
 The optional symbolic equation adapter instead accepts
 `RBFFD(..., local_backend=rbf.CppBackend(...))`. It builds and solves the PDE
-system for you. C++ does not accelerate the global dense collocation assembler.
+system for you.
+
+For scalar stationary dense collocation, select the separate global backend:
+
+```python
+method = rbf.GlobalCollocation(
+    rbf.PHS(5), scheme="symmetric", polynomial_degree=2,
+    backend=rbf.CppGlobalBackend(threads=4, compute_condition=False),
+    precision=rbf.Precision(global_digits=80),
+)
+```
+
+`Precision()` selects double; `global_digits` selects MPFR for native assembly,
+factorization and evaluation. Both symmetric and asymmetric scalar collocation
+support 2D/3D and polynomial augmentation. The existing compiler dependencies
+above are sufficient; no separate global executable build command is needed.
+See [global collocation](tutorials/global-collocation.md#native-double-and-multiprecision)
+for the solution and precision contracts.
 
 ## Installed wheel with a separate native checkout
 

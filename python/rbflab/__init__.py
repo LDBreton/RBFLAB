@@ -23,6 +23,7 @@ from .methods import GlobalCollocation, LHI, interpolate
 from .rbf_fd import RBFFD
 from .discrete_operators import DiscreteOperator, OperatorSet
 from .lhi_backends import PythonBackend, CppBackend
+from .global_backend import CppGlobalBackend
 from .torch_backend import TorchBackend
 
 __all__ = [
@@ -33,5 +34,5 @@ __all__ = [
     'SymbolicScalar', 'SymbolicSystem', 'SymbolicStokes',
     'ScalarSpace', 'DivergenceFreeSpace', 'PressureSpace', 'StencilPolicy', 'Samples', 'LocalApproximation', 'CenterGroup',
     'GlobalCollocation', 'LHI', 'RBFFD', 'interpolate', 'DiscreteOperator', 'OperatorSet',
-    'PythonBackend', 'CppBackend', 'TorchBackend',
+    'PythonBackend', 'CppBackend', 'CppGlobalBackend', 'TorchBackend',
 ]

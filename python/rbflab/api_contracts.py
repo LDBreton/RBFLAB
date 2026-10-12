@@ -41,6 +41,14 @@ class MethodContract:
         if operation=='prepare' and block:
             raise NotImplementedError('Block symbolic kernel preparation is not implemented; bind/compile each scalar kernel explicitly')
         if name=='GlobalCollocation':
+            global_backend=getattr(self,'backend',None)
+            if global_backend is not None:
+                from .global_backend import CppGlobalBackend
+                if not isinstance(global_backend,CppGlobalBackend):raise TypeError('GlobalCollocation backend must be CppGlobalBackend')
+                if flow or block or evolution or getattr(problem,'_evolution_slice',False):
+                    raise NotImplementedError('CppGlobalBackend supports stationary scalar LinearPDE only')
+                from .problems import LinearPDE
+                if problem is not None and not isinstance(problem,LinearPDE):raise NotImplementedError('CppGlobalBackend supports scalar LinearPDE only')
             if self.scheme not in ('symmetric','asymmetric'):raise ValueError('Unknown global scheme')
             if precision.local_digits is not None or precision.global_dtype!='float64':raise ValueError('GlobalCollocation uses global_digits')
             if (flow or block) and self.scheme!='symmetric':raise NotImplementedError('Space/block global assembly currently requires symmetric collocation')
@@ -111,7 +119,7 @@ def recipe(method,problem=None):
         polynomial_degree=method.polynomial_degree,independent_centers=getattr(method,'centers',None) is not None,
         stencil_policy=asdict(method.stencil_policy) if hasattr(method,'stencil_policy') else None,
         local_solver=asdict(method.local_solver) if hasattr(method,'local_solver') else None,
-        backend=repr(getattr(method,'local_backend',None)) if getattr(method,'local_backend',None) is not None else 'Python (default)',precision=asdict(p),
+        backend=repr(getattr(method,'backend',None) or getattr(method,'local_backend',None)) if (getattr(method,'backend',None) or getattr(method,'local_backend',None)) is not None else 'Python (default)',precision=asdict(p),
         arithmetic=dict(coordinates='float64',local_digits=p.local_digits,global_digits=p.global_digits,
                         sparse_storage=p.global_dtype,global_solve_digits=p.global_digits if type(method).__name__=='GlobalCollocation' else p.local_digits if p.global_dtype=='mpmath' else None,default_output='float64'),
         reconstruction='nearest-stencil' if type(method).__name__ in ('LHI','RBFFD') else 'global expansion')
@@ -147,6 +155,10 @@ def fingerprint(matrix):
 
 def expose_system(system,method,cloud,problem):
     system.recipe=recipe(method,problem)
+    if getattr(system,'_native_global',False):
+        system.dof_map=dict(kind='kernel coefficients followed by polynomial coefficients',size=system.size,points=system.centers.copy(),operators=system.source_operators,polynomial_powers=system.powers)
+        system.reconstruction=dict(kind='global expansion',pressure='method-dependent')
+        return system
     owner=getattr(system,'base',system)
     stencils=getattr(owner,'stencils',None)
     if hasattr(owner,'backend_diagnostics'):system.recipe['backend_diagnostics']=copy.deepcopy(owner.backend_diagnostics)

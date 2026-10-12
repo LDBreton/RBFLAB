@@ -5,7 +5,7 @@ backend choice does not automatically change a separate global sparse solve.
 
 | Capability | Python | C++ double | C++ MPFR | PyTorch |
 |---|---|---|---|---|
-| Scalar global collocation | Yes | — | — | — |
+| Scalar stationary global collocation, 2D/3D | Yes | Yes, `CppGlobalBackend` from source checkout | Yes, `Precision(global_digits=...)` | — |
 | Scalar LHI convenience assembly (`LHI`) | Yes | — | — | — |
 | Scalar RBF-FD operators, 2D/3D | Yes | Yes, from source checkout | Supported; installed archive test pending | Yes, CPU Float64 |
 | Divergence-free steady Stokes, global | Yes | — | — | — |
@@ -19,6 +19,15 @@ C++ double, and PyTorch Float64 on Windows/WSL. The
 and C++ MPFR local weights.
 The six default Python examples ran from an installed wheel and source archive
 outside the checkout.
+
+`CppGlobalBackend` supports symmetric Hermite and asymmetric scalar collocation,
+with optional polynomial augmentation. Kernel/polynomial assembly, dense LU,
+residual calculation and expansion evaluation execute in C++. A persistent
+worker retains the factors for repeated right-hand sides. Scalar input geometry
+remains Float64; MPFR preserves extended arithmetic after input conversion.
+Coupled blocks, Stokes and evolution do not yet accept this global backend.
+See the [native scalar example](https://github.com/LDBreton/RBFLAB/blob/main/examples/global_cpp.py)
+and [global tutorial](tutorials/global-collocation.md#native-double-and-multiprecision).
 
 RBFMeshGen generation is integrated into `rbflab.geometry` and `rbflab.meshgen`; Gmsh remains optional. The built-in
 `unit_box_grid` supplies a small 2D/3D deterministic cloud for tutorials.

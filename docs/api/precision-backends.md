@@ -15,6 +15,14 @@ shape parameters, see [local stencil scaling](../theory/conditioning.md#local-st
 
 ::: rbflab.CppBackend
 
+::: rbflab.CppGlobalBackend
+
+`CppGlobalBackend` selects native dense assembly, factorization and evaluation
+for scalar stationary `GlobalCollocation`. Use `Precision()` for double or
+`Precision(global_digits=80)` for MPFR. This setting is independent of the
+local-weight backend used by RBF-FD and LHI. See the
+[global collocation tutorial](../tutorials/global-collocation.md#native-double-and-multiprecision).
+
 ::: rbflab.TorchBackend
 
 ::: rbflab.LocalSolver

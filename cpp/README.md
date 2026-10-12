@@ -1,9 +1,49 @@
-# C++ local numerical backend
+# C++ numerical backends
 
 For the step-by-step Ubuntu or Windows/WSL setup, start with the
 [installation guide](https://ldbreton.github.io/RBFLAB/INSTALL/). This reference
 describes solver internals after that setup. Generated scalar kernels compile
 on demand; built-in vector LHI also has the dedicated executables below.
+
+## Scalar global collocation
+
+`GlobalCollocation(..., backend=CppGlobalBackend(...))` compiles
+`global_collocation.hpp` together with the requested radial derivatives.
+`Precision()` selects double; `Precision(global_digits=80)` selects MPFR.
+Both symmetric Hermite and asymmetric scalar stationary collocation support
+2D/3D and polynomial augmentation. The Python frontend resolves PDE/boundary
+functionals and samples user data; the worker assembles kernel and polynomial
+blocks and performs equilibration, pivoted LU, solves and evaluation.
+
+Unlike the batch local runtime, a global worker persists for the lifetime of
+its system. Dense matrices and factors remain in contiguous Eigen storage.
+Repeated RHS solves reuse the factorization; native matrix edits invalidate it.
+The worker communicates over standard input/output, including bulk export for
+explicit matrix inspection. Each worker uses one arithmetic precision. On
+Windows it runs through Ubuntu WSL using the existing compiler/dependency setup.
+
+Use `with method.assemble(problem, cloud) as system:` or `system.close()` for
+deterministic cleanup. Solutions require the live worker for evaluation.
+`evaluate()` exports Float64; `evaluate_mp()` retains the selected precision.
+MPFR geometry starts from the supplied Float64 coordinates; higher arithmetic
+precision cannot restore input digits.
+
+`compute_condition=True` estimates the equilibrated matrix's 1-norm condition
+using LU solves. It does not form a dense inverse. The estimate's norm differs
+from the existing Python Float64 2-norm diagnostic. Assembly/evaluation can use
+OpenMP; LU retains the current serial Eigen policy. Dense storage and
+factorization still cost O(N²) and O(N³), respectively.
+
+```sh
+python -m examples.global_cpp --scheme asymmetric --digits 60
+RBFLAB_CPP_TESTS=1 python -m pytest tests/test_global_cpp.py tests/test_global_cpp_contracts.py -q
+```
+
+In PowerShell, set `$env:RBFLAB_CPP_TESTS='1'` before the pytest command.
+Coupled blocks, Stokes and evolution remain separate Python global paths and
+reject `CppGlobalBackend`.
+
+## Local factorization
 
 The production LHI local factorization is Eigen `PartialPivLU`. Float64 uses
 `Eigen::Matrix<double,...>`; arbitrary precision uses the existing MPFR `Real`

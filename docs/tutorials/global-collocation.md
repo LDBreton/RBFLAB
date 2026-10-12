@@ -97,6 +97,79 @@ The script verifies that the explicitly constructed asymmetric matrix and
 expansion agree with their assembled counterparts, then evaluates both methods.
 This teaches matrix meaning rather than ranking the two recipes.
 
+## Native double and multiprecision
+
+After the [optional C++ setup](../INSTALL.md#4-enable-c-on-ubuntu-linux), select
+`CppGlobalBackend` on the same scalar stationary method:
+
+```python
+native = rbf.GlobalCollocation(
+    rbf.PHS(5),
+    scheme="symmetric",              # or "asymmetric"
+    polynomial_degree=2,
+    backend=rbf.CppGlobalBackend(threads=4, compute_condition=False),
+    precision=rbf.Precision(global_digits=80),
+)
+system = native.assemble(problem, cloud)
+solution = system.solve()
+values = solution.evaluate(cloud.points)        # NumPy Float64 output
+values_mp = solution.evaluate_mp(cloud.points)  # extended-precision output
+```
+
+Use `Precision()` instead for native double. Extended precision data callbacks
+must supply the `PrecisionData` interface; symbolic `model.data(...)` and the
+symbolic equation frontend provide it. Increasing arithmetic precision cannot
+recover digits already lost in a Float64 callback or input geometry.
+
+The native worker assembles kernel and polynomial blocks, equilibrates and
+factors the dense system, and evaluates the expansion. It keeps its factorization
+for subsequent solves. Both schemes and optional polynomial augmentation work
+in 2D and 3D. A first call can include kernel compilation; cached calls reuse the
+compiled executable.
+
+Use a context manager when solving many independent systems, so that the worker
+is released deterministically after evaluation:
+
+```python
+with native.assemble(problem, cloud) as system:
+    solution = system.solve()
+    values_mp = solution.evaluate_mp(cloud.points)
+```
+
+Solutions need their system's worker for later evaluation, so evaluate before
+leaving the context or calling `system.close()`.
+
+`system.matrix` is a native matrix proxy. Inspect or edit an entry with
+`system.matrix[i, j]`; an edit invalidates the LU factorization. Use
+`system.matrix.to_numpy()` for an explicit Float64 copy or
+`system.matrix.to_mpmath()` for an extended-precision copy in MPFR mode. Editing
+an exported copy does not change the native system until it is assigned back
+to `system.matrix`. Updating `system.rhs` reuses the unchanged matrix factors.
+
+The default `derivative_order=2` on `CppGlobalBackend` prepares value, gradient
+and second-derivative evaluation in addition to assembly's required derivatives.
+Set a higher order before assembly when the kernel supports the derivatives you
+need. `compute_condition=True` requests a 1-norm condition estimate for the
+equilibrated matrix; it is not the Python Float64 solver's 2-norm condition.
+
+Run a small polynomial reproduction check with:
+
+```sh
+python -m examples.global_cpp
+python -m examples.global_cpp --scheme asymmetric --digits 60 --dimension 3
+```
+
+This example checks the algebra using an exactly representable quadratic field;
+it is not a general PDE convergence or performance benchmark.
+
+The backend currently covers scalar stationary problems. Coupled scalar systems,
+divergence-free Stokes and time-dependent problems use their existing Python
+paths and cannot select `CppGlobalBackend`.
+
+Dense storage remains quadratic in the number of coefficients, and dense LU
+factorization remains cubic. MPFR improves arithmetic precision; it does not
+remove an ill-posed PDE or guarantee a well-conditioned trial space.
+
 ## Complete example
 
 Run `python -m examples.tutorials.global_collocation` from a [source checkout](../INSTALL.md).
