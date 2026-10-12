@@ -24,13 +24,27 @@ class Printer(C99CodePrinter):
     def _print_Float(self,e):return 'Real("'+str(e)+'")'
 
 
+class DoublePrinter(Printer):
+    """Emit compile-time binary64 constants instead of parsing decimals per pair."""
+    def _print_Integer(self,e):return 'Real('+str(float(e))+')'
+    def _print_Rational(self,e):return 'Real('+repr(float(e))+')'
+    def _print_Float(self,e):return 'Real('+repr(float(e))+')'
+    def _print_Pow(self,e):
+        if e.exp in (2,3,4):
+            base='('+self._print(e.base)+')'
+            return '('+'*'.join([base]*int(e.exp))+')'
+        if e.exp.is_Integer:
+            return 'pow('+self._print(e.base)+','+str(e.exp)+')'
+        return super()._print_Pow(e)
+
+
 def indices(dimension,order):
     return [a for a in itertools.product(range(order+1),repeat=dimension) if sum(a)<=order]
 
 
 @lru_cache(maxsize=64)
-def header(family,dimension,order,namespace):
-    alpha=indices(dimension,order);printer=Printer();lines=['namespace '+namespace+' {']
+def header(family,dimension,order,namespace,arithmetic=None):
+    alpha=indices(dimension,order);printer=DoublePrinter() if arithmetic=='float64' else Printer();lines=['namespace '+namespace+' {']
     mapping={x:sp.Symbol('z'+str(i)) for i,x in enumerate(_COORDINATES[:dimension])}
     mapping.update({p:sp.Symbol('p'+str(i)) for i,p in enumerate(family.parameters)})
     args=', '.join('const Real& z'+str(i) for i in range(dimension))+', const std::vector<Real>& params'

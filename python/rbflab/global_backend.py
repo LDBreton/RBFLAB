@@ -3,11 +3,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from fractions import Fraction
 import hashlib
+import json
 import math
 import os
 import subprocess
 import threading
 import weakref
+import atexit
 import numpy as np
 
 from .precision import mp_number, mp_values
@@ -29,6 +31,7 @@ class CppGlobalBackend:
         timeout: Maximum seconds for each worker command.
         derivative_order: Maximum evaluation derivative order to prepare, in
             addition to source functional derivatives. Total order is at most 6.
+        reuse_workers: Keep up to four idle workers for subsequent assemblies.
     """
     threads: int = 1
     compute_condition: bool = True
@@ -36,33 +39,89 @@ class CppGlobalBackend:
     distribution: str = 'Ubuntu'
     timeout: float = 120.0
     derivative_order: int = 2
+    reuse_workers: bool = True
 
     def __post_init__(self):
         if type(self.threads) is not int or self.threads < 1: raise ValueError('threads must be positive')
         if type(self.compute_condition) is not bool: raise TypeError('compute_condition must be bool')
+        if type(self.reuse_workers) is not bool: raise TypeError('reuse_workers must be bool')
         if self.distribution != 'Ubuntu': raise NotImplementedError('Native compilation currently uses Ubuntu WSL')
         if not isinstance(self.timeout,(float,int)) or not math.isfinite(self.timeout) or self.timeout <= 0: raise ValueError('timeout must be positive')
         if type(self.derivative_order) is not int or not 0 <= self.derivative_order <= 6:
             raise ValueError('derivative_order must be between 0 and 6')
 
 
+# Only fully validated disk artifacts enter this process-local memo. Stat checks
+# retain invalidation while avoiding repeated dependency and executable hashing.
+_compiled_memo = {}
+_compiled_memo_lock = threading.RLock()
+
+
+def _file_signature(path):
+    try:
+        stat = path.stat()
+        return (stat.st_mtime_ns, stat.st_ctime_ns, stat.st_size,
+                stat.st_ino, stat.st_mode)
+    except OSError:
+        return None
+
+
+def _memo_valid(entry):
+    return all(signature is not None and _file_signature(path) == signature
+               for path, signature in entry[1])
+
+
+def _remember_compiled(key, directory, index, root):
+    from . import kernel_compiler
+    dependencies = [Path(__file__), Path(kernel_compiler.__file__),
+                    Path(kernel_compiler.__file__).with_name('symbolic_kernel.py')]
+    dependencies.extend(root/'cpp'/name for name in
+                        ('global_collocation.hpp', 'real.hpp', 'real_double.hpp',
+                         'lhi_mpfr.cpp', 'eigen_solver.hpp'))
+    # Directory stats detect new/removed Eigen headers without walking the tree
+    # on warm calls; file stats detect edits to every hashed dependency.
+    eigen = root/'cpp/deps/usr/include/eigen3/Eigen'
+    dependencies.extend([eigen, *eigen.rglob('*')])
+    manifest = directory/'manifest.json'
+    files = json.loads(manifest.read_text())['files']
+    dependencies.extend([index, manifest, directory/'kernel'])
+    dependencies.extend(directory/name for name in files)
+    signatures = tuple((path, _file_signature(path)) for path in dependencies)
+    if all(signature is not None for _, signature in signatures):
+        with _compiled_memo_lock:
+            if key not in _compiled_memo and len(_compiled_memo) >= 32:
+                _compiled_memo.pop(next(iter(_compiled_memo)))
+            _compiled_memo[key] = (directory/'kernel', signatures)
+
+
 def _compiled(kernel, dimension, order, arithmetic, backend):
     from .kernel_compiler import as_bound, request_cache, record_request, header, build, ROOT, PRELUDE
     bound=as_bound(kernel)
+    family=bound.family
+    base=(Path(backend.cache_dir) if backend.cache_dir else Path.home()/'.cache'/'rbflab').resolve()
+    key=(family.expression, family.radial_variable, family.parameters,
+         family.dimension, dimension, order, arithmetic, base)
+    with _compiled_memo_lock:
+        entry=_compiled_memo.get(key)
+        if entry is not None and _memo_valid(entry):return entry[0],bound
+        _compiled_memo.pop(key,None)
     runtime=(ROOT/'cpp/global_collocation.hpp').read_text()
     bridge=Path(__file__).read_bytes()
     index,cached=request_cache('global_collocation',(bound.family,),arithmetic,backend.cache_dir,
         dimension=dimension,order=order,runtime=hashlib.sha256(runtime.encode()).hexdigest(),
         bridge=hashlib.sha256(bridge).hexdigest())
-    if cached:return cached/'kernel',bound
-    code,alphas=header(bound.family,dimension,order,'radial')
-    dispatch='\nReal radial_value(const std::vector<Real>&z,const std::vector<int>&a,const std::vector<Real>&params){\n'
+    if cached:
+        _remember_compiled(key,cached,index,ROOT)
+        return cached/'kernel',bound
+    code,alphas=header(bound.family,dimension,order,'radial',arithmetic)
+    dispatch='\ntemplate<class Z,class A> Real radial_value(const Z&z,const A&a,const std::vector<Real>&params){\n'
     for i,alpha in enumerate(alphas):
         dispatch+='if('+ ' && '.join(f'a[{j}]=={v}' for j,v in enumerate(alpha))+') return radial::eval('+str(i)+','+','.join(f'z[{j}]' for j in range(dimension))+',params);\n'
     dispatch+='throw std::runtime_error("Unprepared derivative");}\n'
     source=PRELUDE+f'\nconstexpr int DIM={dimension},PARAMETERS={len(bound.values)};\n'+code+dispatch+runtime
     directory=build(source,dict(kind='global_collocation',dimension=dimension,order=order),arithmetic,backend.cache_dir)
     record_request(index,directory)
+    _remember_compiled(key,directory,index,ROOT)
     return directory/'kernel',bound
 
 
@@ -121,11 +180,92 @@ class _Worker:
             except OSError:pass
 
 
+_IDLE_WORKER_LIMIT = 4
+_idle_workers = []
+_pool_lock = threading.RLock()
+_all_workers = weakref.WeakSet()
+
+
+def _worker_key(executable, backend):
+    path = Path(executable).resolve()
+    stat = path.stat()
+    return (str(path), stat.st_size, stat.st_mtime_ns, backend.distribution)
+
+
+class _WorkerLease:
+    """Exclusive access whose lifetime cannot outlive its assembled system."""
+    def __init__(self, worker, key, reuse):
+        self._worker, self._key, self._reuse = worker, key, reuse
+        self._closed = False
+        self._lock = threading.RLock()
+
+    def check_open(self):
+        if self._closed: raise RuntimeError('C++ global system is closed')
+
+    def request(self, command):
+        with self._lock:
+            self.check_open()
+            return self._worker.request(command)
+
+    def close(self, force=False):
+        with self._lock:
+            if self._closed: return
+            self._closed = True
+            worker = self._worker
+            if force or not self._reuse:
+                worker.close(force=force)
+                return
+            try:
+                worker.request('RESET')
+            except Exception:
+                worker.close(force=True)
+                return
+            with _pool_lock:
+                # Evict the oldest idle worker so stale kernel configurations
+                # cannot permanently prevent reuse of a newly requested one.
+                evicted = _idle_workers.pop(0)[1] if len(_idle_workers) >= _IDLE_WORKER_LIMIT else None
+                _idle_workers.append((self._key, worker))
+            if evicted is not None: evicted.close()
+
+
+def _acquire_worker(executable, backend):
+    key = _worker_key(executable, backend)
+    worker = None
+    if backend.reuse_workers:
+        with _pool_lock:
+            for i in range(len(_idle_workers)-1, -1, -1):
+                candidate_key, candidate = _idle_workers[i]
+                if candidate_key == key:
+                    _idle_workers.pop(i)
+                    if candidate.process.poll() is None:
+                        worker = candidate
+                        break
+                    candidate.close(force=True)
+    if worker is None:
+        worker = _Worker(executable, backend)
+        with _pool_lock: _all_workers.add(worker)
+    worker.timeout = float(backend.timeout)
+    return _WorkerLease(worker, key, backend.reuse_workers)
+
+
+def _close_workers():
+    with _pool_lock:
+        workers = list(_all_workers)
+        _idle_workers.clear()
+    for worker in workers:
+        worker.close(force=True)
+
+
+atexit.register(_close_workers)
+
+
 class _Matrix:
     """Explicit per-entry native matrix inspection and editing."""
     def __init__(self, system):self.system=system
     @property
-    def shape(self):return (self.system.size,self.system.size)
+    def shape(self):
+        self.system.worker.check_open()
+        return (self.system.size,self.system.size)
     def __getitem__(self,key):
         if isinstance(key,tuple) and len(key)==2 and all(isinstance(v,(int,np.integer)) for v in key):
             i,j=key;v=self.system.worker.request(f'GET {i} {j}')[0]
@@ -166,9 +306,12 @@ class CppGlobalSystem:
         self._finalizer=weakref.finalize(self,worker.close)
 
     @property
-    def matrix(self):return self._matrix
+    def matrix(self):
+        self.worker.check_open()
+        return self._matrix
     @matrix.setter
     def matrix(self,value):
+        self.worker.check_open()
         if isinstance(value, _Matrix):
             value = value.to_mpmath() if self.ctx and value.system.ctx else value.to_numpy()
         array=np.asarray(value.tolist() if hasattr(value,'rows') and hasattr(value,'cols') else value)
@@ -192,6 +335,7 @@ class CppGlobalSystem:
         return format(v,'.17g')
 
     def solve(self):
+        self.worker.check_open()
         data=list(self.rhs)
         if len(data)!=self.size:raise ValueError('RHS dimensions changed; reassemble the method')
         reply=self.worker.request('SOLVE 1 '+' '.join(self.encode(v) for v in data))
@@ -213,7 +357,9 @@ class CppGlobalSystem:
         return CppGlobalSolution(self,coeffs,diagnostics)
 
     def close(self):self._finalizer()
-    def __enter__(self):return self
+    def __enter__(self):
+        self.worker.check_open()
+        return self
     def __exit__(self,*_):self.close()
 
 
@@ -224,7 +370,7 @@ class CppGlobalSolution:
     def _evaluate(self,points,operator):
         from .methods import _query
         from .operators import Identity, bind_operators
-        s=self.system;points=_query(points,s.centers.shape[1])
+        s=self.system;s.worker.check_open();points=_query(points,s.centers.shape[1])
         if not len(points):return []
         operators=bind_operators([operator or Identity(points.shape[1])]*len(points),points)
         if any(getattr(op, 'dimension', None) != points.shape[1] for op in operators):
@@ -318,7 +464,7 @@ def assemble_cpp_global(method,problem,cloud):
     order=max(b.derivative_order,equation_order)+source_order
     if order>6:raise NotImplementedError('C++ global collocation supports total kernel derivative order up to 6')
     executable,bound=_compiled(method.kernel,d,order,'mpfr' if ctx else 'float64',b)
-    worker=_Worker(executable,b)
+    worker=_acquire_worker(executable,b)
     system=CppGlobalSystem(worker,centers,source_ops,powers,list(rhs)+[0]*len(powers),ctx,digits,b,order)
     enc=system.encode
     tokens=['INIT',str(digits),str(b.threads),str(int(method.scheme=='symmetric')),str(len(centers)),str(len(powers)),enc(1)]

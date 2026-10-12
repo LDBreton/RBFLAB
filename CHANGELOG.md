@@ -3,6 +3,7 @@
 ## 0.5.0 — functional approximation and matrix algorithms
 
 - Add `CppGlobalBackend` for scalar stationary global collocation in 2D/3D, with double/MPFR assembly, polynomial augmentation, persistent dense LU solves and native evaluation for both schemes.
+- Optimize native global double kernels and symmetric assembly; reuse validated artifacts and bounded idle workers (`reuse_workers=False` opts out). Add reproducible timing/accuracy benchmarks with saved-run comparisons.
 - Add `Samples` and `LocalApproximation`, with explicit space representers and translates.
 - Expose named source blocks, target operators, local weights and on-demand local algebra.
 - Add executable tutorials constructing scalar LHI, its stationary system and heat mass matrix with ordinary SciPy code.

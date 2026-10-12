@@ -127,6 +127,19 @@ for subsequent solves. Both schemes and optional polynomial augmentation work
 in 2D and 3D. A first call can include kernel compilation; cached calls reuse the
 compiled executable.
 
+Double-precision kernels use compiled numeric constants and stack-allocated
+pair temporaries. Symmetric assembly computes one triangle of the kernel block
+and mirrors it. MPFR retains decimal constants at the requested precision.
+Neither path enables unsafe floating-point compiler flags.
+
+Within a Python process, validated executable requests are memoized while their
+dependency and artifact file metadata remain unchanged. Changes trigger full
+cache validation. The backend also keeps at most four idle worker processes:
+closing a system releases its matrices and factors, then makes its worker
+available for another assembly. Active systems remain independent. Set
+`CppGlobalBackend(reuse_workers=False)` to terminate each worker on close;
+remaining workers are terminated when Python exits normally.
+
 Use a context manager when solving many independent systems, so that the worker
 is released deterministically after evaluation:
 
@@ -169,6 +182,27 @@ paths and cannot select `CppGlobalBackend`.
 Dense storage remains quadratic in the number of coefficients, and dense LU
 factorization remains cubic. MPFR improves arithmetic precision; it does not
 remove an ill-posed PDE or guarantee a well-conditioned trial space.
+
+### Measuring performance
+
+Run the scaling benchmark from a native-enabled source checkout:
+
+```sh
+python -m examples.benchmark_global_cpp --precisions double --intervals 4 6 8 10 12 16 24 32 --output outputs/global_double
+python -m examples.benchmark_global_cpp --precisions mp --intervals 4 6 8 10 12 --mp-digits 60 --output outputs/global_mp
+```
+
+The report separates assembly **including LU**, reused-factor solve, and
+evaluation, with sampled solution errors and Python/native differences. It
+uses three repetitions, one thread, 128 fixed off-node points and disables
+condition estimation on both backends. Compilation and a small warmup are
+excluded; cache checks, worker acquisition and communication are timed. Worker
+reuse benefits repeated assemblies after closing earlier systems; the first
+assembly in a fresh Python process still pays validation and launch costs.
+The multiprecision comparison depends on whether mpmath has GMP acceleration.
+Pass `--baseline path/to/results.json` to add before/after tables and a double
+timing plot against a saved run. Keep node counts, arithmetic, threads and
+evaluation points the same when interpreting those comparisons.
 
 ## Complete example
 

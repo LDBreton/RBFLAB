@@ -6,6 +6,7 @@
 #include <memory>
 #include <cmath>
 #include <algorithm>
+#include <array>
 #include <omp.h>
 
 namespace GlobalWorker {
@@ -70,15 +71,17 @@ namespace GlobalWorker {
    return sum;
   }
   Real kernel(const std::vector<Real>& x,int i,const Op& l,const std::vector<Real>& y,int j,const Op& r)const{
-   std::vector<Real> z(DIM);for(int d=0;d<DIM;++d)z[d]=(coordinate(x,i,d)-coordinate(y,j,d))/(*h);
+   std::array<Real,DIM> z;for(int d=0;d<DIM;++d)z[d]=(coordinate(x,i,d)-coordinate(y,j,d))/(*h);
    Real sum;
-   for(const auto& a:l)for(const auto& b:r){std::vector<int> alpha(DIM);
+   for(const auto& a:l)for(const auto& b:r){std::array<int,DIM> alpha;
     int order=0,sign=0;
     for(int d=0;d<DIM;++d){alpha[d]=a.alpha[d]+b.alpha[d];
      order+=alpha[d];
      sign+=b.alpha[d];
     }
-    sum+=a.c*b.c*Real(sign%2?-1:1)*radial_value(z,alpha,params)/pow(*h,order);
+    // Global coordinates normally have unit kernel scale; avoid a libm call.
+    Real value=a.c*b.c*Real(sign%2?-1:1)*radial_value(z,alpha,params);
+    sum+=(*h==Real(1))?value:value/pow(*h,order);
    }
    return sum;
   }
@@ -120,7 +123,13 @@ namespace GlobalWorker {
 #ifndef RBFLAB_DOUBLE
      Real::bits=mpfr_prec_t(std::ceil(digits*std::log2(10.0))+8);
 #endif
-     for(int j=0;j<n;++j)matrix(i,j)=eigen_value(kernel(source,i,left[i],trial,j,right[j]));
+     // Symmetric collocation uses the same source/target functionals. Each
+     // lower-triangle entry owns its transpose too (no cross-thread writes).
+     for(int j=0;j<(symmetric?i+1:n);++j){
+      auto value=eigen_value(kernel(source,i,left[i],trial,j,right[j]));
+      matrix(i,j)=value;
+      if(symmetric&&j!=i)matrix(j,i)=value;
+     }
      for(int p=0;p<m;++p)matrix(i,n+p)=eigen_value(polynomial(source,i,left[i],p));
     }catch(const std::exception& e){errors[i]=e.what();}
    }
@@ -207,6 +216,7 @@ namespace GlobalWorker {
     out<<"OK "<<DIM<<" "<<PARAMETERS;
    }
    else if(cmd=="INIT"){init(in);out<<"OK";}
+   else if(cmd=="RESET"){end(in);*this=Worker();out<<"OK";}
    else if(cmd=="BUILD"){end(in);assemble();out<<"OK "<<size();}
    else if(cmd=="SOLVE"){int count=integer(in);
     if(count<1||count>100000)throw std::runtime_error("Invalid RHS count");
