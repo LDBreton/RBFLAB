@@ -2,6 +2,8 @@
 
 ## 0.5.0 — functional approximation and matrix algorithms
 
+- Support unsteady divergence-free global Stokes with `CppGlobalBackend`: native stiffness/mass assembly, backward Euler/BDF2 shifted LU caching and mass products in double/MPFR, with public time-dependent data and field APIs.
+- Extend `CppGlobalBackend` to stationary symmetric divergence-free Stokes fields in 2D/3D, with double/MPFR arithmetic, separate velocity/pressure kernels, solenoidal polynomial tails and native field evaluation.
 - Add `CppGlobalBackend` for scalar stationary global collocation in 2D/3D, with double/MPFR assembly, polynomial augmentation, persistent dense LU solves and native evaluation for both schemes.
 - Optimize native global double kernels and symmetric assembly; reuse validated artifacts and bounded idle workers (`reuse_workers=False` opts out). Add reproducible timing/accuracy benchmarks with saved-run comparisons.
 - Add `Samples` and `LocalApproximation`, with explicit space representers and translates.

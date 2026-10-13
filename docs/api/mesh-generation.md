@@ -58,6 +58,12 @@ See [the hands-on geometry guide](../geometry/index.md) before the reference.
 
 ::: rbflab.meshgen.generate
 
+::: rbflab.meshgen.padua_points
+
+::: rbflab.meshgen.mapped_padua
+
+::: rbflab.meshgen.triangulate
+
 ::: rbflab.meshgen.quality
 
 ::: rbflab.meshgen.from_gmsh

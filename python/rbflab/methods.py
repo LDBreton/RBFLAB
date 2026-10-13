@@ -16,7 +16,7 @@ from .assembly import functional_matrix, Factor, relative_residual
 
 @dataclass
 class GlobalCollocation(MethodContract):
-    """Dense scalar collocation using a radial kernel.
+    """Dense scalar or field collocation using radial kernels.
 
     Args:
         kernel: Scalar radial kernel or bound symbolic kernel.
@@ -24,10 +24,11 @@ class GlobalCollocation(MethodContract):
         scheme: `"symmetric"` Hermite or `"asymmetric"` nodal collocation.
         polynomial_degree: Optional polynomial augmentation degree.
         spaces: Optional field-to-space mapping for coupled Stokes problems.
-        backend: Optional CppGlobalBackend for native stationary scalar solves.
+        backend: Optional CppGlobalBackend for native stationary scalar or
+            steady/unsteady symmetric divergence-free Stokes solves in 2D/3D.
 
     Use `assemble(problem, cloud)` to obtain a system with a matrix and RHS;
-    then call `system.solve()`."""
+    then call `system.solve()`, or `system.solve(dt=..., steps=...)` for Stokes evolution."""
     kernel: object = None
     precision: Precision = field(default_factory=Precision)
     scheme: str = "symmetric"

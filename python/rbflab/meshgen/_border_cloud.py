@@ -31,7 +31,7 @@ def _outward(material, points_on_curve, next_points, vectors, tolerance):
 
 
 def generate_borders(source, *, interior, method, seed, boundary_distance, max_candidates,
-                     normal_overrides):
+                     normal_overrides, padua_degree=None):
     if isinstance(source, RBFMesh):
         mesh = RBFMesh(*source.borders, abs_tol=source.abs_tol)
     else:
@@ -45,7 +45,7 @@ def generate_borders(source, *, interior, method, seed, boundary_distance, max_c
     x0, y0, x1, y1 = material.bounds
     inside = planar_interior(interior, ((x0, x1), (y0, y1)),
         lambda p: intersects_xy(material, p[:, 0], p[:, 1]), material,
-        method, seed, boundary_distance, max_candidates)
+        method, seed, boundary_distance, max_candidates, padua_degree)
     coordinates = [tuple(p) for p in inside]
     lookup = {p: i for i, p in enumerate(coordinates)}
     groups, interfaces, normals = {}, {}, {}

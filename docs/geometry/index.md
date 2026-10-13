@@ -27,6 +27,11 @@ Ordinary generation does not invent triangle or tetrahedron connectivity.
 When an algorithm needs connected elements, use an explicit mesh or import one
 from Gmsh. A plotted collection of nodes is not a triangulation.
 
+For a FreeFEM-style workflow where densely sampled borders refine the nearby
+interior, use [`meshgen.triangulate`](sampling.md#boundary-driven-triangulation).
+It builds a constrained triangle mesh from `Border(n)` or arc-length domain
+samples and also supplies its vertices for RBF methods.
+
 ## One generation function
 
 The geometry API is included in the base installation. To run the plotting

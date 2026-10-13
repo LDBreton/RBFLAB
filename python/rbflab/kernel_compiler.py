@@ -24,6 +24,37 @@ class Printer(C99CodePrinter):
     def _print_Float(self,e):return 'Real("'+str(e)+'")'
 
 
+class MPConstantPrinter(Printer):
+    """Cache exact numeric literals per native thread and working precision."""
+    def __init__(self):
+        super().__init__()
+        self.constants = {}
+
+    def _constant(self, e):
+        if e not in self.constants:
+            self.constants[e] = 'constant_' + str(len(self.constants))
+        return self.constants[e] + '()'
+
+    _print_Integer = _constant
+    _print_Rational = _constant
+    _print_Float = _constant
+
+    def declarations(self):
+        class Initializer(Printer):
+            def _print_Integer(self, e):
+                return 'Real('+str(e)+')' if -(2**31) < e < 2**31 else super()._print_Integer(e)
+        raw = Initializer()
+        lines = []
+        for value, name in self.constants.items():
+            lines += [f'inline const Real& {name}(){{',
+                      'static thread_local Real value;',
+                      'static thread_local mpfr_prec_t precision=0;',
+                      'if(precision!=Real::bits){',
+                      'value='+raw.doprint(value)+'; precision=Real::bits;',
+                      '} return value; }']
+        return lines
+
+
 class DoublePrinter(Printer):
     """Emit compile-time binary64 constants instead of parsing decimals per pair."""
     def _print_Integer(self,e):return 'Real('+str(float(e))+')'
@@ -43,8 +74,10 @@ def indices(dimension,order):
 
 
 @lru_cache(maxsize=64)
-def header(family,dimension,order,namespace,arithmetic=None):
-    alpha=indices(dimension,order);printer=DoublePrinter() if arithmetic=='float64' else Printer();lines=['namespace '+namespace+' {']
+def header(family,dimension,order,namespace,arithmetic=None,shared=False):
+    alpha=indices(dimension,order)
+    printer=DoublePrinter() if arithmetic=='float64' else (MPConstantPrinter() if arithmetic=='mpfr' else Printer())
+    lines=['namespace '+namespace+' {']
     mapping={x:sp.Symbol('z'+str(i)) for i,x in enumerate(_COORDINATES[:dimension])}
     mapping.update({p:sp.Symbol('p'+str(i)) for i,p in enumerate(family.parameters)})
     args=', '.join('const Real& z'+str(i) for i in range(dimension))+', const std::vector<Real>& params'
@@ -67,8 +100,37 @@ def header(family,dimension,order,namespace,arithmetic=None):
         lines.append('return '+printer.doprint(values[0])+'; }')
     lines.append('inline Real eval(int i,'+args+'){switch(i){')
     for i in range(len(alpha)):lines.append('case '+str(i)+':return f'+str(i)+'('+','.join('z'+str(j) for j in range(dimension))+',params);')
-    lines.append('default:throw std::runtime_error("Unsupported derivative");}} }')
-    return '\n'.join(lines),alpha
+    lines.append('default:throw std::runtime_error("Unsupported derivative");}}')
+    if shared:
+        # A point-pair owns this lazy DAG. Only requested derivatives and their
+        # dependencies are evaluated, with common powers shared across them.
+        subs,values=sp.cse([expressions(family,a)[0].xreplace(mapping) for a in alpha],
+                          symbols=sp.numbered_symbols('shared_'))
+        calls={symbol:sp.Symbol(str(symbol)+'()') for symbol,_ in subs}
+        lines.append('struct Shared {')
+        lines.extend('const Real& z'+str(j)+';' for j in range(dimension))
+        lines.append('const std::vector<Real>& params;')
+        lines.extend('const Real& p'+str(j)+';' for j in range(len(family.parameters)))
+        lines.append('bool origin;')
+        lines.append('std::optional<Real> cache['+str(len(subs)+len(values))+'];')
+        initializers=[f'z{j}(z[{j}])' for j in range(dimension)]+['params(p)']
+        initializers += [f'p{j}(p.at({j}))' for j in range(len(family.parameters))]
+        initializers += ['origin('+' && '.join(f'z{j}==Real(0)' for j in range(dimension))+')']
+        lines.append('template<class Z> Shared(const Z& z,const std::vector<Real>& p):'+','.join(initializers)+'{}')
+        for j,(symbol,expr) in enumerate(subs):
+            lines.append(f'const Real& {symbol}(){{if(!cache[{j}]) cache[{j}].emplace('+printer.doprint(expr.xreplace(calls))+f');return *cache[{j}];}}')
+        lines.append('const Real& get(int i){switch(i){')
+        for j,expr in enumerate(values):
+            fallback=f'f{j}('+','.join(f'z{k}' for k in range(dimension))+',params)'
+            # Compact support and its stable near-origin branch stay in f_j.
+            value=fallback if support is not None else '(origin?'+fallback+':'+printer.doprint(expr.xreplace(calls))+')'
+            slot=len(subs)+j
+            lines.append(f'case {j}:if(!cache[{slot}]) cache[{slot}].emplace({value});return *cache[{slot}];')
+        lines.append('default:throw std::runtime_error("Unsupported derivative");}} };')
+    lines.append('}')
+    if isinstance(printer,MPConstantPrinter):
+        lines[1:1]=printer.declarations()
+    return ('#include <optional>\n' if shared else '')+'\n'.join(lines),alpha
 
 @lru_cache(maxsize=8)
 def toolchain():

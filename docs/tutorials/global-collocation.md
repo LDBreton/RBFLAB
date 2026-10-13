@@ -175,9 +175,9 @@ python -m examples.global_cpp --scheme asymmetric --digits 60 --dimension 3
 This example checks the algebra using an exactly representable quadratic field;
 it is not a general PDE convergence or performance benchmark.
 
-The backend currently covers scalar stationary problems. Coupled scalar systems,
-divergence-free Stokes and time-dependent problems use their existing Python
-paths and cannot select `CppGlobalBackend`.
+The backend also supports [steady/unsteady divergence-free Stokes fields](stokes.md#native-global-fields)
+with symmetric collocation in 2D/3D. Coupled scalar systems and time-dependent
+problems retain their Python paths and cannot select `CppGlobalBackend`.
 
 Dense storage remains quadratic in the number of coefficients, and dense LU
 factorization remains cubic. MPFR improves arithmetic precision; it does not
@@ -203,6 +203,26 @@ The multiprecision comparison depends on whether mpmath has GMP acceleration.
 Pass `--baseline path/to/results.json` to add before/after tables and a double
 timing plot against a saved run. Keep node counts, arithmetic, threads and
 evaluation points the same when interpreting those comparisons.
+
+For stationary divergence-free velocity and pressure fields in 2D and 3D:
+
+```sh
+python -m examples.benchmark_global_cpp_fields --output outputs/global_fields
+```
+
+This benchmark uses a nonpolynomial manufactured Stokes solution, PHS(7)
+velocity and PHS(3) pressure kernels, solenoidal degree-2 velocity augmentation,
+and degree-1 pressure augmentation. It compares double and 60-digit arithmetic
+with three repetitions and 64 fixed off-node queries. Assembly includes LU on
+both backends: Python's lazy factorization is explicitly moved into that stage.
+Python also constructs its transient mass matrix during stationary assembly.
+The solve stage reuses the factorization; evaluation times velocity and pressure
+gradient together. Gauged pressure and analytic divergence are checked outside
+the timed stages. JSON retains individual samples, separate velocity/gradient
+timings, errors and backend differences; HTML and PNG reports show scaling.
+Use `--dimensions`, `--precisions`, `--cells`, `--queries`, and `--repeats`
+to select a smaller run. Cell counts correspond to `(cells + 1)**dimension`
+nodes, and the dense system has additional polynomial unknowns.
 
 ## Complete example
 

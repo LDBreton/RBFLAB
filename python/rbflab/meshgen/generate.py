@@ -8,8 +8,9 @@ from .surfaces import ParametricSurface3D
 from ._sampling import planar_interior
 
 
-def generate(domain, *, interior=400, boundary=None, method="halton", seed=0,
-             boundary_distance=0., max_candidates=1000000, normals=None) -> PointCloud:
+def generate(domain, *, interior=None, boundary=None, method="halton", seed=0,
+             boundary_distance=0., max_candidates=1000000, normals=None,
+             degree=None) -> PointCloud:
     """Generate labeled 2D/3D nodes through one geometry-independent entry point.
 
     Args:
@@ -17,12 +18,18 @@ def generate(domain, *, interior=400, boundary=None, method="halton", seed=0,
             Primitive/parametric 2D domain, implicit 3D region, sampled Border,
             list/tuple of sampled borders, an RBFMesh construction, or a
             ParametricSurface3D (use interior=0 for a surface).
-        interior (int): Nonnegative number of points sampled in the material.
+        interior (int | None): Nonnegative number of points sampled in the material.
+            Default 400 for random/Halton/Sobol; omit for Padua generation.
             Retained internal-interface samples add further interior unknowns.
         boundary (int | dict | None): Boundary count for domains (default 100).
             2D parametric domains also accept a count per arc label. For borders,
             omit this argument: counts are already fixed by border(n).
-        method (str): random, halton, or sobol. No minimum separation guarantee.
+        method (str): random, halton, sobol, or padua. Padua is 2D only.
+        degree (int | None): Positive Padua polynomial degree. The reference
+            grid is scaled to the bounding box and clipped to the material;
+            its retained interior count depends on geometry. Existing boundary
+            sampling is unchanged. This is not a curved-domain Padua mapping
+            and carries no polynomial interpolation optimality guarantee.
         seed (int | None): Nonnegative seed or None; global random state is unchanged.
         boundary_distance (float): Physical boundary clearance. Generic 2D domains
             use a polygon approximation; custom 3D regions need clearance support.
@@ -41,10 +48,23 @@ def generate(domain, *, interior=400, boundary=None, method="halton", seed=0,
     no interface normals or transmission equations are inferred. A label cannot
     simultaneously describe an exterior boundary and an internal interface.
     """
+    if method == "padua":
+        if type(degree) is not int or degree < 1:
+            raise ValueError("Padua generation requires a positive integer degree")
+        if interior is not None:
+            raise ValueError("omit interior for Padua generation; choose degree instead")
+        if isinstance(domain, (ImplicitRegion, ParametricSurface3D)):
+            raise ValueError("Padua generation supports only planar domains")
+        interior = 0
+    else:
+        if degree is not None:
+            raise ValueError("degree is only supported for method='padua'")
+        if interior is None:
+            interior = 400
     if type(interior) is not int or interior < 0:
         raise ValueError("interior must be a nonnegative integer")
-    if method not in ("random", "halton", "sobol"):
-        raise ValueError("method must be random, halton or sobol")
+    if method not in ("random", "halton", "sobol", "padua"):
+        raise ValueError("method must be random, halton, sobol or padua")
     if seed is not None and (type(seed) is not int or seed < 0):
         raise ValueError("seed must be a nonnegative integer or None")
     if not np.isfinite(boundary_distance) or boundary_distance < 0:
@@ -60,7 +80,7 @@ def generate(domain, *, interior=400, boundary=None, method="halton", seed=0,
         from ._border_cloud import generate_borders
         cloud = generate_borders(domain, interior=interior, method=method, seed=seed,
             boundary_distance=boundary_distance, max_candidates=max_candidates,
-            normal_overrides=overrides)
+            normal_overrides=overrides, padua_degree=degree)
         return _with_normals(cloud, overrides)
     if boundary is None:
         boundary = 100
@@ -100,7 +120,8 @@ def generate(domain, *, interior=400, boundary=None, method="halton", seed=0,
         raise TypeError("domain must be a 2D domain, 3D region/surface, Border collection, or RBFMesh")
     groups = domain.sample_boundary(boundary)
     interior_points = planar_interior(interior, domain.bounds, domain.contains_points,
-        domain.polygon, method, seed, boundary_distance, max_candidates)
+        domain.polygon, method, seed, boundary_distance, max_candidates, degree)
+    interior = len(interior_points)
     points = [interior_points]
     ids, normals, offset = {}, {}, interior
     for label, (p, normal) in groups.items():

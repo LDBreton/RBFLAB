@@ -12,5 +12,9 @@ from .surfaces import ParametricSurface3D
 
 from .generate import generate, quality
 from .gmsh import from_gmsh
+from .padua import padua_points
+from .mapped_padua import mapped_padua
+from .triangulate import triangulate
 
 __all__ = ['generate', 'quality', 'from_gmsh', 'RBFMesh', 'RBFMesh3D', 'ParametricSurface3D', 'calculate_point_allocation', 'generate_points_within_polygons', 'generate_regions', 'exclude_nested_polygons', 'calculate_volume_allocation', 'calculate_boundary_allocation', 'estimate_region_volume', 'generate_points_within_regions', 'generate_boundary_points']
+__all__ += ['padua_points', 'mapped_padua', 'triangulate']

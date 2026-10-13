@@ -45,10 +45,16 @@ class MethodContract:
             if global_backend is not None:
                 from .global_backend import CppGlobalBackend
                 if not isinstance(global_backend,CppGlobalBackend):raise TypeError('GlobalCollocation backend must be CppGlobalBackend')
-                if flow or block or evolution or getattr(problem,'_evolution_slice',False):
-                    raise NotImplementedError('CppGlobalBackend supports stationary scalar LinearPDE only')
+                if block or evolution or getattr(problem,'_evolution_slice',False):
+                    raise NotImplementedError('CppGlobalBackend supports stationary scalar LinearPDE and steady/unsteady divergence-free Stokes only')
                 from .problems import LinearPDE
-                if problem is not None and not isinstance(problem,LinearPDE):raise NotImplementedError('CppGlobalBackend supports scalar LinearPDE only')
+                if problem is not None and not isinstance(problem,(LinearPDE,SpaceStokesProblem)):
+                    raise NotImplementedError('CppGlobalBackend supports scalar LinearPDE and divergence-free Stokes only')
+                if flow:
+                    from .space_stokes import select_spaces
+                    select_spaces(self,problem)
+                    if global_backend.derivative_order>2:
+                        raise NotImplementedError('Native Stokes supports evaluation derivative_order up to 2 (total kernel order 6)')
             if self.scheme not in ('symmetric','asymmetric'):raise ValueError('Unknown global scheme')
             if precision.local_digits is not None or precision.global_dtype!='float64':raise ValueError('GlobalCollocation uses global_digits')
             if (flow or block) and self.scheme!='symmetric':raise NotImplementedError('Space/block global assembly currently requires symmetric collocation')
@@ -157,7 +163,14 @@ def expose_system(system,method,cloud,problem):
     system.recipe=recipe(method,problem)
     if getattr(system,'_native_global',False):
         system.dof_map=dict(kind='kernel coefficients followed by polynomial coefficients',size=system.size,points=system.centers.copy(),operators=system.source_operators,polynomial_powers=system.powers)
+        if getattr(system,'_native_global_flow',False):
+            system.dof_map.pop('polynomial_powers')
+            system.dof_map.update(kind='vector functional coefficients followed by polynomial coefficients',
+                polynomial_columns=system.polynomials.columns,fields=problem.model.fields,
+                ordering='component-major momentum rows, then component-major boundary rows, then polynomial constraints')
         system.reconstruction=dict(kind='global expansion',pressure='method-dependent')
+        if getattr(system,'_native_global_flow',False):
+            system.reconstruction.update(pressure='kernel representative modulo constants',divergence='analytic')
         return system
     owner=getattr(system,'base',system)
     stencils=getattr(owner,'stencils',None)

@@ -8,7 +8,8 @@ backend choice does not automatically change a separate global sparse solve.
 | Scalar stationary global collocation, 2D/3D | Yes | Yes, `CppGlobalBackend` from source checkout | Yes, `Precision(global_digits=...)` | — |
 | Scalar LHI convenience assembly (`LHI`) | Yes | — | — | — |
 | Scalar RBF-FD operators, 2D/3D | Yes | Yes, from source checkout | Supported; installed archive test pending | Yes, CPU Float64 |
-| Divergence-free steady Stokes, global | Yes | — | — | — |
+| Divergence-free steady Stokes, global 2D/3D | Yes | Yes, symmetric `CppGlobalBackend` | Yes, `Precision(global_digits=...)` | — |
+| Divergence-free unsteady Stokes, global 2D/3D | Yes, backward Euler/BDF2 | Yes, native mass and shifted solves | Yes, `Precision(global_digits=...)` | — |
 | Divergence-free Stokes LHI, 2D | Yes | Yes, from source archive | 50 digit local weights verified from source archive | Unaugmented stencils only; not the curated example |
 | Custom symbolic kernel evaluation | Yes | Compilation from source checkout | Compilation from source checkout | Supported where the local backend accepts the kernel |
 | Extended mpmath global sparse solve | Supported by selected Python methods | Separate from local C++ backend | Separate setting | — |
@@ -25,7 +26,11 @@ with optional polynomial augmentation. Kernel/polynomial assembly, dense LU,
 residual calculation and expansion evaluation execute in C++. A persistent
 worker retains the factors for repeated right-hand sides. Scalar input geometry
 remains Float64; MPFR preserves extended arithmetic after input conversion.
-Coupled blocks, Stokes and evolution do not yet accept this global backend.
+Stationary `SymbolicStokes` also accepts this backend with symmetric collocation,
+`DivergenceFreeSpace` velocity and scalar pressure spaces, including solenoidal
+polynomial augmentation in 2D/3D. Velocity, pressure (modulo constants), pressure
+gradient, divergence and momentum residuals have native expansion evaluation.
+Asymmetric Stokes, coupled scalar blocks and evolution do not accept this global backend.
 See the [native scalar example](https://github.com/LDBreton/RBFLAB/blob/main/examples/global_cpp.py)
 and [global tutorial](tutorials/global-collocation.md#native-double-and-multiprecision).
 

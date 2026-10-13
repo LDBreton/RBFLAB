@@ -17,7 +17,7 @@ from .precision import mp_number, mp_values
 
 @dataclass(frozen=True)
 class CppGlobalBackend:
-    """Compile and reuse a C++ scalar global collocation worker.
+    """Compile and reuse a C++ scalar or divergence-free Stokes global worker.
 
     Native assembly, factorization, solves, and evaluation stay in the selected
     arithmetic. Accessing ``system.matrix`` explicitly exports entries lazily.
@@ -75,6 +75,8 @@ def _remember_compiled(key, directory, index, root):
     from . import kernel_compiler
     dependencies = [Path(__file__), Path(kernel_compiler.__file__),
                     Path(kernel_compiler.__file__).with_name('symbolic_kernel.py')]
+    flow_bridge = Path(__file__).with_name('global_flow_backend.py')
+    if flow_bridge.exists(): dependencies.append(flow_bridge)
     dependencies.extend(root/'cpp'/name for name in
                         ('global_collocation.hpp', 'real.hpp', 'real_double.hpp',
                          'lhi_mpfr.cpp', 'eigen_solver.hpp'))
@@ -94,32 +96,47 @@ def _remember_compiled(key, directory, index, root):
             _compiled_memo[key] = (directory/'kernel', signatures)
 
 
-def _compiled(kernel, dimension, order, arithmetic, backend):
+def _compiled(kernel, dimension, order, arithmetic, backend, *, pressure_kernel=None, pressure_order=0):
     from .kernel_compiler import as_bound, request_cache, record_request, header, build, ROOT, PRELUDE
     bound=as_bound(kernel)
     family=bound.family
     base=(Path(backend.cache_dir) if backend.cache_dir else Path.home()/'.cache'/'rbflab').resolve()
     key=(family.expression, family.radial_variable, family.parameters,
          family.dimension, dimension, order, arithmetic, base)
+    pressure=as_bound(pressure_kernel) if pressure_kernel is not None else None
+    families=(family,) if pressure is None else (family,pressure.family)
+    if pressure is not None:
+        f=pressure.family
+        key+=('fields',f.expression,f.radial_variable,f.parameters,f.dimension,pressure_order)
     with _compiled_memo_lock:
         entry=_compiled_memo.get(key)
         if entry is not None and _memo_valid(entry):return entry[0],bound
         _compiled_memo.pop(key,None)
     runtime=(ROOT/'cpp/global_collocation.hpp').read_text()
     bridge=Path(__file__).read_bytes()
-    index,cached=request_cache('global_collocation',(bound.family,),arithmetic,backend.cache_dir,
+    if pressure is not None:bridge+=Path(__file__).with_name('global_flow_backend.py').read_bytes()
+    index,cached=request_cache('global_collocation',families,arithmetic,backend.cache_dir,
         dimension=dimension,order=order,runtime=hashlib.sha256(runtime.encode()).hexdigest(),
-        bridge=hashlib.sha256(bridge).hexdigest())
+        bridge=hashlib.sha256(bridge).hexdigest(),pressure_order=pressure_order)
     if cached:
         _remember_compiled(key,cached,index,ROOT)
         return cached/'kernel',bound
-    code,alphas=header(bound.family,dimension,order,'radial',arithmetic)
-    dispatch='\ntemplate<class Z,class A> Real radial_value(const Z&z,const A&a,const std::vector<Real>&params){\n'
-    for i,alpha in enumerate(alphas):
-        dispatch+='if('+ ' && '.join(f'a[{j}]=={v}' for j,v in enumerate(alpha))+') return radial::eval('+str(i)+','+','.join(f'z[{j}]' for j in range(dimension))+',params);\n'
-    dispatch+='throw std::runtime_error("Unprepared derivative");}\n'
-    source=PRELUDE+f'\nconstexpr int DIM={dimension},PARAMETERS={len(bound.values)};\n'+code+dispatch+runtime
-    directory=build(source,dict(kind='global_collocation',dimension=dimension,order=order),arithmetic,backend.cache_dir)
+    def generated(family,order,namespace):
+        code,alphas=header(family,dimension,order,namespace,arithmetic,shared=True)
+        dispatch=f'\ntemplate<class A> int {namespace}_index(const A&a){{\n'
+        for i,alpha in enumerate(alphas):
+            dispatch+='if('+ ' && '.join(f'a[{j}]=={v}' for j,v in enumerate(alpha))+f') return {i};\n'
+        dispatch+='throw std::runtime_error("Unprepared derivative");}\n'
+        dispatch+=f'template<class Z> Real {namespace}_prepared(int i,const Z&z,const std::vector<Real>&params){{return {namespace}::eval(i,'+','.join(f'z[{j}]' for j in range(dimension))+',params);}\n'
+        dispatch+=f'template<class Z,class A> Real {namespace}_value(const Z&z,const A&a,const std::vector<Real>&params){{return {namespace}_prepared({namespace}_index(a),z,params);}}\n'
+        return code+dispatch
+    code=generated(bound.family,order,'radial')
+    if pressure is not None:
+        code=f'\n#define RBFLAB_GLOBAL_FIELDS\nconstexpr int PRESSURE_PARAMETERS={len(pressure.values)};\n'+code
+        code+=generated(pressure.family,pressure_order,'pressure')
+    source=PRELUDE+f'\nconstexpr int DIM={dimension},PARAMETERS={len(bound.values)};\n'+code+runtime
+    directory=build(source,dict(kind='global_collocation',dimension=dimension,order=order,
+                               pressure_order=pressure_order,fields=pressure is not None),arithmetic,backend.cache_dir)
     record_request(index,directory)
     _remember_compiled(key,directory,index,ROOT)
     return directory/'kernel',bound
@@ -301,7 +318,8 @@ class CppGlobalSystem:
         self.rhs=rhs
         self.ctx,self.digits,self.backend=ctx,digits,backend
         self.prepared_order=prepared_order
-        self.source_order=max((sum(alpha) for op in source_operators for alpha,_ in op.terms),default=0)
+        self.source_order=max((sum(alpha) for row in source_operators
+            for op in (row.values() if isinstance(row,dict) else (row,)) for alpha,_ in op.terms),default=0)
         self._matrix=_Matrix(self)
         self._finalizer=weakref.finalize(self,worker.close)
 
@@ -402,6 +420,10 @@ def prepare_cpp_global(method,problem,dimension,cache_dir):
     """Warm the worker executable while retaining the original bound kernel."""
     from dataclasses import replace
     from .operators import NormalDerivative,Robin
+    from .spaces import SpaceStokesProblem
+    if isinstance(problem,SpaceStokesProblem):
+        from .global_flow_backend import prepare_cpp_flow
+        return prepare_cpp_flow(method,problem,dimension,cache_dir)
     backend=method.backend
     if cache_dir is not None:
         backend=replace(backend,cache_dir=cache_dir)
@@ -420,6 +442,10 @@ def prepare_cpp_global(method,problem,dimension,cache_dir):
 
 
 def assemble_cpp_global(method,problem,cloud):
+    from .spaces import SpaceStokesProblem
+    if isinstance(problem,SpaceStokesProblem):
+        from .global_flow_backend import assemble_cpp_flow
+        return assemble_cpp_flow(method,problem,cloud)
     from .methods import _query
     from .operators import Identity, bind_operators
     from .problems import boundary_data, values
