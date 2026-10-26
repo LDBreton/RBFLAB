@@ -1,6 +1,9 @@
 #pragma once
-// Keep parallelism across stencils; Eigen must not create nested workers.
+// Local methods parallelize across stencils. Global workers instead allow
+// Eigen to parallelize sufficiently large dense products/factorizations.
+#ifndef RBFLAB_GLOBAL_DENSE
 #define EIGEN_DONT_PARALLELIZE
+#endif
 #include "real.hpp"
 #ifndef RBFLAB_DOUBLE
 inline bool operator!=(const Real&a,const Real&b){return !(a==b);}
@@ -17,11 +20,27 @@ namespace Eigen {
 template<> struct NumTraits<::Real>:GenericNumTraits<::Real> {
  using Real=::Real; using NonInteger=::Real; using Nested=::Real; using Literal=::Real;
  enum {IsComplex=0,IsInteger=0,IsSigned=1,RequireInitialization=1,ReadCost=10,AddCost=20,MulCost=40};
- static Real epsilon(){Real x(1);mpfr_div_2si(x.v,x.v,::Real::bits-1,MPFR_RNDN);return x;}
+ static Real epsilon(){Real x(1);mpfr_div_2si(x.v,x.v,::Real::precision()-1,MPFR_RNDN);return x;}
  static Real dummy_precision(){return sqrt(epsilon());}
- static int digits10(){return int((::Real::bits-1)*0.3010299956639812);}
+ static int digits10(){return int((::Real::precision()-1)*0.3010299956639812);}
 };
 }
+#if defined(RBFLAB_GLOBAL_DENSE) && !defined(RBFLAB_MPFR_GEBP_REFERENCE)
+// Eigen's scalar panel update otherwise constructs a product and a sum for
+// every multiply-add. Reuse its scratch scalar and accumulator instead,
+// retaining separate round-to-nearest multiplication and addition.
+namespace Eigen { namespace internal {
+template<> template<typename LhsPacketType, typename RhsPacketType,
+                     typename AccPacketType, typename LaneIdType>
+EIGEN_STRONG_INLINE void
+gebp_traits<::Real,::Real,false,false,Architecture::Target,GEBPPacketFull>::madd(
+    const LhsPacketType& a,const RhsPacketType& b,AccPacketType& c,
+    RhsPacketType& tmp,const LaneIdType&) const {
+  mpfr_mul(tmp.v,a.v,b.v,MPFR_RNDN);
+  mpfr_add(c.v,c.v,tmp.v,MPFR_RNDN);
+}
+}}
+#endif
 #endif
 #include <Eigen/LU>
 #include <vector>

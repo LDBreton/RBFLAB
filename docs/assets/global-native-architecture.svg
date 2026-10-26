@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="740" viewBox="0 0 1040 740" role="img" aria-labelledby="title desc">
+<title id="title">Global and local approximation routes in RBFLAB</title>
+<desc id="desc">Global interpolation, scalar PDEs and Stokes share a persistent C++ dense engine. Spaces and functionals describe the approximation. LocalApproximation remains a separate route producing sparse maps for user-owned algorithms.</desc>
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#536a83"/></marker></defs>
+<rect width="1040" height="740" rx="18" fill="#f5f8fc"/>
+<g font-family="Arial,sans-serif" fill="#17324d">
+<text x="40" y="42" font-size="23" font-weight="bold">Spaces and functionals, shared numerical engines</text>
+<text x="40" y="70" font-size="15">Keep the public problem simple; select arithmetic and execution independently.</text>
+<g fill="#e6efff" stroke="#93b4df"><rect x="40" y="105" width="290" height="100" rx="10"/><rect x="375" y="105" width="290" height="100" rx="10"/><rect x="710" y="105" width="290" height="100" rx="10"/></g>
+<g text-anchor="middle"><text x="185" y="136" font-size="18" font-weight="bold">Global interpolation</text><text x="185" y="162" font-size="11">interpolate(space=..., centers=X, data=...)</text><text x="185" y="186" font-size="13">Scalar · independent outputs · solenoidal</text><text x="520" y="136" font-size="18" font-weight="bold">Scalar PDEs</text><text x="520" y="162" font-size="14">GlobalCollocation + ScalarSpace</text><text x="520" y="186" font-size="13">Stationary · backward Euler · BDF2</text><text x="855" y="136" font-size="18" font-weight="bold">Stokes fields</text><text x="855" y="162" font-size="14">DivergenceFreeSpace + PressureSpace</text><text x="855" y="186" font-size="13">Steady · unsteady · symbolic data</text></g>
+<g stroke="#536a83" stroke-width="2" fill="none" marker-end="url(#arrow)"><path d="M185 205V225H445V245"/><path d="M520 205V245"/><path d="M855 205V225H595V245"/></g>
+<rect x="220" y="248" width="600" height="112" rx="12" fill="#ece6fb" stroke="#a793cc"/>
+<text x="520" y="280" text-anchor="middle" font-size="19" font-weight="bold">CppGlobalBackend: persistent dense worker</text><text x="520" y="307" text-anchor="middle" font-size="14">Compile kernel and supported data expressions · content-addressed cache</text><text x="520" y="332" text-anchor="middle" font-size="14">Eigen: Float64 / MPFR · MPLAPACK: MPFR · explicit lifecycle</text>
+<g stroke="#536a83" stroke-width="2" fill="none" marker-end="url(#arrow)"><path d="M400 360V390H310V408"/><path d="M640 360V390H730V408"/></g>
+<g fill="#e2f3e9" stroke="#8fbaa4"><rect x="110" y="412" width="400" height="94" rx="10"/><rect x="550" y="412" width="400" height="94" rx="10"/></g>
+<text x="310" y="440" text-anchor="middle" font-size="17" font-weight="bold">Native matrix and field operations</text><text x="310" y="465" text-anchor="middle" font-size="14">Kernel/polynomial blocks · A and M · evaluation</text><text x="310" y="488" text-anchor="middle" font-size="13">Scalar node order · explicit target/source functionals</text>
+<text x="750" y="440" text-anchor="middle" font-size="17" font-weight="bold">Native dense algebra</text><text x="750" y="465" text-anchor="middle" font-size="14">LU reuse · separate initial projection · shifted factors</text><text x="750" y="488" text-anchor="middle" font-size="13">Scalar history combinations and timestep solves</text>
+<g stroke="#536a83" stroke-width="2" fill="none" marker-end="url(#arrow)"><path d="M310 506V523H440V543"/><path d="M750 506V523H600V543"/></g>
+<rect x="220" y="546" width="600" height="70" rx="10" fill="#fff0d8" stroke="#d3b078"/>
+<text x="520" y="574" text-anchor="middle" font-size="18" font-weight="bold">Interpolants, solution fields and trajectories</text><text x="520" y="600" text-anchor="middle" font-size="14">execution_info inspects routes · Python schedules · callbacks may run in Python</text>
+<rect x="40" y="650" width="960" height="62" rx="10" fill="#e6efff" stroke="#93b4df"/>
+<text x="520" y="677" text-anchor="middle" font-size="17" font-weight="bold">Separate local route: LocalApproximation → named sparse maps → your algorithm</text><text x="520" y="701" text-anchor="middle" font-size="13">Local backend controls weights, not a later solve · Geometry/query coordinates remain Float64.</text>
+</g></svg>

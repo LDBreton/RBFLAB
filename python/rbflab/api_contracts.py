@@ -7,6 +7,21 @@ import numpy as np
 from scipy.sparse import issparse
 from .configuration import LocalSolver
 
+class _Unset:
+    def __repr__(self):
+        return "_UNSET"
+
+
+_UNSET = _Unset()
+
+
+def _keyword_alias(value, alias, *, name, alias_name, default):
+    """Resolve additive keyword aliases before dispatching numerical work."""
+    if value is not _UNSET and alias is not _UNSET:
+        raise ValueError(f"Specify {name} or {alias_name}, not both")
+    return alias if alias is not _UNSET else default if value is _UNSET else value
+
+
 class MethodContract:
     def preflight(self, problem=None, cloud=None, *, operation="assemble", space=None):
         """Validate supported combinations without compiling or assembling matrices.
@@ -45,10 +60,12 @@ class MethodContract:
             if global_backend is not None:
                 from .global_backend import CppGlobalBackend
                 if not isinstance(global_backend,CppGlobalBackend):raise TypeError('GlobalCollocation backend must be CppGlobalBackend')
-                if block or evolution or getattr(problem,'_evolution_slice',False):
-                    raise NotImplementedError('CppGlobalBackend supports stationary scalar LinearPDE and steady/unsteady divergence-free Stokes only')
+                if global_backend.linear_solver=='mplapack' and precision.global_digits is None:
+                    raise ValueError('MPLAPACK requires Precision(global_digits=...) with MPFR arithmetic')
+                if block or getattr(problem,'_evolution_slice',False):
+                    raise NotImplementedError('CppGlobalBackend supports scalar LinearPDE/EvolutionPDE and steady/unsteady divergence-free Stokes only')
                 from .problems import LinearPDE
-                if problem is not None and not isinstance(problem,(LinearPDE,SpaceStokesProblem)):
+                if problem is not None and not isinstance(problem,(LinearPDE,EvolutionPDE,SpaceStokesProblem)):
                     raise NotImplementedError('CppGlobalBackend supports scalar LinearPDE and divergence-free Stokes only')
                 if flow:
                     from .space_stokes import select_spaces

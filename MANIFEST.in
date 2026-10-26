@@ -10,4 +10,5 @@ global-exclude __pycache__ *.py[cod] *.exe
 recursive-include docs *.md *.css *.js
 include mkdocs.yml
 recursive-include scripts *.py
+include scripts/build_mplapack.sh
 prune cpp/deps

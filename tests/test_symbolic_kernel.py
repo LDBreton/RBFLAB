@@ -1,4 +1,5 @@
 import os
+from rbflab.native_toolchain import executable_path
 import numpy as np
 import pytest
 import sympy as sp
@@ -18,12 +19,12 @@ def test_runtime_parameters_and_origin():
     with pytest.raises(ValueError):family(c=1)
     with pytest.raises(ValueError,match='continuous'):expressions(r.Kernel(s**sp.Rational(3,2),s),(4,0))
 
-@pytest.mark.skipif(os.environ.get('RBFLAB_CPP_TESTS')!='1',reason='GCC/WSL opt-in')
+@pytest.mark.skipif(os.environ.get('RBFLAB_CPP_TESTS')!='1',reason='Native GCC opt-in')
 @pytest.mark.parametrize('arithmetic',['float64','mpfr'])
 def test_compiled_scalar_runtime_and_3d(tmp_path,arithmetic):
     family=r.Kernel(sp.exp(-c*s),s,(c,))
     artifact=family.compile(dimension=3,derivative_order=2,arithmetic=arithmetic,cache_dir=tmp_path)
-    stamp=(artifact.directory/'kernel').stat().st_mtime_ns
+    stamp=executable_path(artifact.directory/'kernel').stat().st_mtime_ns
     for value in ('0.7','2'):
         q=[[0,0,0],[.2,.3,.1]];alpha=(1,0,1)
         actual=artifact.evaluate(q,(value,),alpha)
@@ -36,9 +37,9 @@ def test_compiled_scalar_runtime_and_3d(tmp_path,arithmetic):
         assert actual!=1
     again=family.compile(dimension=3,derivative_order=2,arithmetic=arithmetic,cache_dir=tmp_path)
     assert again.directory==artifact.directory
-    assert (again.directory/'kernel').stat().st_mtime_ns==stamp
+    assert executable_path(again.directory/'kernel').stat().st_mtime_ns==stamp
 
-@pytest.mark.skipif(os.environ.get('RBFLAB_CPP_TESTS')!='1',reason='GCC/WSL opt-in')
+@pytest.mark.skipif(os.environ.get('RBFLAB_CPP_TESTS')!='1',reason='Native GCC opt-in')
 @pytest.mark.parametrize('digits',[None,45])
 def test_space_compiler_matches_builtin(tmp_path,digits):
     from examples.tutorials.stokes_spaces import make_problem
@@ -55,7 +56,7 @@ def test_space_compiler_matches_builtin(tmp_path,digits):
     np.testing.assert_allclose(*weights,rtol=1e-8,atol=1e-9)
     np.testing.assert_allclose(*outputs,rtol=1e-8,atol=1e-9)
 
-@pytest.mark.skipif(os.environ.get('RBFLAB_CPP_TESTS')!='1',reason='GCC/WSL opt-in')
+@pytest.mark.skipif(os.environ.get('RBFLAB_CPP_TESTS')!='1',reason='Native GCC opt-in')
 def test_compiled_interpolation_fd_and_symmetric(tmp_path,monkeypatch):
     family=r.Kernel((1+c*s)**sp.Rational(-1,2),s,(c,))
     artifact=family.compile(derivative_order=4,cache_dir=tmp_path)
@@ -74,7 +75,7 @@ def test_compiled_interpolation_fd_and_symmetric(tmp_path,monkeypatch):
     np.testing.assert_allclose(matrix,matrix.T,atol=1e-12)
     np.testing.assert_allclose(matrix,functional_matrix(r.IMQ('2'),points,left,points,left),rtol=1e-12,atol=1e-12)
 
-@pytest.mark.skipif(os.environ.get('RBFLAB_CPP_TESTS')!='1',reason='GCC/WSL opt-in')
+@pytest.mark.skipif(os.environ.get('RBFLAB_CPP_TESTS')!='1',reason='Native GCC opt-in')
 def test_nonbuiltin_space_kernel(tmp_path):
     from examples.tutorials.stokes_spaces import make_problem
     problem,spaces=make_problem(False);U,p=tuple(spaces);cloud=r.geometry.unit_box_grid(3)

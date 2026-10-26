@@ -7,6 +7,28 @@ simple shapes, labeled curves, and existing meshes.
 
 ![Examples of generated nodes on curved, perforated, polygonal and 3D domains](../assets/geometry_gallery.png)
 
+## Choose the result you want
+
+| Your goal | Start here | Resolution control | Returned object |
+|---|---|---|---|
+| Scattered nodes in a disk, polygon or holed plate | [2D shapes](planar-domains.md), then [sampling](sampling.md) | Interior count plus boundary counts | `PointCloud`, no cells |
+| Your own channel or curved contour | [Border pieces](parametric-borders.md) or [explicit contours](custom-domains.md) | Per-piece counts and interior count | Labeled `PointCloud` |
+| A deterministic Padua-based pattern | [Clipped Padua](padua.md) | Degree plus boundary counts | `PointCloud`; retained count varies |
+| Concentration around star-shaped holes | [Mapped Padua](padua.md#experimental-mapped-padua-points-concentrated-near-holes) | Degree per patch and clustering | Experimental `PointCloud` |
+| Unstructured nodes refined near selected boundaries | [Boundary-refined triangles](triangulation.md) | Boundary counts and sizing targets | `TriangleMesh2D`; convert to a cloud |
+| Two interlaced node sets | [Staggered layouts](staggered.md) | Existing triangle connectivity | Vertex and edge-midpoint clouds |
+| Nodes inside a solid or on a surface | [Volumes](volumes-3d.md) or [surfaces](surfaces-3d.md) | Volume/surface counts | 3D `PointCloud` |
+
+![Six node styles on the same annulus, with actual total counts](../assets/meshes/styles.png)
+
+All panels use the same annulus and 40 inner / 80 outer boundary samples.
+Random, Halton and Sobol request 200 interior nodes. Padua uses `degree=24`;
+mapped Padua uses `degree=20, clustering=2`; triangles use `growth=.25`.
+Their totals differ because degrees and sizing targets do not request a fixed
+interior count. The lines in the last panel show actual connectivity.
+Reproduce this comparison with `python -m examples.mesh_styles` from a source
+checkout with the examples and triangulation extras installed.
+
 ## The construction philosophy
 
 Describe the geometry first; choose its sampling resolution afterwards. A
@@ -32,7 +54,7 @@ interior, use [`meshgen.triangulate`](sampling.md#boundary-driven-triangulation)
 It builds a constrained triangle mesh from `Border(n)` or arc-length domain
 samples and also supplies its vertices for RBF methods.
 
-## One generation function
+## Step 1 — Generate your first cloud
 
 The geometry API is included in the base installation. To run the plotting
 lines used throughout this chapter, install the optional example dependencies:
@@ -49,12 +71,48 @@ domain = geometry.Annulus(inner_radius=.35, outer_radius=1.)
 cloud = meshgen.generate(domain, interior=200,
                          boundary={"inner": 40, "outer": 80}, seed=42)
 fig, ax = viz.plot_cloud(cloud, normals=True)
+# In a script, add: import matplotlib.pyplot as plt; plt.show()
 ```
 
 ![An annulus with labeled boundaries and outward normals](../assets/meshes/annulus.png)
 
 The center is a hole: it gets boundary samples but no material samples.
 Normals on the inner circle point into the hole.
+
+## Step 2 — Inspect what you built
+
+Run this after the first block in the same Python session:
+
+```python
+print("coordinate array:", cloud.points.shape)
+print("interior nodes:", len(cloud.interior))
+for label, indices in cloud.boundary.items():
+    print(label, "nodes:", len(indices), "normal array:", cloud.normals[label].shape)
+print(meshgen.quality(cloud, stencil_size=25, polynomial_degree=2))
+```
+
+Expect `(320, 2)` coordinates: 200 material nodes, 40 on `inner`, and 80 on
+`outer`. Each boundary's normals have one two-component vector per node.
+`cloud.boundary["inner"]` contains row indices; get its coordinates with
+`cloud.points[cloud.boundary["inner"]]`. The quality report helps detect close
+nodes and poor neighborhoods; it does not certify PDE accuracy.
+
+## Step 3 — Change one choice at a time
+
+```python
+# Add interior nodes while keeping the same geometry and boundary resolution.
+denser = meshgen.generate(domain, interior=400,
+                          boundary={"inner": 40, "outer": 80}, seed=42)
+fig, ax = viz.plot_cloud(denser)
+```
+
+Expect 520 total nodes, while the hole and both boundary counts stay the same.
+Next change the inner radius to `.55`: the material becomes a thinner ring.
+Plot it before a solve to check whether your interior resolution still resolves
+that gap. Follow [the sampling lesson](sampling.md) to change the distribution
+without changing the geometry.
+
+## Step 4 — Build a different geometry
 
 `meshgen.generate` accepts the following descriptions:
 
@@ -71,7 +129,8 @@ require **RBFLAB 0.4 or newer**. Existing array-based workflows remain available
 
 ## Learn to build beyond the examples
 
-Follow these sections in order:
+Each page runs from top to bottom in one Python session. Start a fresh session
+when moving to another page. Follow these sections in order:
 
 - [Built-in 2D domains](planar-domains.md): dimensions, rotations, polygons and holes.
 - [Oriented borders](parametric-borders.md): assemble a channel from individually labeled curves.

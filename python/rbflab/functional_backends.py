@@ -7,6 +7,7 @@ intentionally absent: these routines do not distinguish LHI from RBF-FD.
 """
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
+from .native_toolchain import executable_path
 from types import SimpleNamespace
 import hashlib
 import multiprocessing
@@ -107,7 +108,7 @@ def _compile(owner):
         runtime=hashlib.sha256(runtime.encode()).hexdigest(),
         bridge=hashlib.sha256(Path(__file__).read_bytes()).hexdigest())
     if cached:
-        return cached/'kernel',bound
+        return executable_path(cached/'kernel'),bound
     code,alphas = header(bound.family,d,maximum,'radial')
     dispatch = '\nReal radial_value(const std::vector<Real>&z,const std::vector<int>&a,const std::vector<Real>&params){\n'
     for i,alpha in enumerate(alphas):
@@ -117,11 +118,11 @@ def _compile(owner):
     directory = build(source,dict(kind='functional_local',dimension=d,order=maximum),
                       arithmetic,owner.backend.cache_dir)
     record_request(index,directory)
-    return directory/'kernel',bound
+    return executable_path(directory/'kernel'),bound
 
 
 def _cpp(owner, jobs, inspect=False):
-    from .legacy_cpp import _linux_path
+    from .native_toolchain import native_path as _native_path, executable_path
     a,b = owner.arithmetic,owner.backend
     digits = owner.precision.local_digits or 17
     executable,bound = _compile(owner)
@@ -147,8 +148,8 @@ def _cpp(owner, jobs, inspect=False):
     with tempfile.TemporaryDirectory(prefix='rbflab_functional_') as tmp:
         source,target = Path(tmp)/'input',Path(tmp)/'output'
         source.write_text('\n'.join(lines)+'\n',encoding='ascii')
-        prefix = ['wsl.exe','-d',b.distribution,'--'] if os.name=='nt' else []
-        run = subprocess.run([*prefix,_linux_path(executable),_linux_path(source),_linux_path(target)],
+        prefix = []
+        run = subprocess.run([*prefix,_native_path(executable),_native_path(source),_native_path(target)],
                              capture_output=True,text=True,timeout=b.timeout)
         if run.returncode:
             raise RuntimeError('C++ functional backend: '+run.stderr)

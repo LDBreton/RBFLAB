@@ -3,9 +3,22 @@
 The method and backend combinations below are intentionally precise. A local
 backend choice does not automatically change a separate global sparse solve.
 
+Public global entry points accept `interpolate(space=..., centers=..., data=...)`
+and `GlobalCollocation(space=..., collocation_scheme=...)`; evolution uses
+`solve(time_scheme=...)`. Earlier positional and keyword spellings remain
+compatible. `ScalarSpace` fits `(N, C)` independent scalar outputs, whereas
+`DivergenceFreeSpace` fits `(N, dimension)` coupled vector outputs.
+`execution_info(obj)` reports configured or implemented execution and selected
+existing diagnostics without dispatching computation; unknown routes remain
+null. Geometry remains Float64 even with extended arithmetic.
+
 | Capability | Python | C++ double | C++ MPFR | PyTorch |
 |---|---|---|---|---|
 | Scalar stationary global collocation, 2D/3D | Yes | Yes, `CppGlobalBackend` from source checkout | Yes, `Precision(global_digits=...)` | — |
+| Scalar unsteady global collocation, 2D/3D | Yes, backward Euler/BDF2 | Yes, native initial/mass/shifted solves | Yes, `Precision(global_digits=...)` | — |
+| Global scalar/vector interpolation, 2D/3D | Yes | Yes, `interpolate(..., backend=...)` | Yes, including optional MPLAPACK | — |
+| Explicit-cover RBF partition-of-unity interpolation, scalar or independent outputs, 2D/3D | Yes, `PatchCover` | Yes, one native worker with retained patch factors | Yes, `Precision(global_digits=...)` | — |
+| Planar divergence-free RBF partition of unity, 2D | Yes, aligned streamfunction blend | Yes, retained native patch factors and evaluation | Yes, mpmath glue alignment and optional native MPFR local solves/evaluation | Velocity and first derivatives; approximates rather than exactly interpolates nodes |
 | Scalar LHI convenience assembly (`LHI`) | Yes | — | — | — |
 | Scalar RBF-FD operators, 2D/3D | Yes | Yes, from source checkout | Supported; installed archive test pending | Yes, CPU Float64 |
 | Divergence-free steady Stokes, global 2D/3D | Yes | Yes, symmetric `CppGlobalBackend` | Yes, `Precision(global_digits=...)` | — |
@@ -18,6 +31,10 @@ The curated [3D operator example](https://github.com/LDBreton/RBFLAB/blob/main/e
 C++ double, and PyTorch Float64 on Windows/WSL. The
 [Stokes example](https://github.com/LDBreton/RBFLAB/blob/main/examples/stokes_spaces.py) ran with Python, C++ double,
 and C++ MPFR local weights.
+
+Scalar explicit-cover partition-of-unity interpolation supports derivatives
+through order two. Planar divergence-free partition of unity supports velocity
+and first derivatives. Both exclude pressure spaces.
 The six default Python examples ran from an installed wheel and source archive
 outside the checkout.
 
@@ -30,7 +47,20 @@ Stationary `SymbolicStokes` also accepts this backend with symmetric collocation
 `DivergenceFreeSpace` velocity and scalar pressure spaces, including solenoidal
 polynomial augmentation in 2D/3D. Velocity, pressure (modulo constants), pressure
 gradient, divergence and momentum residuals have native expansion evaluation.
-Asymmetric Stokes, coupled scalar blocks and evolution do not accept this global backend.
+Supported symbolic forcing and velocity boundary data also evaluate in the
+native worker, with Python fallback for arbitrary callbacks or unsupported
+expressions. Initial velocity evaluation and time stepping remain Python-owned.
+The optional `CppGlobalBackend(linear_solver="mplapack", mplapack_dir=...)`
+uses an explicitly installed MPFR/OpenMP dense LU engine with
+`Precision(global_digits=...)`. Eigen remains the default; kernel assembly,
+evaluation, balancing and method APIs are shared by both engines.
+Scalar evolution supports linear, fixed spatial and boundary operators with
+time-dependent data. Both symmetric Hermite and asymmetric scalar schemes are
+supported; pure derivative Hermite source functionals retain the existing
+constant-mode adjustment. Native interpolation supports independent scalar
+outputs and explicit divergence-free vector spaces, with deterministic worker
+cleanup. Asymmetric Stokes and coupled scalar blocks remain unsupported by this
+global backend. Nonlinear or time-varying scalar operators are outside this path.
 See the [native scalar example](https://github.com/LDBreton/RBFLAB/blob/main/examples/global_cpp.py)
 and [global tutorial](tutorials/global-collocation.md#native-double-and-multiprecision).
 

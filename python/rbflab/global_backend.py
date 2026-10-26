@@ -6,6 +6,7 @@ import hashlib
 import json
 import math
 import os
+from .native_toolchain import executable_path
 import subprocess
 import threading
 import weakref
@@ -21,17 +22,21 @@ class CppGlobalBackend:
 
     Native assembly, factorization, solves, and evaluation stay in the selected
     arithmetic. Accessing ``system.matrix`` explicitly exports entries lazily.
-    The compiler toolchain uses Ubuntu WSL on Windows.
+    Windows uses native MinGW-w64 GCC and directly launches Windows executables.
 
     Args:
-        threads: OpenMP threads for assembly and evaluation.
+        threads: Thread limit for native assembly, evaluation, matrix products,
+            and Eigen's parallel global dense factorization when applicable.
         compute_condition: Estimate the balanced matrix one-norm condition.
         cache_dir: Directory for compiled native artifacts.
-        distribution: WSL distribution; currently Ubuntu.
+        distribution: Compatibility field; retain the default Ubuntu. CPU execution is native.
         timeout: Maximum seconds for each worker command.
         derivative_order: Maximum evaluation derivative order to prepare, in
             addition to source functional derivatives. Total order is at most 6.
         reuse_workers: Keep up to four idle workers for subsequent assemblies.
+        linear_solver: Dense factor engine, ``'eigen'`` (default) or the optional
+            MPFR-only ``'mplapack'``. Assembly and evaluation are unchanged.
+        mplapack_dir: Explicit installed MPLAPACK MPFR/OpenMP dependency prefix.
     """
     threads: int = 1
     compute_condition: bool = True
@@ -40,12 +45,20 @@ class CppGlobalBackend:
     timeout: float = 120.0
     derivative_order: int = 2
     reuse_workers: bool = True
+    linear_solver: str = 'eigen'
+    mplapack_dir: object = None
 
     def __post_init__(self):
+        if self.linear_solver not in ('eigen','mplapack'):
+            raise ValueError("linear_solver must be 'eigen' or 'mplapack'")
+        if self.linear_solver=='mplapack' and self.mplapack_dir is None:
+            raise ValueError('mplapack_dir is required for the optional MPLAPACK solver')
+        if self.linear_solver=='eigen' and self.mplapack_dir is not None:
+            raise ValueError('mplapack_dir requires linear_solver=\'mplapack\'')
         if type(self.threads) is not int or self.threads < 1: raise ValueError('threads must be positive')
         if type(self.compute_condition) is not bool: raise TypeError('compute_condition must be bool')
         if type(self.reuse_workers) is not bool: raise TypeError('reuse_workers must be bool')
-        if self.distribution != 'Ubuntu': raise NotImplementedError('Native compilation currently uses Ubuntu WSL')
+        if self.distribution != 'Ubuntu': raise NotImplementedError('distribution is a compatibility field; retain Ubuntu')
         if not isinstance(self.timeout,(float,int)) or not math.isfinite(self.timeout) or self.timeout <= 0: raise ValueError('timeout must be positive')
         if type(self.derivative_order) is not int or not 0 <= self.derivative_order <= 6:
             raise ValueError('derivative_order must be between 0 and 6')
@@ -71,56 +84,83 @@ def _memo_valid(entry):
                for path, signature in entry[1])
 
 
-def _remember_compiled(key, directory, index, root):
+def _remember_compiled(key, directory, index, root, dependency=None):
     from . import kernel_compiler
     dependencies = [Path(__file__), Path(kernel_compiler.__file__),
-                    Path(kernel_compiler.__file__).with_name('symbolic_kernel.py')]
+                    Path(kernel_compiler.__file__).with_name('symbolic_kernel.py'),
+                    Path(kernel_compiler.__file__).with_name('native_toolchain.py')]
     flow_bridge = Path(__file__).with_name('global_flow_backend.py')
     if flow_bridge.exists(): dependencies.append(flow_bridge)
+    data_codegen=Path(__file__).with_name('global_data_codegen.py')
+    if data_codegen.exists():dependencies.append(data_codegen)
     dependencies.extend(root/'cpp'/name for name in
                         ('global_collocation.hpp', 'real.hpp', 'real_double.hpp',
-                         'lhi_mpfr.cpp', 'eigen_solver.hpp'))
+                         'lhi_mpfr.cpp', 'eigen_solver.hpp','global_solver.hpp'))
+    if dependency is not None:
+        dependencies.append(Path(__file__).with_name('mplapack_build.py'))
+        dependencies.extend(dependency.files)
     # Directory stats detect new/removed Eigen headers without walking the tree
     # on warm calls; file stats detect edits to every hashed dependency.
+    from .eigen_build import eigen_dependency
     eigen = root/'cpp/deps/usr/include/eigen3/Eigen'
+    if not eigen.is_dir():eigen = eigen_dependency()[0]/'Eigen'
     dependencies.extend([eigen, *eigen.rglob('*')])
     manifest = directory/'manifest.json'
     files = json.loads(manifest.read_text())['files']
-    dependencies.extend([index, manifest, directory/'kernel'])
+    dependencies.extend([index, manifest, executable_path(directory/'kernel')])
     dependencies.extend(directory/name for name in files)
     signatures = tuple((path, _file_signature(path)) for path in dependencies)
     if all(signature is not None for _, signature in signatures):
         with _compiled_memo_lock:
             if key not in _compiled_memo and len(_compiled_memo) >= 32:
                 _compiled_memo.pop(next(iter(_compiled_memo)))
-            _compiled_memo[key] = (directory/'kernel', signatures)
+            _compiled_memo[key] = (executable_path(directory/'kernel'), signatures)
 
 
-def _compiled(kernel, dimension, order, arithmetic, backend, *, pressure_kernel=None, pressure_order=0):
+def _compiled(kernel, dimension, order, arithmetic, backend, *, pressure_kernel=None, pressure_order=0,data_plan=None,vector_only=False):
     from .kernel_compiler import as_bound, request_cache, record_request, header, build, ROOT, PRELUDE
     bound=as_bound(kernel)
+    if vector_only and pressure_kernel is not None:raise ValueError('Vector-only workers do not have pressure')
     family=bound.family
     base=(Path(backend.cache_dir) if backend.cache_dir else Path.home()/'.cache'/'rbflab').resolve()
     key=(family.expression, family.radial_variable, family.parameters,
-         family.dimension, dimension, order, arithmetic, base)
+         family.dimension, dimension, order, arithmetic, base,backend.linear_solver,
+         Path(backend.mplapack_dir).resolve() if backend.mplapack_dir is not None else None,vector_only,
+         os.environ.get('RBFLAB_CXX'),os.environ.get('RBFLAB_NATIVE_PREFIX'))
+    if backend.linear_solver=='mplapack' and arithmetic!='mpfr':
+        raise ValueError('MPLAPACK requires Precision(global_digits=...) with MPFR arithmetic')
     pressure=as_bound(pressure_kernel) if pressure_kernel is not None else None
     families=(family,) if pressure is None else (family,pressure.family)
     if pressure is not None:
         f=pressure.family
         key+=('fields',f.expression,f.radial_variable,f.parameters,f.dimension,pressure_order)
+    if data_plan is not None:key+=('data',data_plan.expressions)
     with _compiled_memo_lock:
         entry=_compiled_memo.get(key)
         if entry is not None and _memo_valid(entry):return entry[0],bound
         _compiled_memo.pop(key,None)
+    dependency=None
+    if backend.linear_solver=='mplapack':
+        from .mplapack_build import mplapack_dependency
+        dependency=mplapack_dependency(backend.mplapack_dir)
     runtime=(ROOT/'cpp/global_collocation.hpp').read_text()
+    adapter=(ROOT/'cpp/global_solver.hpp').read_bytes()
     bridge=Path(__file__).read_bytes()
     if pressure is not None:bridge+=Path(__file__).with_name('global_flow_backend.py').read_bytes()
+    data_identity=None
+    if data_plan is not None:
+        import sympy as sp
+        bridge+=Path(__file__).with_name('global_data_codegen.py').read_bytes()
+        data_identity=[sp.srepr(expr) for expr in data_plan.expressions]
+    if dependency is not None:bridge+=Path(__file__).with_name('mplapack_build.py').read_bytes()
     index,cached=request_cache('global_collocation',families,arithmetic,backend.cache_dir,
         dimension=dimension,order=order,runtime=hashlib.sha256(runtime.encode()).hexdigest(),
-        bridge=hashlib.sha256(bridge).hexdigest(),pressure_order=pressure_order)
+        bridge=hashlib.sha256(bridge+adapter).hexdigest(),pressure_order=pressure_order,
+        linear_solver=backend.linear_solver,dependency=dependency.identity if dependency else None,
+        native_data=data_identity,vector_only=vector_only)
     if cached:
-        _remember_compiled(key,cached,index,ROOT)
-        return cached/'kernel',bound
+        _remember_compiled(key,cached,index,ROOT,dependency)
+        return executable_path(cached/'kernel'),bound
     def generated(family,order,namespace):
         code,alphas=header(family,dimension,order,namespace,arithmetic,shared=True)
         dispatch=f'\ntemplate<class A> int {namespace}_index(const A&a){{\n'
@@ -132,21 +172,30 @@ def _compiled(kernel, dimension, order, arithmetic, backend, *, pressure_kernel=
         return code+dispatch
     code=generated(bound.family,order,'radial')
     if pressure is not None:
-        code=f'\n#define RBFLAB_GLOBAL_FIELDS\nconstexpr int PRESSURE_PARAMETERS={len(pressure.values)};\n'+code
+        code=f'\n#define RBFLAB_GLOBAL_FIELDS\n#define RBFLAB_GLOBAL_PRESSURE\nconstexpr int PRESSURE_PARAMETERS={len(pressure.values)};\n'+code
         code+=generated(pressure.family,pressure_order,'pressure')
-    source=PRELUDE+f'\nconstexpr int DIM={dimension},PARAMETERS={len(bound.values)};\n'+code+runtime
+    elif vector_only:code='\n#define RBFLAB_GLOBAL_FIELDS\n#define RBFLAB_GLOBAL_VECTOR_ONLY\n'+code
+    if data_plan is not None:
+        from .global_data_codegen import generate_data
+        code+=generate_data(data_plan,arithmetic)
+    source='#define RBFLAB_GLOBAL_DENSE\n'+PRELUDE+f'\nconstexpr int DIM={dimension},PARAMETERS={len(bound.values)};\n'+code+runtime
+    if dependency is not None:source='#define RBFLAB_MPLAPACK\n'+source
     directory=build(source,dict(kind='global_collocation',dimension=dimension,order=order,
-                               pressure_order=pressure_order,fields=pressure is not None),arithmetic,backend.cache_dir)
+                               pressure_order=pressure_order,fields=pressure is not None or vector_only,
+                               native_data=data_identity,
+                               vector_only=vector_only,
+                               linear_solver=backend.linear_solver),arithmetic,backend.cache_dir,
+                    dependency=dependency,extra_headers=('global_solver.hpp',))
     record_request(index,directory)
-    _remember_compiled(key,directory,index,ROOT)
-    return directory/'kernel',bound
+    _remember_compiled(key,directory,index,ROOT,dependency)
+    return executable_path(directory/'kernel'),bound
 
 
 class _Worker:
     def __init__(self, executable, backend):
-        from .legacy_cpp import _linux_path
-        prefix=['wsl.exe','-d',backend.distribution,'--'] if os.name=='nt' else []
-        self.process=subprocess.Popen([*prefix,_linux_path(executable)],stdin=subprocess.PIPE,
+        from .native_toolchain import native_path as _native_path, executable_path
+        prefix=[]
+        self.process=subprocess.Popen([*prefix,_native_path(executable)],stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,text=True,bufsize=1)
         self.timeout=float(backend.timeout)
         self.lock=threading.RLock()
@@ -372,6 +421,8 @@ class CppGlobalSystem:
             diagnostics['condition_kind']='estimate'
         diagnostics['backend']='cpp_global'
         diagnostics['arithmetic']='mpfr' if self.ctx else 'float64'
+        diagnostics['linear_solver']=self.backend.linear_solver
+        if hasattr(self,'data_backend'):diagnostics['data_backend']=self.data_backend
         return CppGlobalSolution(self,coeffs,diagnostics)
 
     def close(self):self._finalizer()
@@ -406,7 +457,8 @@ class CppGlobalSolution:
 
     def evaluate_mp(self,points,operator=None):
         if self.system.ctx is None:raise ValueError('evaluate_mp requires extended precision')
-        return self.system.ctx.matrix(self._evaluate(points,operator))
+        values=self._evaluate(points,operator)
+        return self.system.ctx.matrix(values) if values else self.system.ctx.matrix(0,1)
 
     def evaluate(self,points,operator=None):
         return np.asarray([float(v) for v in self._evaluate(points,operator)],dtype=float)
@@ -421,6 +473,7 @@ def prepare_cpp_global(method,problem,dimension,cache_dir):
     from dataclasses import replace
     from .operators import NormalDerivative,Robin
     from .spaces import SpaceStokesProblem
+    from .evolution import EvolutionPDE
     if isinstance(problem,SpaceStokesProblem):
         from .global_flow_backend import prepare_cpp_flow
         return prepare_cpp_flow(method,problem,dimension,cache_dir)
@@ -436,8 +489,10 @@ def prepare_cpp_global(method,problem,dimension,cache_dir):
     source=equation if method.scheme=='symmetric' else 0
     order=max(equation+source,backend.derivative_order+source)
     if order>6:raise NotImplementedError('C++ global collocation supports total kernel derivative order up to 6')
+    from .global_evolution_backend import scalar_data_bundle
+    data_plan=scalar_data_bundle(problem,dimension,problem.initial if isinstance(problem,EvolutionPDE) else None)[0]
     method.compiled_artifact=_compiled(method.kernel,dimension,order,
-        'mpfr' if method.precision.global_digits else 'float64',backend)[0]
+        'mpfr' if method.precision.global_digits else 'float64',backend,data_plan=data_plan)[0]
     return method
 
 
@@ -446,65 +501,58 @@ def assemble_cpp_global(method,problem,cloud):
     if isinstance(problem,SpaceStokesProblem):
         from .global_flow_backend import assemble_cpp_flow
         return assemble_cpp_flow(method,problem,cloud)
+    from .evolution import EvolutionPDE
+    if isinstance(problem,EvolutionPDE):
+        from .global_evolution_backend import assemble_cpp_evolution
+        return assemble_cpp_evolution(method,problem,cloud)
     from .methods import _query
     from .operators import Identity, bind_operators
     from .problems import boundary_data, values
-    from .nodal import Arithmetic, NodalBasis, collocation_data
-    from .stencils import polynomial_powers
-    import mpmath
-    p=method.precision;b=method.backend;d=cloud.dimension
+    from .nodal import dense_arithmetic, collocation_data
+    from .global_scalar_engine import assemble_scalar_native
+    from .global_evolution_backend import scalar_data_bundle, scalar_data_rows
+    d=cloud.dimension
     if d not in (2,3):raise ValueError('C++ global collocation requires 2D or 3D')
-    ctx=mpmath.mp.clone() if p.global_digits else None
-    if ctx:ctx.dps=p.global_digits
-    digits=p.global_digits or 17
+    arithmetic=dense_arithmetic(method.kernel,method.precision)
+    ctx=arithmetic.ctx
     if ctx:
-        for data in [problem.rhs] + [bc.rhs for bc in problem.boundary]:
-            if callable(data) and not hasattr(data, 'mp_values'):
+        for data in [problem.rhs]+[bc.rhs for bc in problem.boundary]:
+            if callable(data) and not hasattr(data,'mp_values'):
                 raise TypeError('Extended native methods require PrecisionData callbacks')
-    if method.scheme=='symmetric' and method.polynomial_degree is None:
+    plan,program_ids,_=scalar_data_bundle(problem,d)
+    node_order=np.r_[cloud.interior_indices,cloud.boundary_indices] if method.scheme=='symmetric' and method.polynomial_degree is None else np.arange(len(cloud.points))
+    rows=scalar_data_rows(problem,cloud,program_ids,order=node_order)
+    if rows is not None:
+        from dataclasses import replace
+        template=replace(problem,rhs=0,boundary=tuple(replace(bc,rhs=0) for bc in problem.boundary))
+        bd=boundary_data(template,cloud)
+        centers=_query(cloud.points[node_order])
+        ops=[bd[int(node)][0] if int(node) in bd else problem.operator for node in node_order]
+        rhs=[0]*len(centers)
+    elif method.scheme=='symmetric' and method.polynomial_degree is None:
         bd=boundary_data(problem,cloud,ctx=ctx)
-        ids=np.r_[cloud.interior_indices,cloud.boundary_indices]
-        centers=_query(cloud.points[ids]);ops=[problem.operator]*len(cloud.interior_indices)+[bd[int(i)][0] for i in cloud.boundary_indices]
+        node_order=np.r_[cloud.interior_indices,cloud.boundary_indices]
+        centers=_query(cloud.points[node_order])
+        ops=[problem.operator]*len(cloud.interior_indices)+[bd[int(i)][0] for i in cloud.boundary_indices]
         data=mp_values(problem.rhs,cloud.points[cloud.interior_indices],ctx) if ctx else values(problem.rhs,cloud.points[cloud.interior_indices])
         rhs=list(data)+[bd[int(i)][1] for i in cloud.boundary_indices]
     else:
+        node_order=np.arange(len(cloud.points))
         centers=_query(cloud.points)
-        ops,rhs=collocation_data(problem,cloud,Arithmetic(method.kernel,p.global_digits))
+        ops,rhs=collocation_data(problem,cloud,arithmetic)
     ops=bind_operators(ops,centers)
     source_ops=ops if method.scheme=='symmetric' else [Identity(d)]*len(centers)
-    powers=[] if method.polynomial_degree is None else polynomial_powers(d,method.polynomial_degree)
-    if len(powers)>len(centers):raise ValueError('Too few centers for polynomial basis')
-    if powers:
-        basis=NodalBasis(Arithmetic(method.kernel,p.global_digits),centers,method.polynomial_degree,source_operators=source_ops)
-        P=np.asarray(basis.polynomials(centers,source_ops).tolist() if ctx else basis.polynomials(centers,source_ops),float)
-        row_scale=np.max(abs(P),axis=1)
-        check=P/np.where(row_scale>0,row_scale,1)[:,None]
-        column_scale=np.max(abs(check),axis=0)
-        check=check/np.where(column_scale>0,column_scale,1)[None,:]
-        if np.linalg.matrix_rank(check)<len(powers):
-            raise np.linalg.LinAlgError('Polynomial functionals are not unisolvent')
-        origin=basis.origin;scale=[basis.scale]*d
-    else:origin=[0]*d;scale=[1]*d
-    source_order=max((sum(alpha) for op in source_ops for alpha,_ in op.terms),default=0)
-    equation_order=max((sum(alpha) for op in ops for alpha,_ in op.terms),default=0)
-    order=max(b.derivative_order,equation_order)+source_order
-    if order>6:raise NotImplementedError('C++ global collocation supports total kernel derivative order up to 6')
-    executable,bound=_compiled(method.kernel,d,order,'mpfr' if ctx else 'float64',b)
-    worker=_acquire_worker(executable,b)
-    system=CppGlobalSystem(worker,centers,source_ops,powers,list(rhs)+[0]*len(powers),ctx,digits,b,order)
-    enc=system.encode
-    tokens=['INIT',str(digits),str(b.threads),str(int(method.scheme=='symmetric')),str(len(centers)),str(len(powers)),enc(1)]
-    tokens.extend(enc(v) for v in bound.values)
-    tokens.extend(enc(v) for v in centers.flat)
-    tokens.extend(enc(v) for v in centers.flat)
-    tokens.extend(enc(v) for v in origin)
-    tokens.extend(enc(v) for v in scale)
-    tokens.extend(str(v) for power in powers for v in power)
-    for op in ops:tokens.extend(_op_tokens(op,enc))
-    for op in source_ops:tokens.extend(_op_tokens(op,enc))
+    system=assemble_scalar_native(method,centers,ops,source_ops,rhs,data_plan=plan,arithmetic=arithmetic)
+    system.data_backend='python'
     try:
-        worker.request(' '.join(tokens))
-        worker.request('BUILD')
+        if plan is not None and rows is not None:
+            system.worker.request('DATA_INIT '+str(len(rows))+' '+' '.join(map(str,rows)))
+            reply=system.worker.request('RHS_DATA '+system.encode(0))
+            if not reply or int(reply[0])!=system.size or len(reply)!=system.size+1:
+                raise RuntimeError('Invalid native stationary data result')
+            system.rhs=[system.number(value) for value in reply[1:]]
+            system.data_backend='cpp_symbolic'
     except Exception:
-        worker.close(force=True);raise
+        system.close()
+        raise
     return system

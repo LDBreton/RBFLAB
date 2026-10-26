@@ -1,4 +1,4 @@
-"""Build the owned MPFR/OpenMP LHI executable (Linux or Windows with WSL)."""
+"""Build the owned MPFR/OpenMP LHI executable (Linux or native Windows)."""
 from pathlib import Path
 import os,subprocess,shutil,json,hashlib
 import sympy as sp
@@ -26,17 +26,17 @@ def main():
  generate(folder)
  from rbflab.eigen_build import eigen_dependency
  eigen_path,eigen_hash=eigen_dependency()
- from rbflab.legacy_cpp import _linux_path
- src=_linux_path(folder)
- prefix=['wsl.exe','-d','Ubuntu','--'] if os.name=='nt' else []
- compiler=subprocess.check_output(prefix+['g++','--version'],text=True).splitlines()[0]
- sources=['cpp/lhi_mpfr.cpp','cpp/real.hpp','cpp/eigen_solver.hpp','cpp/real_double.hpp','cpp/generated_imq.hpp','cpp/generated_hybrid.hpp','examples/generate_cpp_hybrid.py','python/rbflab/kernels.py','examples/build_cpp_backend.py','python/rbflab/eigen_build.py']
+ from rbflab.native_toolchain import native_path as _native_path, compiler, compiler_identity, arithmetic_flags, executable_path, compiler_environment
+ src=_native_path(folder)
+ prefix=[]
+ compiler_version=compiler_identity()
+ sources=['cpp/lhi_mpfr.cpp','cpp/real.hpp','cpp/eigen_solver.hpp','cpp/real_double.hpp','cpp/generated_imq.hpp','cpp/generated_hybrid.hpp','examples/generate_cpp_hybrid.py','python/rbflab/kernels.py','examples/build_cpp_backend.py','python/rbflab/eigen_build.py','python/rbflab/native_toolchain.py']
  for native in (False,True):
-  name='lhi_double' if native else 'lhi_mpfr'
-  flags=['-DRBFLAB_DOUBLE'] if native else ['-I'+src+'/deps/usr/include','-I'+src+'/deps/usr/include/x86_64-linux-gnu','-Wl,-l:libmpfr.so.6','-Wl,-l:libgmp.so.10']
-  subprocess.run(prefix+['g++','-O3','-std=c++17','-fopenmp','-I'+src+'/deps/usr/include/eigen3',src+'/lhi_mpfr.cpp',*flags,'-o',src+'/'+name],check=True)
+  name=executable_path(Path('lhi_double' if native else 'lhi_mpfr')).name
+  flags=arithmetic_flags('float64' if native else 'mpfr')
+  subprocess.run(prefix+[compiler(),'-O3','-std=c++17','-fopenmp','-I'+_native_path(eigen_path),src+'/lhi_mpfr.cpp',*flags,'-o',src+'/'+name],check=True,env=compiler_environment())
   versions=subprocess.check_output(prefix+[src+'/'+name,'--version'],text=True).strip()
-  manifest=dict(eigen_sha256=eigen_hash,protocol=2,arithmetic='float64' if native else 'mpfr',compiler=compiler,runtime=versions,source_sha256={p:hashlib.sha256((root/p).read_bytes()).hexdigest() for p in sources},binary_sha256=hashlib.sha256((folder/name).read_bytes()).hexdigest())
-  (folder/('build_manifest_double.json' if native else 'build_manifest.json')).write_text(json.dumps(manifest,indent=2)+'\n')
+  manifest=dict(eigen_sha256=eigen_hash,protocol=2,arithmetic='float64' if native else 'mpfr',compiler=compiler_version,platform=os.name,runtime=versions,source_sha256={p:hashlib.sha256((root/p).read_bytes()).hexdigest() for p in sources},binary_sha256=hashlib.sha256((folder/name).read_bytes()).hexdigest())
+  (folder/(('build_manifest_double_windows.json' if native else 'build_manifest_windows.json') if os.name=='nt' else ('build_manifest_double.json' if native else 'build_manifest.json'))).write_text(json.dumps(manifest,indent=2)+'\n')
   print('Built',folder/name,versions,flush=True)
 if __name__=='__main__':main()

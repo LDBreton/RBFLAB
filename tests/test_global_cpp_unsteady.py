@@ -81,3 +81,37 @@ def test_incompatible_initial_velocity(tmp_path):
     method=r.GlobalCollocation(spaces=spaces,backend=r.CppGlobalBackend(cache_dir=tmp_path,compute_condition=False))
     with method.assemble(problem,r.geometry.unit_box_grid(2)) as system:
         with pytest.raises(ValueError,match='incompatible'):system.solve('.01',2)
+
+
+@native
+def test_parallel_precision_reuse_and_evaluation_cache(tmp_path):
+    """Reused workers must reset precision/cache; query caches exclude coefficients."""
+    problem,spaces=problem_and_spaces(hybrid=True)
+    cloud=r.geometry.unit_box_grid(8)
+    query=np.random.default_rng(413).uniform(.1,.9,(130,2))
+    reference=None
+    for digits,threads in [(60,4),(80,4),(60,1)]:
+        method=r.GlobalCollocation(spaces=spaces,precision=r.Precision(global_digits=digits),
+            backend=r.CppGlobalBackend(cache_dir=tmp_path,threads=threads,compute_condition=False))
+        with method.assemble(problem,cloud) as system:
+            configured,bits=map(int,system.worker.request('RUNTIME_INFO'))
+            assert configured==threads and bits==int(np.ceil(digits*np.log2(10)))+8
+            info=lambda:tuple(map(int,system.worker.request('EVAL_CACHE_INFO')))
+            assert info()==(0,0,0,0)
+            tr=system.solve('.01',2,scheme='backward_euler')
+            tr.states[0].velocity(cloud.interior,extended=True)
+            assert info()[0]==1 and info()[3]==0  # Reuse mass, no second matrix.
+            first=tr.states[0].pressure_gradient(query,extended=True)
+            assert info()[1:2]==(1,)
+            second=tr.states[1].pressure_gradient(query,extended=True)
+            assert info()[0]==2 and info()[1]==1
+            assert system.ctx.mnorm(first-second,'inf')>system.ctx.mpf('1e-5')
+            velocity=tr.states[1].velocity(query,extended=True)
+            shifted=tr.states[1].pressure_gradient(query+.001,extended=True)
+            assert info()[1]==3  # Operator and point changes must miss.
+            current=(second,velocity,shifted)
+            if reference is None:reference=[v.tolist() for v in current]
+            else:
+                for value,expected in zip(current,reference):
+                    assert system.ctx.mnorm(value-system.ctx.matrix(expected),'inf')<system.ctx.mpf('1e-42')
+            assert system.solve('.01',2,scheme='backward_euler').diagnostics['new_factorizations']==0

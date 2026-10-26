@@ -3,6 +3,7 @@
 Exposes M, A, and a boundary map C in M z_dot + A z = forcing(t)+C g(t).
 Local Hermite unknowns have M=I-SL, not an identity mass matrix.
 """
+from .api_contracts import _UNSET, _keyword_alias
 from dataclasses import dataclass, replace
 from fractions import Fraction
 from types import SimpleNamespace
@@ -254,7 +255,7 @@ class EvolutionSystem:
             self.initial_constraint_residual=None
         return z,initial
 
-    def solve(self,dt,steps,*,scheme="bdf2",start_time=0) -> "EvolutionTrajectory":
+    def solve(self,dt,steps,*,scheme=_UNSET,start_time=0,time_scheme=_UNSET) -> "EvolutionTrajectory":
         """Advance at fixed dt with backward Euler or BE-started BDF2.
 
         Args:
@@ -262,12 +263,14 @@ class EvolutionSystem:
                 intent on conversion to the selected arithmetic.
             steps (int): Positive number of steps.
             scheme (str): "backward_euler" or "bdf2".
+            time_scheme (str): Alias for scheme; specify only one spelling.
             start_time (float, str, or Fraction): Time of the supplied initial field.
 
         Returns:
             EvolutionTrajectory: Initial field, saved states, and diagnostics.
                 A + alpha*M is factored once per distinct alpha.
         """
+        scheme = _keyword_alias(scheme, time_scheme, name="scheme", alias_name="time_scheme", default="bdf2")
         dt=Fraction(dt);start_time=Fraction(start_time)
         if dt<=0 or type(steps) is not int or steps<1:raise ValueError("Positive dt and integer steps required")
         if scheme not in ("backward_euler","bdf2"):raise ValueError("Unknown time scheme")

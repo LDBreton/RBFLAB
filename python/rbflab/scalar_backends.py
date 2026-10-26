@@ -5,6 +5,7 @@ Polynomial geometry/functionals are prepared once with the same arithmetic.
 """
 from dataclasses import dataclass
 from pathlib import Path
+from .native_toolchain import executable_path
 import hashlib,json,os,subprocess,tempfile,time
 from concurrent.futures import ProcessPoolExecutor
 import numpy as np
@@ -36,7 +37,7 @@ def _cpp_compile(kernel,dimension,order,digits,cache_dir):
     bound=as_bound(kernel);runtime=(ROOT/'cpp/scalar_local.hpp').read_text()
     arithmetic='mpfr' if digits else 'float64'
     index,cached=request_cache('scalar_local',(bound.family,),arithmetic,cache_dir,dimension=dimension,order=order,bridge=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),runtime=hashlib.sha256(runtime.encode()).hexdigest())
-    if cached:return cached/'kernel',bound
+    if cached:return executable_path(cached/'kernel'),bound
     code,alphas=header(bound.family,dimension,order,'radial')
     dispatch='\nReal radial_value(const std::vector<Real>&z,const std::vector<int>&a,const std::vector<Real>&params){\n'
     for i,alpha in enumerate(alphas):
@@ -45,7 +46,7 @@ def _cpp_compile(kernel,dimension,order,digits,cache_dir):
     source=PRELUDE+f'\nconstexpr int DIM={dimension},PARAMETERS={len(bound.values)};\n'+code+dispatch+runtime
     directory=build(source,dict(kind='scalar_local',dimension=dimension,order=order),arithmetic,cache_dir)
     record_request(index,directory)
-    return directory/'kernel',bound
+    return executable_path(directory/'kernel'),bound
 
 
 def _torch_matrix(kernel,x,left,y,right,scale):
@@ -99,7 +100,7 @@ class ScalarExecutor:
         return result
 
     def _cpp(self,rhs):
-        from .legacy_cpp import _linux_path
+        from .native_toolchain import native_path as _native_path, executable_path
         a=self.arithmetic;digits=self.digits or 17;b=self.backend
         num=lambda v:a.ctx.nstr(a.number(v),digits+5) if a.ctx else format(float(v),'.17g')
         lines=[f'{digits} {b.threads} {int(b.compute_condition and rhs is None)} {int(rhs is not None)} {len(self.jobs)}',' '.join(num(v) for v in self.bound.values)]
@@ -118,8 +119,8 @@ class ScalarExecutor:
             if rhs is not None:lines.append(' '.join(num(v) for v in rhs[index]))
         with tempfile.TemporaryDirectory(prefix='rbflab_scalar_') as tmp:
             source=Path(tmp)/'input';target=Path(tmp)/'output';source.write_text('\n'.join(lines)+'\n',encoding='ascii')
-            prefix=['wsl.exe','-d',b.distribution,'--'] if os.name=='nt' else []
-            run=subprocess.run([*prefix,_linux_path(self.executable),_linux_path(source),_linux_path(target)],capture_output=True,text=True,timeout=b.timeout)
+            prefix=[]
+            run=subprocess.run([*prefix,_native_path(self.executable),_native_path(source),_native_path(target)],capture_output=True,text=True,timeout=b.timeout)
             if run.returncode:raise RuntimeError('C++ scalar backend: '+run.stderr)
             results=[]
             for i,line in enumerate(target.read_text().splitlines()):

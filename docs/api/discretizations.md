@@ -13,6 +13,8 @@ See [functional operators](../tutorials/local-approximation.md) and
 
 ::: rbflab.interpolate
 
+::: rbflab.PatchCover
+
 ::: rbflab.RBFFD.weights
 
 ::: rbflab.GlobalCollocation

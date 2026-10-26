@@ -76,11 +76,13 @@ nav:
           - Oriented borders: geometry/parametric-borders.md
           - Parametric contours: geometry/custom-domains.md
           - Labels and normals: geometry/labels-normals.md
-      - Sampling and quality: geometry/sampling.md
+      - Node distributions and quality: geometry/sampling.md
+      - Padua node recipes: geometry/padua.md
       - 3D geometry:
           - Volume clouds: geometry/volumes-3d.md
           - Surface clouds: geometry/surfaces-3d.md
       - Connected meshes:
+          - Boundary-refined triangles: geometry/triangulation.md
           - Gmsh triangles: geometry/gmsh.md
           - Staggered clouds explained: geometry/staggered.md
   - Tutorials:

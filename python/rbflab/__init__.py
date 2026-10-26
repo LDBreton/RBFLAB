@@ -20,11 +20,13 @@ from .samples import Samples
 from .local_approximation import LocalApproximation
 from .centers import CenterGroup
 from .methods import GlobalCollocation, LHI, interpolate
+from .patches import PatchCover
 from .rbf_fd import RBFFD
 from .discrete_operators import DiscreteOperator, OperatorSet
 from .lhi_backends import PythonBackend, CppBackend
 from .global_backend import CppGlobalBackend
 from .torch_backend import TorchBackend
+from .execution import execution_info
 
 __all__ = [
     'geometry', 'meshgen', 'PointCloud', 'Precision', 'PrecisionData', 'LocalSolver',
@@ -33,6 +35,6 @@ __all__ = [
     'LinearPDE', 'BoundaryCondition', 'Dirichlet', 'EvolutionPDE',
     'SymbolicScalar', 'SymbolicSystem', 'SymbolicStokes',
     'ScalarSpace', 'DivergenceFreeSpace', 'PressureSpace', 'StencilPolicy', 'Samples', 'LocalApproximation', 'CenterGroup',
-    'GlobalCollocation', 'LHI', 'RBFFD', 'interpolate', 'DiscreteOperator', 'OperatorSet',
-    'PythonBackend', 'CppBackend', 'CppGlobalBackend', 'TorchBackend',
+    'GlobalCollocation', 'LHI', 'RBFFD', 'interpolate', 'PatchCover', 'DiscreteOperator', 'OperatorSet',
+    'PythonBackend', 'CppBackend', 'CppGlobalBackend', 'TorchBackend', 'execution_info',
 ]

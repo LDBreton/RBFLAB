@@ -1,6 +1,6 @@
 """Cached C++ Cartesian evaluators shared by scalar methods and space assemblers.
 
-Compilation currently uses GCC on Linux or Ubuntu WSL from a source checkout.
+Compilation uses native GCC on Linux or MinGW-w64 GCC on Windows from a source checkout.
 Parameter values never participate in generated source or cache identity.
 """
 from dataclasses import dataclass
@@ -13,7 +13,7 @@ import sympy as sp
 from sympy.printing.c import C99CodePrinter
 from .symbolic_kernel import BoundKernel,expressions,compact_parts,near_expression
 from .kernels import _COORDINATES
-from .legacy_cpp import _linux_path
+from .native_toolchain import native_path as _native_path, compiler, compiler_identity, arithmetic_flags, executable_path, compiler_environment, dependency_identity
 from .eigen_build import eigen_dependency
 
 ROOT=source_root()
@@ -132,18 +132,24 @@ def header(family,dimension,order,namespace,arithmetic=None,shared=False):
         lines[1:1]=printer.declarations()
     return ('#include <optional>\n' if shared else '')+'\n'.join(lines),alpha
 
-@lru_cache(maxsize=8)
 def toolchain():
-    prefix=('wsl.exe','-d','Ubuntu','--') if os.name=='nt' else ()
-    version=subprocess.check_output([*prefix,'g++','--version'],text=True).splitlines()[0]
+    return _toolchain(compiler())
+
+
+@lru_cache(maxsize=8)
+def _toolchain(cxx):
+    prefix=()
+    version=compiler_identity(cxx)
     return prefix,version
 
 
-def build(source,identity,arithmetic,cache_dir=None):
+def build(source,identity,arithmetic,cache_dir=None,*,dependency=None,extra_headers=()):
     if arithmetic not in ('float64','mpfr'):raise ValueError('arithmetic must be float64 or mpfr')
     prefix,version=toolchain();cpp=ROOT/'cpp'
-    headers={name:(cpp/name).read_text() for name in ('real.hpp','real_double.hpp','eigen_solver.hpp')}
-    identity=dict(identity,eigen_sha256=eigen_dependency()[1],arithmetic=arithmetic,compiler=version,source=hashlib.sha256(source.encode()).hexdigest(),headers={k:hashlib.sha256(v.encode()).hexdigest() for k,v in headers.items()},flags=['-O3','-std=c++17','-fopenmp'])
+    headers={name:(cpp/name).read_text() for name in ('real.hpp','real_double.hpp','eigen_solver.hpp',*extra_headers)}
+    identity=dict(identity,eigen_sha256=eigen_dependency()[1],arithmetic=arithmetic,compiler=version,platform=os.name,native_dependencies=dependency_identity(arithmetic),source=hashlib.sha256(source.encode()).hexdigest(),headers={k:hashlib.sha256(v.encode()).hexdigest() for k,v in headers.items()},flags=['-O3','-std=c++17','-fopenmp',*arithmetic_flags(arithmetic)])
+    if dependency is not None:
+        identity['linear_solver_dependency']=dict(dependency.identity,flags=list(dependency.flags))
     key=hashlib.sha256(json.dumps(identity,sort_keys=True).encode()).hexdigest()
     base=Path(cache_dir) if cache_dir else Path.home()/'.cache'/'rbflab';base=base.resolve();base.mkdir(parents=True,exist_ok=True);dest=base/key
     def valid():
@@ -156,10 +162,11 @@ def build(source,identity,arithmetic,cache_dir=None):
         folder=Path(tmp)
         for n,v in headers.items():(folder/n).write_text(v)
         (folder/'kernel.cpp').write_text(source)
-        path=_linux_path(folder);flags=['-DRBFLAB_DOUBLE'] if arithmetic=='float64' else ['-I'+_linux_path(cpp/'deps/usr/include'),'-I'+_linux_path(cpp/'deps/usr/include/x86_64-linux-gnu'),'-Wl,-l:libmpfr.so.6','-Wl,-l:libgmp.so.10']
-        result=subprocess.run([*prefix,'g++','-O3','-std=c++17','-fopenmp','-I'+_linux_path(cpp/'deps/usr/include/eigen3'),path+'/kernel.cpp',*flags,'-o',path+'/kernel'],capture_output=True,text=True,timeout=300)
-        if result.returncode:raise RuntimeError('Kernel compilation failed: '+result.stderr)
-        files={n:hashlib.sha256((folder/n).read_bytes()).hexdigest() for n in ('kernel.cpp','real.hpp','real_double.hpp','eigen_solver.hpp','kernel')}
+        path=_native_path(folder);flags=arithmetic_flags(arithmetic)
+        if dependency is not None:flags=list(dependency.flags)
+        result=subprocess.run([*prefix,compiler(),'-O3','-std=c++17','-fopenmp','-I'+_native_path(eigen_dependency()[0]),path+'/kernel.cpp',*flags,'-o',str(executable_path(folder/'kernel'))],capture_output=True,text=True,timeout=300,env=compiler_environment())
+        if result.returncode:raise RuntimeError(f'Kernel compilation failed ({result.returncode}): '+result.stderr)
+        files={n:hashlib.sha256((folder/n).read_bytes()).hexdigest() for n in ('kernel.cpp',*headers,executable_path(Path('kernel')).name)}
         (folder/'manifest.json').write_text(json.dumps(dict(identity=identity,files=files),indent=2))
         try:folder.rename(dest)
         except OSError:
@@ -201,7 +208,7 @@ class CompiledKernel:
         text=f'{digits} {len(flat)} {self.alpha.index(tuple(alpha))}\n'+' '.join(map(number,values))+'\n'+'\n'.join(' '.join(map(number,row)) for row in flat)
         with tempfile.TemporaryDirectory(prefix='rbflab_eval_') as tmp:
             source=Path(tmp)/'input';source.write_text(text)
-            result=subprocess.run([*toolchain()[0],_linux_path(self.directory/'kernel'),_linux_path(source)],capture_output=True,text=True,check=True,timeout=120)
+            result=subprocess.run([*toolchain()[0],_native_path(executable_path(self.directory/'kernel')),_native_path(source)],capture_output=True,text=True,check=True,timeout=120)
         data=result.stdout.split()
         if len(data)!=len(flat):raise RuntimeError('Incomplete compiled evaluation')
         if self.arithmetic=='float64':
@@ -284,7 +291,7 @@ def compile_stokes(velocity,pressure,arithmetic,cache_dir=None):
     """Space transform + two-sided functionals; scalar derivative compiler is shared."""
     velocity,pressure=as_bound(velocity),as_bound(pressure)
     index,cached=request_cache('stokes_lhi',(velocity.family,pressure.family),arithmetic,cache_dir)
-    if cached:return cached/'kernel'
+    if cached:return executable_path(cached/'kernel')
     code=stokes_header(velocity.family,pressure.family)
     runtime=(ROOT/'cpp/lhi_mpfr.cpp').read_text()
     runtime=runtime.replace('#include "generated_imq.hpp"','').replace('#include "generated_hybrid.hpp"','')
@@ -295,7 +302,7 @@ def compile_stokes(velocity,pressure,arithmetic,cache_dir=None):
     runtime=runtime[:first]+'  for(auto*k:{&t.v,&t.p}){int count;if(!(in>>count)||count<0)throw std::runtime_error("Invalid parameter count");k->params.resize(count);for(auto&v:k->params)v=read(in);}\n'+runtime[last:]
     ident=dict(kind='stokes_lhi',velocity=sp.srepr(velocity.family.expression),pressure=sp.srepr(pressure.family.expression))
     directory=build(runtime,ident,arithmetic,cache_dir);record_request(index,directory)
-    return directory/'kernel'
+    return executable_path(directory/'kernel')
 
 
 def prepare_method(method,problem,dimension=2,cache_dir=None):
@@ -348,8 +355,8 @@ def prepare_method(method,problem,dimension=2,cache_dir=None):
 
 def request_cache(kind,families,arithmetic,cache_dir,**settings):
     """Check before any symbolic differentiation or C++ generation."""
-    dependencies=[Path(__file__),Path(__file__).with_name('symbolic_kernel.py'),ROOT/'cpp/real.hpp',ROOT/'cpp/real_double.hpp',ROOT/'cpp/lhi_mpfr.cpp',ROOT/'cpp/eigen_solver.hpp']
-    request=dict(eigen_sha256=eigen_dependency()[1],kind=kind,families=[dict(expression=sp.srepr(f.expression),radial=sp.srepr(f.radial_variable),parameters=[sp.srepr(p) for p in f.parameters],dimension=f.dimension) for f in families],arithmetic=arithmetic,compiler=toolchain()[1],settings=settings,dependencies=[hashlib.sha256(p.read_bytes()).hexdigest() for p in dependencies])
+    dependencies=[Path(__file__).with_name('native_toolchain.py'),Path(__file__),Path(__file__).with_name('symbolic_kernel.py'),ROOT/'cpp/real.hpp',ROOT/'cpp/real_double.hpp',ROOT/'cpp/lhi_mpfr.cpp',ROOT/'cpp/eigen_solver.hpp']
+    request=dict(eigen_sha256=eigen_dependency()[1],kind=kind,families=[dict(expression=sp.srepr(f.expression),radial=sp.srepr(f.radial_variable),parameters=[sp.srepr(p) for p in f.parameters],dimension=f.dimension) for f in families],arithmetic=arithmetic,compiler=toolchain()[1],native_dependencies=dependency_identity(arithmetic),settings=settings,dependencies=[hashlib.sha256(p.read_bytes()).hexdigest() for p in dependencies])
     base=Path(cache_dir) if cache_dir else Path.home()/'.cache'/'rbflab';base=base.resolve();base.mkdir(parents=True,exist_ok=True)
     index=base/('request-'+hashlib.sha256(json.dumps(request,sort_keys=True).encode()).hexdigest()+'.json')
     if index.exists():

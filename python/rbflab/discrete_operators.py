@@ -63,7 +63,11 @@ class _Basis:
         # Vector potential CPD degree differs from the scalar potential degree.
         # Geometry and monomial evaluation do not depend on the kernel.
         from .kernels import IMQ
-        self.poly=NodalBasis(Arithmetic(IMQ(),digits),points,degree,kernel_scaling=scaling)
+        # Vector unisolvence depends on N*dimension samples and the solenoidal
+        # columns, not on the scalar monomial count. Reuse normalization without
+        # applying the scalar sample-count gate to vector spaces.
+        self.poly=NodalBasis(Arithmetic(IMQ(),digits),points,None if vector else degree,kernel_scaling=scaling)
+        if vector:self.poly.powers=polynomial_powers(self.d,degree) if degree is not None else []
         if self.a.ctx:
             self.poly.arithmetic.ctx=self.a.ctx;self.poly.arithmetic.backend.ctx=self.a.ctx
         self.h=self.poly.kernel_scale if scaling=='local' else self.a.number(1)

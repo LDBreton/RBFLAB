@@ -4,6 +4,7 @@ Six groups: solution velocity, boundary velocity, Stokes momentum, each in two
 components. Pressure gradients are reconstructed locally; a global pressure
 field/gauge is not defined. Nearest-patch velocity is only patchwise solenoidal.
 """
+from .api_contracts import _UNSET, _keyword_alias
 from .symbolic_kernel import BoundKernel
 from dataclasses import dataclass,field
 from fractions import Fraction
@@ -244,7 +245,8 @@ class LHIStokesSystem:
         g=a.vector([v for data in self.problem.boundary_velocity for v in a.data(_at(data,time),boundary)])
         return f,g
 
-    def solve(self,dt,steps,*,scheme='bdf2',start_time=0):
+    def solve(self,dt,steps,*,scheme=_UNSET,start_time=0,time_scheme=_UNSET):
+        scheme = _keyword_alias(scheme, time_scheme, name="scheme", alias_name="time_scheme", default="bdf2")
         if hasattr(self,'cpp_weights'):raise NotImplementedError('Experimental C++ backend currently supports steady LHI only')
         dt=Fraction(dt);start_time=Fraction(start_time)
         if dt<=0 or type(steps) is not int or steps<1:raise ValueError("Positive dt and integer steps required")

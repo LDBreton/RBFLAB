@@ -1,5 +1,5 @@
 """Dense global Hermite collocation and genuine local Hermite interpolation."""
-from .api_contracts import MethodContract, assembled, prepared
+from .api_contracts import MethodContract, assembled, prepared, _UNSET, _keyword_alias
 from dataclasses import dataclass, field
 import numpy as np
 from scipy.spatial import cKDTree
@@ -14,27 +14,49 @@ from .problems import values, boundary_data
 from .assembly import functional_matrix, Factor, relative_residual
 
 
-@dataclass
+@dataclass(init=False)
 class GlobalCollocation(MethodContract):
     """Dense scalar or field collocation using radial kernels.
 
     Args:
-        kernel: Scalar radial kernel or bound symbolic kernel.
-        precision: Arithmetic policy for assembly and solve.
-        scheme: `"symmetric"` Hermite or `"asymmetric"` nodal collocation.
-        polynomial_degree: Optional polynomial augmentation degree.
-        spaces: Optional field-to-space mapping for coupled Stokes problems.
-        backend: Optional CppGlobalBackend for native stationary scalar or
+        kernel (object): Scalar radial kernel or bound symbolic kernel.
+        precision (Precision): Arithmetic policy for assembly and solve.
+        scheme (str): `"symmetric"` Hermite or `"asymmetric"` nodal collocation.
+        polynomial_degree (int or None): Optional polynomial augmentation degree.
+        space (ScalarSpace): Optional ScalarSpace shorthand for scalar problems.
+        collocation_scheme (str): Alias for scheme; specify only one spelling.
+        spaces (dict or None): Optional field-to-space mapping for coupled Stokes problems.
+        backend (object): Optional CppGlobalBackend for native stationary/unsteady scalar or
             steady/unsteady symmetric divergence-free Stokes solves in 2D/3D.
 
     Use `assemble(problem, cloud)` to obtain a system with a matrix and RHS;
-    then call `system.solve()`, or `system.solve(dt=..., steps=...)` for Stokes evolution."""
+    then call `system.solve()`, or `system.solve(dt=..., steps=...)` for evolution."""
     kernel: object = None
     precision: Precision = field(default_factory=Precision)
     scheme: str = "symmetric"
     polynomial_degree: int | None = None
     spaces: dict | None = None
     backend: object = None
+
+    def __init__(self, kernel=_UNSET, precision=_UNSET, scheme=_UNSET,
+                 polynomial_degree=None, spaces=_UNSET, backend=None, *,
+                 space=_UNSET, collocation_scheme=_UNSET):
+        if space is not _UNSET:
+            from .spaces import ScalarSpace
+            if kernel is not _UNSET or spaces is not _UNSET:
+                raise ValueError("Specify space, kernel or spaces, not more than one")
+            if type(space) is not ScalarSpace:
+                raise TypeError("GlobalCollocation space must be a ScalarSpace; use spaces for fields")
+            if polynomial_degree is not None:
+                raise ValueError("Specify polynomial_degree in ScalarSpace only")
+            kernel, polynomial_degree = space.kernel, space.degree()
+        self.kernel = None if kernel is _UNSET else kernel
+        self.precision = Precision() if precision is _UNSET else precision
+        self.scheme = _keyword_alias(scheme, collocation_scheme, name="scheme",
+                                     alias_name="collocation_scheme", default="symmetric")
+        self.polynomial_degree = polynomial_degree
+        self.spaces = None if spaces is _UNSET else spaces
+        self.backend = backend
 
     @prepared
     def prepare(self,problem,*,dimension=2,cache_dir=None):
@@ -306,26 +328,75 @@ def _query(points, dimension=None):
     return points
 
 
-def interpolate(kernel, centers, data, precision=None, polynomial_degree=None):
-    """Fit a scalar RBF interpolant to supplied values at distinct centers.
+def interpolate(kernel=_UNSET, centers=_UNSET, data=_UNSET, precision=None, polynomial_degree=None, *, backend=None, space=_UNSET, patches=None):
+    """Fit scalar, componentwise or divergence-free global interpolants.
 
     Args:
-        kernel (object): Built-in radial kernel or bound symbolic kernel.
+        kernel (object): Built-in radial kernel, bound symbolic kernel, or
+            ScalarSpace specifying its polynomial augmentation. DivergenceFreeSpace
+            selects a coupled solenoidal vector interpolant in 2D/3D.
+        space (object): Alias for kernel; specify only one spelling.
         centers (numpy.ndarray): Finite coordinate array of shape (N, 2) or (N, 3).
-        data (numpy.ndarray or callable): Scalar samples of shape (N,), or a callback evaluated at centers.
+        data (numpy.ndarray or callable): Scalar samples of shape (N,), independent
+            outputs of shape (N, C), or a scalar callback evaluated at centers.
+            DivergenceFreeSpace takes (N, dimension) samples or a tuple of
+            dimension scalar data callbacks/expressions.
             Row i corresponds to centers[i]. Extended callbacks require
             PrecisionData.
         precision (Precision or None): Optional Precision(global_digits=...) for dense arithmetic.
         polynomial_degree (int or None): Highest total polynomial degree. Must meet
             the kernel's minimum augmentation requirement.
+        backend (CppGlobalBackend or None): Optional native global assembly,
+            factorization and evaluation. Native interpolants own a live worker;
+            close them explicitly or use a context manager.
+        patches (PatchCover or None): Explicit compact-support balls for
+            partition-of-unity interpolation. Local factors persist for refit.
+            Scalar and independent outputs support derivatives through order two.
+            Planar DivergenceFreeSpace uses aligned local streamfunctions and
+            supports velocity and first derivatives.
 
     Returns:
-        result (NodalSolution): Fitted expansion with coefficients, diagnostics, and
-            evaluate(points, operator=None). Evaluation returns one value per
-            query point; an operator differentiates the fitted expansion.
+        result (object): Fitted expansion with coefficients, diagnostics, and
+            evaluate(points, operator=None). Scalar output is (M,); independent
+            outputs are (M, C); solenoidal outputs are (M, dimension). An operator
+            differentiates each component. evaluate_mp retains extended arithmetic.
 
-    This is exact interpolation, not noise-aware smoothing. Coefficients are
+    Scalar and global vector fits interpolate nodes exactly. The planar
+    divergence-free partition-of-unity fit is an approximant and generally
+    differs at nodes because the blended potential has weight derivatives.
+    Coefficients are
     expansion coefficients, not the input nodal values. Assembly is dense.
     """
+    kernel = _keyword_alias(kernel, space, name="kernel", alias_name="space", default=_UNSET)
+    missing = [name for name, value in (("kernel or space", kernel), ("centers", centers), ("data", data)) if value is _UNSET]
+    if missing:
+        raise TypeError("interpolate missing required argument(s): " + ", ".join(missing))
+    from .spaces import ScalarSpace, DivergenceFreeSpace, PressureSpace
+    if patches is not None and isinstance(kernel, PressureSpace):
+        raise NotImplementedError('PUM does not support PressureSpace gauge constraints')
+    if isinstance(kernel, DivergenceFreeSpace):
+        if polynomial_degree is not None:
+            raise ValueError('Specify polynomial_degree in DivergenceFreeSpace only')
+        if patches is not None:
+            from .dfpu import interpolate_dfpu
+            return interpolate_dfpu(kernel, centers, data, precision or Precision(), patches, backend)
+        from .global_vector_interpolation_backend import interpolate_vector
+        return interpolate_vector(kernel, centers, data, precision or Precision(), backend)
+    if isinstance(kernel, ScalarSpace):
+        if polynomial_degree is not None:
+            raise ValueError('Specify polynomial_degree in ScalarSpace only')
+        polynomial_degree=kernel.degree()
+        kernel=kernel.kernel
+    if patches is not None:
+        from .patches import interpolate_patches
+        return interpolate_patches(kernel,centers,data,precision or Precision(),polynomial_degree,patches,backend)
+    if not callable(data):
+        array=np.asarray(data.tolist() if hasattr(data,'rows') else data,dtype=object)
+        if array.ndim==2 and array.shape[1]>1:
+            from .global_vector_interpolation_backend import interpolate_componentwise
+            return interpolate_componentwise(kernel,centers,data,precision or Precision(),polynomial_degree,backend)
+    if backend is not None:
+        from .global_interpolation_backend import interpolate_cpp
+        return interpolate_cpp(kernel, centers, data, precision or Precision(), polynomial_degree, backend)
     from .nodal import interpolation
     return interpolation(kernel, centers, data, precision or Precision(), polynomial_degree)

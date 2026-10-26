@@ -1,6 +1,7 @@
 """Multi-RHS local solves. No local systems are retained after construction."""
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
+from .native_toolchain import executable_path
 import multiprocessing, os, subprocess, tempfile, hashlib
 import numpy as np
 from .discrete_operators import _Basis
@@ -31,7 +32,7 @@ def _compile(o):
     order+=2 if o.vector else 0
     arithmetic='mpfr' if o.precision.local_digits else 'float64'
     index,cached=request_cache('operators_local',(bound.family,),arithmetic,o.backend.cache_dir,dimension=d,order=order,runtime=hashlib.sha256(runtime.encode()).hexdigest(),bridge=hashlib.sha256(Path(__file__).read_bytes()).hexdigest())
-    if cached:return cached/'kernel',bound
+    if cached:return executable_path(cached/'kernel'),bound
     code,alphas=header(bound.family,d,order,'radial')
     dispatch='\nReal radial_value(const std::vector<Real>&z,const std::vector<int>&a,const std::vector<Real>&params){\n'
     for i,alpha in enumerate(alphas):
@@ -39,11 +40,11 @@ def _compile(o):
     dispatch+='throw std::runtime_error("Unprepared derivative");}\n'
     source=PRELUDE+f'\nconstexpr int DIM={d},PARAMETERS={len(bound.values)};\n'+code+dispatch+runtime
     directory=build(source,dict(kind='operators_local',dimension=d,order=order),arithmetic,o.backend.cache_dir)
-    record_request(index,directory);return directory/'kernel',bound
+    record_request(index,directory);return executable_path(directory/'kernel'),bound
 
 
 def _cpp(o,jobs,inspect=False):
-    from .legacy_cpp import _linux_path
+    from .native_toolchain import native_path as _native_path, executable_path
     from .operators import Identity
     a=o.arithmetic;b=o.backend;digits=o.precision.local_digits or 17
     exe,bound=_compile(o)
@@ -64,8 +65,8 @@ def _cpp(o,jobs,inspect=False):
         lines.extend(' '.join(num(T[i,k]) for k in range(basis.m)) for i in range(len(j['ops'])*o.components))
     with tempfile.TemporaryDirectory(prefix='rbflab_operators_') as tmp:
         src=Path(tmp)/'input';dst=Path(tmp)/'output';src.write_text('\n'.join(lines)+'\n',encoding='ascii')
-        prefix=['wsl.exe','-d',b.distribution,'--'] if os.name=='nt' else []
-        run=subprocess.run([*prefix,_linux_path(exe),_linux_path(src),_linux_path(dst)],capture_output=True,text=True,timeout=b.timeout)
+        prefix=[]
+        run=subprocess.run([*prefix,_native_path(exe),_native_path(src),_native_path(dst)],capture_output=True,text=True,timeout=b.timeout)
         if run.returncode:raise RuntimeError('C++ operators: '+run.stderr)
         result=[]
         for index,line in enumerate(dst.read_text().splitlines()):

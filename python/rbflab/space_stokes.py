@@ -1,4 +1,5 @@
 """Gauge-free divergence-free Stokes assembly selected through explicit spaces."""
+from .api_contracts import _UNSET, _keyword_alias
 import warnings
 from dataclasses import dataclass
 from fractions import Fraction
@@ -151,7 +152,8 @@ class GlobalFlowSystem:
         boundary=list(boundary_values(self.problem,self.cloud,a,time))
         return a.vector(forcing+boundary+[0]*(self.size-self.n))
 
-    def solve(self,dt=None,steps=None,*,scheme='bdf2',start_time=0):
+    def solve(self,dt=None,steps=None,*,scheme=_UNSET,start_time=0,time_scheme=_UNSET):
+        scheme = _keyword_alias(scheme, time_scheme, name="scheme", alias_name="time_scheme", default="bdf2")
         a=self.arithmetic
         if not self.problem.transient:
             if dt is not None or steps is not None:raise ValueError("Steady Stokes does not take time-step arguments")

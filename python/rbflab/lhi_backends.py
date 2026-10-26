@@ -18,7 +18,7 @@ from .kernels import IMQ,ScalarKernel,Hybrid
 from .symbolic_kernel import BoundKernel
 from .stencils import neighbors,geometry_quality
 from .stokes_polynomials import StokesPolynomialBasis,append_columns,rank_ratio
-from .legacy_cpp import _linux_path
+from .native_toolchain import native_path as _native_path, executable_path
 
 _WORKER_ARITH={}
 _WORKER_THREAD_LIMIT=None
@@ -256,11 +256,11 @@ class CppBackend(BackendSettings):
         if custom:
             from .kernel_compiler import compile_stokes
             custom_executable=compile_stokes(method.kernel,pk,'float64' if native else 'mpfr',self.cache_dir)
-        executable=custom_executable or (Path(self.executable) if self.executable else source_root()/'cpp'/('lhi_double' if native else 'lhi_mpfr'))
+        executable=custom_executable or (Path(self.executable) if self.executable else executable_path(source_root()/'cpp'/('lhi_double' if native else 'lhi_mpfr')))
         if not executable.is_file():raise FileNotFoundError('Build the C++ backend first: python examples/build_cpp_backend.py')
         build_info=None
         if self.executable is None and not custom:
-            repository=source_root();manifest=executable.parent/('build_manifest_double.json' if native else 'build_manifest.json')
+            repository=source_root();manifest=executable.parent/(('build_manifest_double_windows.json' if native else 'build_manifest_windows.json') if os.name=='nt' else ('build_manifest_double.json' if native else 'build_manifest.json'))
             if not manifest.is_file():raise RuntimeError('Build manifest missing; rerun examples/build_cpp_backend.py')
             build_info=json.loads(manifest.read_text())
             if build_info.get('protocol')!=2:raise RuntimeError('Unsupported C++ build protocol')
@@ -293,9 +293,8 @@ class CppBackend(BackendSettings):
                 lines.extend(' '.join(num(T[k,j]) for k in range(4)) for j in range(T.cols if a.ctx else T.shape[1]))
         with tempfile.TemporaryDirectory(prefix='rbflab_mpfr_') as temporary:
             folder=Path(temporary);source=folder/'input.txt';target=folder/'output.txt';source.write_text('\n'.join(lines)+'\n',encoding='ascii')
-            args=[_linux_path(executable),_linux_path(source),_linux_path(target)]
+            args=[_native_path(executable),_native_path(source),_native_path(target)]
             if self.local_solver=='svd':args += ['svd',str(self.svd_rcond if self.svd_rcond is not None else -1)]
-            if os.name=='nt':args=['wsl.exe','-d',self.distribution,'--']+args
             before=time.perf_counter();run=subprocess.run(args,capture_output=True,text=True,timeout=self.timeout);elapsed=time.perf_counter()-before
             if run.returncode:raise RuntimeError('C++ numerical backend: '+run.stderr)
             results=[]

@@ -34,6 +34,46 @@ componentwise functionals on `DivergenceFreeSpace` in 2D/3D; this is not automat
 mixed `SymbolicSystem` or velocity-pressure assembly. Vector samples are ordered
 node-major, and their matrix blocks contain component-to-component coupling.
 
+## Global interpolation and PDE execution
+
+The global entry points share a persistent dense numerical engine:
+
+![Global interpolation and PDEs share the native dense engine; local maps remain separate](../assets/global-native-architecture.svg)
+
+Use `interpolate(space=space, centers=points, data=data, backend=CppGlobalBackend(...))` for scalar
+or vector samples. Ordinary kernels and `ScalarSpace` fit independent columns
+of an `(N, C)` array, sharing one native factorization. `DivergenceFreeSpace`
+fits an `(N, dimension)` array with the coupled solenoidal kernel and polynomial
+space; it does not silently replace ordinary vector interpolation.
+
+`GlobalCollocation` accepts stationary scalar equations, scalar `EvolutionPDE`
+problems, and supported `SymbolicStokes` problems. Scalar evolution retains
+original cloud-node ordering, an indexed mass matrix, and a separate initial
+coefficient projection. Python schedules backward Euler/BDF2 and exposes the
+trajectory; C++ combines coefficient histories, applies mass, and solves the
+shifted system. Stokes retains its existing Python history orchestration.
+Supported symbolic data evaluate natively; arbitrary callbacks retain Python
+execution. Selecting this global backend does not change the local-map route.
+
+Native fits and systems own live workers. Close them or use a context manager.
+This preserves the same space/data/operator separation without a second public
+solver hierarchy. See [precision and backends](../api/precision-backends.md).
+
+The canonical scalar PDE spelling is
+`GlobalCollocation(space=ScalarSpace(kernel), collocation_scheme="symmetric")`.
+An evolution system accepts `system.solve(dt=..., steps=..., time_scheme="bdf2")`.
+The earlier positional kernel/space, `kernel=`, `scheme=` method keyword and
+`scheme=` solve keyword remain compatible; supplying both aliases is an error.
+
+Call `execution_info(fit)`, `execution_info(system)`, or
+`execution_info(trajectory)` to inspect execution without evaluating the field,
+exporting a matrix, or sending a worker request. Method and `LocalApproximation`
+reports describe configuration; system and fit reports describe implementation.
+Selected existing diagnostics appear in `recorded`. This metadata is not runtime
+profiling. A local backend selects weight construction; the user's later global
+solve has no implied backend. Geometry and query coordinates remain Float64.
+Increasing arithmetic precision cannot recover digits lost in Float64 inputs.
+
 ## Five mathematical objects
 
 | Object | Meaning |
@@ -140,3 +180,99 @@ Existing symbolic evolution conveniences remain available; see
 uses expansion coefficients, while local maps act on named sampled data. Keeping
 those interpretations explicit is more important than giving every method the
 same solver wrapper.
+# Explicit patch interpolation
+
+`PatchCover(centers, radii)` defines fixed overlapping ball supports in 2D or
+3D. Pass it as `patches=cover` to `interpolate` for scalar or independent
+multioutput data. Every input and query point needs positive support; an
+uncovered point raises `ValueError`. Local factors are retained by the fit and
+`fit.refit(new_data)` updates values on the same geometry without rebuilding
+them. Both Python and `CppGlobalBackend` support Float64 and
+`Precision(global_digits=...)`.
+
+```python
+cover = rbflab.PatchCover(centers=[[-0.5, 0], [0.5, 0]], radii=[1.7, 1.7])
+fit = rbflab.interpolate(space=rbflab.ScalarSpace(rbflab.Gaussian(1)),
+                         centers=X, data=Y, patches=cover)
+values = fit.evaluate(Q)
+gradient_x = fit.evaluate(Q, rbflab.Derivative(0))
+```
+
+The compact C2 patch weights are normalized and differentiated through order
+two, including the product rule for overlap derivatives. Scalar outputs support
+derivatives through order two. The explicit cover scans patches during query
+routing, so evaluation has an `O(PQ)` geometry component for P patches and Q
+points. See `examples/pum_interpolation.py`.
+
+For planar divergence-free data, pass a `DivergenceFreeSpace` and a 2D cover.
+Each patch fits the coupled vector kernel. RBFLAB recovers its local scalar
+streamfunction, aligns additive constants at patch overlaps using weighted
+least squares, then takes the curl of the blended streamfunction. The field is
+analytically divergence-free on the positive cover. It is an **approximant**:
+the weight-gradient correction generally changes nodal values. Inspect
+`fit.evaluate(X) - Y` if nodal discrepancy matters. `fit.potential(Q)` returns
+the blended streamfunction, and `fit.divergence(Q)` computes divergence from
+the two component derivatives. `evaluate_mp`, `potential_mp`, and
+`divergence(Q, extended=True)` retain mpmath precision. `refit` reuses local
+factors and the overlap graph factorization. The C2 cover supports velocity
+and first derivatives; higher derivatives raise `NotImplementedError`.
+With `CppGlobalBackend`, local coupled solves and blended potential/velocity
+evaluation run in one retained native worker; overlap alignment and sample
+preparation run in Python at the requested mpmath precision. The overlap
+graph factorization is dense here, so arbitrary patch counts have no
+near-linear scaling guarantee.
+
+```python
+space = rbflab.DivergenceFreeSpace(rbflab.IMQ(), polynomial_degree=1)
+fit = rbflab.interpolate(space, X, velocity, patches=cover)
+velocity_at_q = fit.evaluate(Q)
+streamfunction_at_q = fit.potential(Q)
+divergence_at_q = fit.divergence(Q)
+```
+
+This implementation covers planar 2D fields. Surface fields, 3D divergence-free
+fields, PDE solves, and pressure gauges are outside this interpolation API.
+The fitted potential assumes a globally single-valued streamfunction on each
+connected cover component. On a multiply connected domain with nonzero flux
+around a hole, that assumption can fail. A runnable triangulated disk example
+is in `examples/dfpu_interpolation.py`.
+The construction follows [Drake, Fuselier and Wright (2021)](https://arxiv.org/abs/2010.15898),
+equations 19–24. Disconnected patch groups receive separate zero gauges; the
+streamfunction is therefore comparable only within each group. Coincident
+patch centers make the paper's distance weight ratio undefined; this
+implementation uses uniform glue weights in that case. Extremely
+unbalanced overlap weights can make Float64 potential alignment lose numerical
+rank; choose a more balanced cover or `Precision(global_digits=...)`.
+
+### Build patch covers automatically
+
+`PatchCover.from_points` builds reproducible ball supports from distinct 2D or
+3D samples. It uses seeded farthest-first initialization followed by Lloyd
+iterations. `points_per_patch` sets the clustering target before radii are
+expanded; it is not a maximum membership count. Every input point lies strictly
+inside at least one support, and `min_points` sets a minimum support occupancy.
+That count does not certify polynomial rank. Point samples alone cannot certify
+coverage of the space between them.
+
+```python
+cover = rbflab.PatchCover.from_points(
+    X, points_per_patch=32, overlap=0.25, min_points=6, seed=0
+)
+fit = rbflab.interpolate(rbflab.Gaussian(1), X, Y, patches=cover)
+```
+
+For a `TriangleMesh2D`, `from_mesh` places at least one patch in each connected
+mesh component. Each mesh triangle has all three vertices strictly inside one
+ball. Because balls are convex, its edges and interior are covered as well.
+
+```python
+from rbflab.geometry import TriangleMesh2D
+
+mesh = TriangleMesh2D(vertices, triangles)
+cover = rbflab.PatchCover.from_mesh(mesh, points_per_patch=32, seed=0)
+fit = rbflab.interpolate(rbflab.Gaussian(1), mesh.vertices, Y, patches=cover)
+```
+
+The supports are balls in ambient space. Their boundaries are not clipped to
+the mesh boundary or holes; restrict queries to your physical domain when that
+matters. For either constructor, `n_patches` sets an exact count if supplied.

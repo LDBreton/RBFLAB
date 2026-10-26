@@ -101,8 +101,8 @@ share helpers, so keep the `examples` directory together.
 ## 4. Enable C++ on Ubuntu Linux
 
 The verified native route uses **GCC with OpenMP, Eigen, MPFR and GMP**, on
-Ubuntu x86-64 or Ubuntu under WSL. Native Windows/MSVC and macOS builds are not
-covered by this guide. Python-only installation remains independent of these tools.
+Ubuntu x86-64. Native Windows with MinGW-w64 is covered below; MSVC and macOS
+builds are not covered by this guide. Python-only installation remains independent of these tools.
 
 From the checkout root, with your Python environment selected:
 
@@ -141,48 +141,43 @@ The build should report **both** `cpp/lhi_double` and `cpp/lhi_mpfr`, with their
 manifests. The scalar example above uses generated artifacts; these dedicated
 executables serve the built-in vector LHI path. They are different build routes.
 
-## 5. Enable C++ from Windows through WSL
+## 5. Enable native C++ on Windows
 
-The tested arrangement keeps **Python on Windows** and runs **GCC/native executables
-inside WSL Ubuntu**. This does not require moving the Python environment into Linux.
-Keep the checkout on a Windows drive accessible to WSL. Do not reuse a Windows
-virtual environment from a Linux Python interpreter, or vice versa.
-
-If Ubuntu WSL is not installed, install it with `wsl --install -d Ubuntu` from
-an administrator PowerShell, finish Ubuntu's first-run setup, and reopen the terminal.
-Check the distribution name with:
+Windows Python compiles and launches native MinGW-w64 executables directly.
+From an ordinary PowerShell in the checkout, run:
 
 ```powershell
-wsl --list --verbose
-```
-
-From the RBFLAB checkout in ordinary PowerShell:
-
-```powershell
-wsl -d Ubuntu -- sudo apt-get update
-wsl -d Ubuntu -- sudo apt-get install -y g++ libmpfr6 libgmp10
-$windowsRepo = (Get-Location).Path.Replace('\', '/')
-$linuxRepo = (wsl -d Ubuntu --exec wslpath -a $windowsRepo).Trim()
-wsl -d Ubuntu --exec bash "$linuxRepo/cpp/prepare_dependencies.sh"
 python -m pip install -e ".[examples,test]"
+python scripts/setup_windows_cpp.py
 python -m examples.annulus --backend cpp
-```
-
-Use your environment's Python command from step 1. `wslpath` derives the Linux path
-from your checkout; no personal drive path is required.
-
-For built-in vector LHI:
-
-```powershell
 python -m examples.build_cpp_backend
 $env:RBFLAB_CPP_TESTS = "1"
-python -m pytest tests/test_discrete_operators.py tests/test_symbolic_kernel.py -q
+python -m pytest tests/test_global_cpp.py tests/test_discrete_operators.py tests/test_symbolic_kernel.py -q
 Remove-Item Env:RBFLAB_CPP_TESTS
 ```
 
-The supplied build helper and generated-kernel compiler currently target a WSL
-distribution named **Ubuntu**. Use that name for the documented route; changing
-one backend field does not reconfigure every compiler helper.
+The setup script downloads official MSYS2 UCRT64 GCC, OpenMP, Eigen, MPFR and GMP
+packages and their dependencies into ignored `cpp/deps/windows`. It checks each
+package against the SHA256 recorded in the repository database and saves package
+versions/checksums in `packages.json`. No administrator rights or WSL installation
+are needed. The first setup needs network access and Windows `tar` with zstd support.
+
+Generated kernels, local functional maps and persistent global workers support
+both Float64 and MPFR. Built-in vector LHI produces `cpp/lhi_double.exe` and
+`cpp/lhi_mpfr.exe` with separate Windows manifests. Executables are statically
+linked, so runtime DLL directories need not be added to PATH. Compiler helpers
+supply their own child-process PATH without changing your environment.
+
+An existing MinGW-w64 GCC can instead be selected with `RBFLAB_CXX` (the full
+`g++.exe` path); `RBFLAB_NATIVE_PREFIX` optionally selects its matching MPFR/GMP
+include/lib prefix. Eigen can live in that compiler prefix's `include/eigen3`
+or the existing `cpp/deps/usr/include/eigen3`. Linux headers/libraries for MPFR/GMP
+must not be reused for Windows. Compiler target and host platform separate the
+compiled cache from old WSL artifacts. The `distribution="Ubuntu"` field remains
+for API compatibility; current CPU backends launch directly on the host.
+
+The archived `LegacyCppLHIBackend` and experimental CUDA adapter retain their
+existing Linux/WSL execution paths.
 
 ## 6. Select the backend in Python
 
@@ -242,6 +237,53 @@ above are sufficient; no separate global executable build command is needed.
 See [global collocation](tutorials/global-collocation.md#native-double-and-multiprecision)
 for the solution and precision contracts.
 
+## Optional MPLAPACK global MPFR solver
+
+Eigen is the default factor engine. MPLAPACK 3.0.1 provides an optional optimized
+MPFR/OpenMP factor engine with the same global API.
+
+On native Windows, first prepare the toolchain in step 5, then run:
+
+```powershell
+python -m pip install cmake ninja
+python scripts/build_mplapack_windows.py cpp/deps/mplapack-windows --jobs 4
+$env:RBFLAB_CPP_TESTS = "1"
+$env:RBFLAB_MPLAPACK_DIR = (Resolve-Path cpp/deps/mplapack-windows).Path
+python -m pytest tests/test_global_cpp_mplapack.py -q
+```
+
+The helper verifies the pinned official source archive, builds the full optimized
+MPFR target with native MinGW-w64 GCC and OpenMP, and stages its archive, wrapper
+headers, matching static GMP/MPFR/MPC libraries, available licenses and build
+manifest into the specified prefix. No WSL or administrator rights are needed.
+The first build compiles over a thousand source files. Repeating the command
+reuses the verified source and incremental build. `--deps` optionally selects a
+matching native dependency prefix; `--archive` reuses a downloaded release archive.
+
+On Linux, use the separate helper with an existing GMP/MPFR/MPC development prefix:
+
+```sh
+bash scripts/build_mplapack.sh /absolute/path/to/mplapack-prefix /usr 4
+```
+
+Select the prepared prefix explicitly:
+
+```python
+backend = rbf.CppGlobalBackend(
+    linear_solver="mplapack",
+    mplapack_dir="cpp/deps/mplapack-windows",  # use your Linux prefix on Linux
+    threads=4,
+)
+# Pass backend with Precision(global_digits=60) to GlobalCollocation or interpolate.
+```
+
+MPLAPACK requires MPFR precision; Float64 keeps the Eigen solver. Preparation
+checks and hashes the prefix without installing dependencies or silently falling
+back. Windows uses static native libraries; Linux shared libraries cannot be
+reused. Keep the prefix in place while workers run. Tests cover precision changes,
+worker reuse, normal/transposed solves, condition estimation and Stokes stepping.
+See [precision and backends](api/precision-backends.md).
+
 ## Installed wheel with a separate native checkout
 
 The simplest native setup is the editable install above. If you must keep a wheel
@@ -263,8 +305,8 @@ machines. For solver/cache details, see the [native reference](https://github.co
 | Message or symptom | Check |
 |---|---|
 | `No module named examples...` | Run from the source root; examples are not a wheel package |
-| `Eigen headers missing` | Run `cpp/prepare_dependencies.sh`; check `cpp/deps/usr/include/eigen3/Eigen/Core` |
-| `g++` missing / WSL cannot find Ubuntu | Install the compiler in Ubuntu and verify `wsl --list --verbose` |
+| `Eigen headers missing` | Windows: run `python scripts/setup_windows_cpp.py`; Linux: run `bash cpp/prepare_dependencies.sh` |
+| Native `g++` missing | Windows: run `python scripts/setup_windows_cpp.py` or set `RBFLAB_CXX`; Linux: install GCC |
 | `libmpfr.so.6` / `libgmp.so.10` missing | Install Ubuntu runtime libraries; Windows DLLs cannot satisfy a Linux executable |
 | `Build the C++ backend first` / manifest missing | Run `python -m examples.build_cpp_backend` from matching sources |
 | Native sources changed | Rebuild; the content hashes intentionally reject stale binaries |

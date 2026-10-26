@@ -4,6 +4,7 @@ The velocity mass rows act only at interior momentum sites. Boundary rows,
 pressure gauge and pressure side constraint remain algebraic. No pressure
 splitting or pressure boundary condition is introduced.
 """
+from .api_contracts import _UNSET, _keyword_alias
 from dataclasses import dataclass,field
 from fractions import Fraction
 import numpy as np
@@ -81,13 +82,14 @@ class UnsteadyStokesSystem:
         return StokesSystem(a,problem,cloud,self.base.points,self.base.functionals,
                             self.base.matrix,a.vector(data))
 
-    def solve(self,dt,steps,*,scheme="bdf2",start_time=0):
+    def solve(self,dt,steps,*,scheme=_UNSET,start_time=0,time_scheme=_UNSET):
         """Constant dt. BDF2 starts with one backward Euler step.
 
         Initial velocity must be solenoidal and compatible with boundary data.
         Initial pressure is not required and is not fabricated. Returned states
         correspond to positive steps; the initial object stores velocity only.
         """
+        scheme = _keyword_alias(scheme, time_scheme, name="scheme", alias_name="time_scheme", default="bdf2")
         dt=Fraction(dt);start_time=Fraction(start_time)
         if dt<=0:raise ValueError("dt must be positive")
         if type(steps) is not int or steps<1:raise ValueError("steps must be a positive integer")

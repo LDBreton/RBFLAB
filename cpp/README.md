@@ -1,11 +1,74 @@
 # C++ numerical backends
 
-For the step-by-step Ubuntu or Windows/WSL setup, start with the
+For the step-by-step Ubuntu or native Windows setup, start with the
 [installation guide](https://ldbreton.github.io/RBFLAB/INSTALL/). This reference
 describes solver internals after that setup. Generated scalar kernels compile
 on demand; built-in vector LHI also has the dedicated executables below.
 
 ## Scalar and field global collocation
+
+Global interpolation, stationary scalar PDEs, scalar evolution and Stokes share
+the persistent dense worker. `interpolate(..., backend=CppGlobalBackend(...))`
+fits scalar or independent multi-output data; `DivergenceFreeSpace` selects
+coupled vector interpolation with a vector-only executable and no pressure
+channel. Scalar evolution preserves original cloud-node ordering through
+`MASS_INDEXED`, retains a separate `INITIAL_MATRIX`/initial factor, and advances
+numerical histories through `TIME_STEP`. Python chooses BE/BDF2 and retains
+public trajectory objects; C++ evaluates supported data, combines coefficients,
+applies mass, solves and checks residuals. Callback and initial derivative checks
+retain Python fallbacks. Spatial/boundary operators must remain fixed and linear.
+
+`EVOLVE_INIT` projects initial values through the initial matrix and resets
+history without discarding shifted factors. Initial and stiffness matrix edits
+invalidate their respective caches. Pure-derivative Hermite trials retain their
+constant-mode adjustment; unequal source/target rows never use symmetric
+assembly shortcuts. Scalar shifted matrices use general row-max scaling.
+
+### Optional MPLAPACK MPFR factorization
+
+The MPLAPACK solver is an explicit optional dependency. Prepare a separate
+prefix with MPLAPACK 3.0.1 and gmpfrxx_mkII 1.4.0, then pass that prefix as
+`mplapack_dir` when selecting the MPLAPACK linear solver. Backend preparation
+does not download or install it. The default Eigen solver needs no MPLAPACK.
+
+On Ubuntu (or Ubuntu WSL), provide CMake, a C++ compiler with OpenMP, curl,
+Python 3, and GMP/MPFR/MPC development headers and libraries first. The helper
+downloads the official pinned release tag and builds only the optimized MPFR
+archive; it never changes system packages:
+
+```sh
+bash scripts/build_mplapack.sh /absolute/path/mplapack-prefix /usr 2
+```
+
+The second argument may instead point to a locally extracted dependency
+prefix with `include` and `lib` directories, including a multiarch library
+subdirectory. The third argument limits build parallelism. This script builds
+Linux libraries. For native Windows, use the matching helper:
+
+```powershell
+python -m pip install cmake ninja
+python scripts/build_mplapack_windows.py cpp/deps/mplapack-windows --jobs 4
+```
+
+It uses MinGW-w64 GCC/OpenMP, verifies the same pinned MPLAPACK source archive,
+and stages `libmplapack_mpfr_opt.a`, `libmpc.a`, `libmpfr.a`, `libgmp.a` and complete
+headers. Pass that Windows prefix to `mplapack_dir`. Linux shared libraries cannot
+be linked into the Windows worker. See the installation guide for integration tests.
+
+The prepared layout contains `include/mplapack`, GMP/MPFR/MPC headers in
+`include`, `lib/libmplapack_mpfr_opt.a`, bundled GMP/MPFR/MPC libraries
+(static archives on Windows; shared libraries and SONAME files on Linux)
+in `lib`, and `rbflab-mplapack.json`. That manifest
+records the release, downloaded source hash, wrapper version, dependency
+prefix and build options. All headers, archive, runtime libraries and the
+manifest contribute to the executable cache identity; runtime lookup uses
+the explicit prefix. Keep the prefix in place while its workers run.
+
+The helper retains upstream MPLAPACK license files in `licenses`. Retain the
+license and copyright notices for GMP, MPFR, MPC and the bundled wrapper when
+redistributing a prefix, and follow their respective redistribution terms.
+Dependency package selection remains a user decision. Building the archive
+can take substantial time; existing matching prefixes can be reused.
 
 `GlobalCollocation(..., backend=CppGlobalBackend(...))` compiles
 `global_collocation.hpp` together with the requested radial derivatives.
@@ -26,7 +89,17 @@ its system. Dense matrices and factors remain in contiguous Eigen storage.
 Repeated RHS solves reuse the factorization; native matrix edits invalidate it.
 The worker communicates over standard input/output, including bulk export for
 explicit matrix inspection. Each worker uses one arithmetic precision. On
-Windows it runs through Ubuntu WSL using the existing compiler/dependency setup.
+Windows it runs directly as a native MinGW-w64 executable (Float64 or MPFR).
+
+Supported symbolic Stokes forcing and velocity boundary expressions are compiled
+into the same worker. `DATA_INIT` supplies per-row expression indices at assembly;
+`RHS_DATA time` evaluates the forcing/boundary vector in the selected arithmetic,
+with zero polynomial constraints. Expressions enter all executable cache keys.
+Native data runs in parallel for sufficiently large systems and refreshes
+per-thread precision before evaluating cached constants. Arbitrary callbacks,
+normal-dependent/unsupported expressions and conflicting boundary overlaps use
+the existing Python route. Python still evaluates initial velocity and owns
+time integration and history combinations.
 
 Use `with method.assemble(problem, cloud) as system:` or `system.close()` for
 deterministic cleanup. Solutions require the live worker for evaluation.
@@ -37,7 +110,9 @@ precision cannot restore input digits.
 `compute_condition=True` estimates the equilibrated matrix's 1-norm condition
 using LU solves. It does not form a dense inverse. The estimate's norm differs
 from the existing Python Float64 2-norm diagnostic. Assembly/evaluation can use
-OpenMP; LU retains the current serial Eigen policy. Dense storage and
+OpenMP; eligible dense Eigen updates also use the configured global thread limit.
+The optional MPLAPACK MPFR engine uses its optimized OpenMP factorization.
+Dense storage and
 factorization still cost O(N²) and O(N³), respectively.
 
 ```sh
@@ -89,6 +164,21 @@ and field executables have distinct cache identities. Asymmetric Stokes,
 coupled scalar blocks and evolution remain unsupported by this global backend.
 
 ### Internal evaluation profiling
+
+For global step diagnostics, `GLOBAL_PROFILE 1` enables aggregate timers and
+clears counters; `GLOBAL_PROFILE 0` disables them and clears counters. `INIT`
+and `RESET` also clear this state. Retrieve `GLOBAL_TIMING` after a measured
+batch rather than querying after every command. It returns the number of
+records, followed by each command name, count and ten aggregate seconds:
+parse, matrix setup/balancing, factorization, RHS scaling, triangular solve,
+coefficient scaling, residual, mass product, response formatting, total.
+Records cover `SHIFT`, `SOLVE`, `MASS_MV`, and supported `RHS_DATA`. For `RHS_DATA`,
+evaluation is included in total command time, with parsing/formatting separated.
+Factorization includes the solver
+adapter's transfers and checks. Total excludes stdout flushing, transport and
+Python work. Round-trip wall time minus native total is an unattributed
+remainder, including scheduling and pipe overhead. Ordinary responses and
+arithmetic are unchanged; these are internal opt-in diagnostics.
 
 For native-worker diagnostics, `EVAL_PROFILE 1` enables opt-in phase timers;
 `EVAL_PROFILE 0` disables them. After a successful profiled `EVAL`,

@@ -10,8 +10,20 @@
 class Real {
 public:
  static thread_local mpfr_prec_t bits;
+#ifdef RBFLAB_GLOBAL_DENSE
+ // A global worker runs one command at a time, with one precision shared by
+ // its OpenMP/Eigen teams. Set only by INIT before any parallel work starts.
+ static mpfr_prec_t global_bits;
+#endif
+ static mpfr_prec_t precision(){
+#ifdef RBFLAB_GLOBAL_DENSE
+  return global_bits;
+#else
+  return bits;
+#endif
+ }
  mpfr_t v;
- Real(){mpfr_init2(v,bits);mpfr_set_zero(v,0);}
+ Real(){mpfr_init2(v,precision());mpfr_set_zero(v,0);}
  Real(int x):Real(){mpfr_set_si(v,x,MPFR_RNDN);}
  Real(double x):Real(){mpfr_set_d(v,x,MPFR_RNDN);}
  Real(const std::string& x):Real(){if(mpfr_set_str(v,x.c_str(),10,MPFR_RNDN))throw std::runtime_error("Invalid decimal input");}
@@ -27,6 +39,9 @@ public:
  std::string str(int digits)const {char* b=nullptr;mpfr_asprintf(&b,"%.*Rg",digits,v);std::string out(b);mpfr_free_str(b);return out;}
 };
 thread_local mpfr_prec_t Real::bits=340;
+#ifdef RBFLAB_GLOBAL_DENSE
+mpfr_prec_t Real::global_bits=340;
+#endif
 inline Real operator+(const Real&a,const Real&b){Real r;mpfr_add(r.v,a.v,b.v,MPFR_RNDN);return r;}
 inline Real operator-(const Real&a,const Real&b){Real r;mpfr_sub(r.v,a.v,b.v,MPFR_RNDN);return r;}
 inline Real operator*(const Real&a,const Real&b){Real r;mpfr_mul(r.v,a.v,b.v,MPFR_RNDN);return r;}

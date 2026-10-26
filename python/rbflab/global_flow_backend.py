@@ -3,6 +3,7 @@
 Python describes rows and exact polynomial modes; the worker assembles and
 factors every dense block and evaluates the resulting vector expansion.
 """
+from .api_contracts import _UNSET, _keyword_alias
 from dataclasses import replace
 from fractions import Fraction
 
@@ -34,11 +35,41 @@ def _artifact(method, problem, dimension):
     # public pressure-gradient queries use one derivative. Preparing only two
     # pressure derivatives also permits C2 potentials such as PHS(3).
     pressure_order = 2
+    from .global_data_codegen import native_data_plan
+    data_plan=native_data_plan(problem,dimension)
     executable, bound = _compiled(velocity.kernel, dimension, 6,
         'mpfr' if method.precision.global_digits else 'float64', method.backend,
-        pressure_kernel=pressure.kernel, pressure_order=pressure_order)
+        pressure_kernel=pressure.kernel, pressure_order=pressure_order,data_plan=data_plan)
     from .kernel_compiler import as_bound
-    return executable, bound, as_bound(pressure.kernel), pressure_order
+    return executable, bound, as_bound(pressure.kernel), pressure_order,data_plan
+
+
+def _data_rows(plan,problem,cloud):
+    """Match boundary_values first-label precedence and component-major rows."""
+    chosen={}
+    conflicting=False
+    for on,components in plan.boundary_groups:
+        labels=list(cloud.boundary) if on=='boundary' else ([on] if isinstance(on,str) else list(on))
+        for label in labels:
+            if label not in cloud.boundary:raise ValueError(f'Unknown boundary label: {label}')
+            for node in cloud.boundary[label]:
+                node=int(node)
+                if node in chosen and chosen[node]!=components:conflicting=True
+                chosen.setdefault(node,components)
+    if set(chosen)!=set(cloud.boundary_indices):
+        raise ValueError('Every boundary node requires velocity data')
+    if conflicting:return None
+    return [index for index in plan.forcing_ids for _ in cloud.interior_indices]+[
+        chosen[int(node)][c] for c in range(problem.dimension) for node in cloud.boundary_indices]
+
+
+def _boundary_key(cloud):
+    return tuple((label,tuple(map(int,ids))) for label,ids in cloud.boundary.items())
+
+
+def _problem_data_key(problem):
+    return (tuple(problem.forcing),tuple((on if isinstance(on,str) else tuple(on),tuple(components))
+        for on,components in problem.boundary))
 
 
 def prepare_cpp_flow(method, problem, dimension, cache_dir):
@@ -83,6 +114,22 @@ class CppGlobalFlowSystem(CppGlobalSystem):
         return self._mass
 
     def data(self,time):
+        self.worker.check_open()
+        if (self._native_data_problem is self.problem
+                and _problem_data_key(self.problem)==self._native_data_key
+                and np.array_equal(self.cloud.points,self._native_data_points)
+                and _boundary_key(self.cloud)==self._native_data_boundary):
+            reply=self.worker.request('RHS_DATA '+self.encode(time))
+            if not reply or int(reply[0])!=self.size or len(reply)!=self.size+1:
+                raise RuntimeError('Invalid native forcing/boundary result')
+            self.data_backend='cpp_symbolic';self.data_fallback_reason=None
+            return self.arithmetic.vector([self.number(v) for v in reply[1:]])
+        self.data_backend='python'
+        if self._native_data_problem is not None:
+            self.data_fallback_reason='Problem or geometry changed since native data preparation'
+        return self._python_data(time)
+
+    def _python_data(self,time):
         a=self.arithmetic
         forcing=[v for f in self.problem.forcing for v in a.data(at_time(f,time),self.cloud.interior)]
         return a.vector(forcing+list(boundary_values(self.problem,self.cloud,a,time))+[0]*(self.size-self.n))
@@ -93,13 +140,15 @@ class CppGlobalFlowSystem(CppGlobalSystem):
             raise RuntimeError('Invalid native mass product')
         return self.arithmetic.vector([self.number(v) for v in reply[1:]])
 
-    def solve(self, dt=None, steps=None, *, scheme='bdf2', start_time=0):
+    def solve(self, dt=None, steps=None, *, scheme=_UNSET, start_time=0, time_scheme=_UNSET):
+        scheme = _keyword_alias(scheme, time_scheme, name="scheme", alias_name="time_scheme", default="bdf2")
         self.worker.check_open()
         if not self.problem.transient:
             if dt is not None or steps is not None:
                 raise ValueError('Native stationary Stokes does not take time-step arguments')
             solution = super().solve()
-            solution.diagnostics.update(pressure='kernel representative modulo constants',divergence='analytic')
+            solution.diagnostics.update(pressure='kernel representative modulo constants',divergence='analytic',
+                data_backend=self.data_backend,data_fallback_reason=self.data_fallback_reason)
             return CppGlobalFlowSolution(self, solution.coefficients, 0,diagnostics=solution.diagnostics)
         if dt is None or steps is None:raise ValueError('Unsteady Stokes requires dt and steps')
         dt,start_time=Fraction(dt),Fraction(start_time)
@@ -130,6 +179,7 @@ class CppGlobalFlowSystem(CppGlobalSystem):
                 history=[states[-1] if states else initial]
                 if second:history.append(states[-2] if len(states)>1 else initial)
                 solved.diagnostics.update(divergence='analytic',pressure='kernel representative modulo constants')
+                solved.diagnostics.update(data_backend=self.data_backend,data_fallback_reason=self.data_fallback_reason)
                 states.append(CppGlobalFlowSolution(self,solved.coefficients,time,a.number(alpha),history,
                     [a.number(w) for w in weights],solved.diagnostics))
                 previous2=previous;previous=self._mass_values(solved.coefficients)
@@ -137,6 +187,8 @@ class CppGlobalFlowSystem(CppGlobalSystem):
         return StokesTrajectory(initial,states,{'steps':steps,'dt':str(dt),'scheme':scheme,
             'new_factorizations':new,'cached_factorizations':cached,
             'backend':'cpp_global','arithmetic':'mpfr' if a.ctx else 'float64',
+            'linear_solver':self.backend.linear_solver,
+            'data_backend':self.data_backend,'data_fallback_reason':self.data_fallback_reason,
             'pressure':'no initial value or gauge imposed'})
 
 
@@ -214,13 +266,16 @@ def assemble_cpp_flow(method, problem, cloud):
     else:
         forcing = [v for data in problem.forcing for v in a.data(data, cloud.interior)]
         rhs = forcing + list(boundary_values(problem, cloud, a)) + [0]*len(columns)
-    executable, bound, pressure_bound, pressure_order = _artifact(method, problem, d)
+    executable, bound, pressure_bound, pressure_order,data_plan = _artifact(method, problem, d)
     worker = _acquire_worker(executable, method.backend)
     system = CppGlobalFlowSystem(worker, points, rows, columns, rhs, a.ctx,
         method.precision.global_digits or 17, method.backend, 6)
     system.problem, system.cloud, system.arithmetic = problem, cloud, a
     system.points, system.functionals, system.polynomials = points, rows, polynomials
     system.n, system.pressure_order = len(points), pressure_order
+    system._native_data_problem=None;system._native_data_points=None;system._native_data_boundary=None
+    system._native_data_key=None
+    system.data_backend='python';system.data_fallback_reason='Unsupported or non-symbolic forcing/boundary data'
     enc = system.encode
     try:
         tokens = ['INIT', str(system.digits), str(method.backend.threads), '1',
@@ -238,6 +293,14 @@ def assemble_cpp_flow(method, problem, cloud):
         for row in rows + rows:
             tokens.extend(_field_tokens(row, enc))
         worker.request(' '.join(tokens))
+        if data_plan is not None:
+            rows=_data_rows(data_plan,problem,cloud)
+            if rows is not None:
+                worker.request('DATA_INIT '+str(len(rows))+' '+' '.join(map(str,rows)))
+                system._native_data_problem=problem;system._native_data_points=cloud.points.copy()
+                system._native_data_boundary=_boundary_key(cloud);system._native_data_key=_problem_data_key(problem)
+                system.data_backend='cpp_symbolic';system.data_fallback_reason=None
+            else:system.data_fallback_reason='Overlapping boundary groups with differing data retain Python evaluation'
         worker.request('BUILD_MOL' if problem.transient else 'BUILD')
         if problem.transient:
             mass_rows=[{component:Identity(d)} for component in range(d) for _ in cloud.interior_indices]
@@ -245,6 +308,8 @@ def assemble_cpp_flow(method, problem, cloud):
             for row in mass_rows:tokens.extend(_field_tokens(row,enc))
             worker.request(' '.join(tokens))
             system._mass=_MassMatrix(system)
+        elif data_plan is not None:
+            system.rhs=system.data(0)
     except Exception:
         worker.close(force=True)
         raise

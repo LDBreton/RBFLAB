@@ -23,7 +23,7 @@ help small systems. The documented Torch path does not use CUDA or MPFR.
 ## C++ source setup
 
 Use the step-by-step [Ubuntu](../INSTALL.md#4-enable-c-on-ubuntu-linux) or
-[Windows/WSL](../INSTALL.md#5-enable-c-from-windows-through-wsl) installation route.
+[native Windows](../INSTALL.md#5-enable-native-c-on-windows) installation route.
 The guide distinguishes generated scalar kernels from dedicated vector LHI
 executables and explains dependencies, cache reuse and matching native sources.
 

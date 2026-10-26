@@ -3,6 +3,8 @@ __pycache__/
 *.egg-info/
 .pytest_cache/
 outputs/
+/experiments/matlab_no_slip/
+/experiments/native_scalar_global/
 
 
 cpp/deps/
@@ -15,3 +17,6 @@ cpp/build_manifest_double.json
 build/
 dist/
 site/
+
+cpp/*.exe
+cpp/build_manifest*_windows.json

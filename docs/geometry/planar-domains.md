@@ -5,7 +5,7 @@ a **filled material domain** with named boundary pieces. `meshgen.generate`
 then chooses node locations. All lengths use your chosen physical units; angles
 are in radians.
 
-## Disks, ellipses, annuli and flowers
+## Step 1 — Choose a smooth shape
 
 ```python
 from rbflab import geometry as g, meshgen, viz
@@ -40,7 +40,7 @@ $$r(t)=\text{radius}\,[1+\text{amplitude}\cos(\text{petals}\,t)].$$
 `radius*(1-amplitude)` and `radius*(1+amplitude)`. Large modulation creates
 narrow features that need adequate node resolution.
 
-## Divide a curved boundary into labels
+## Step 2 — Divide a curved boundary into labels
 
 An ellipse can be split into equal **parameter-angle** arcs:
 
@@ -60,7 +60,7 @@ For unequal arc intervals or arbitrary curved pieces, use
 [ParametricBoundary](custom-domains.md). A label identifies a boundary group,
 not its boundary condition.
 
-## Rectangles and arbitrary polygons
+## Step 3 — Use straight edges and corners
 
 ```python
 rectangle = g.Rectangle(width=2., height=1., angle=.4)
@@ -87,7 +87,7 @@ At a corner, the generator retains the point once, on the edge starting there.
 Its normal is that edge's normal, not a corner average. Choose boundary equations
 at corners deliberately; the PDE itself may have reduced regularity there.
 
-## Cut named holes from a domain
+## Step 4 — Cut named holes from a domain
 
 `with_holes(outer, holes)` returns a new material domain. The dictionary keys
 name the holes; its values describe the shapes to remove.
@@ -134,3 +134,24 @@ To build a shape not available as a primitive:
 
 Constructor signatures and return types are listed in the
 [geometry API reference](../api/mesh-generation.md).
+
+## Step 5 — Set the resolution of each piece
+
+```python
+print("available labels:", list(plate.boundaries))
+counts = {label: 30 for label in plate.boundaries}
+counts["circle"] = 60
+cloud = meshgen.generate(plate, interior=400, boundary=counts, seed=0)
+fig, ax = viz.plot_cloud(cloud, normals=True)
+for label, indices in cloud.boundary.items():
+    print(label, len(indices))
+```
+
+Expect 60 nodes around the circular hole and 30 on every other arc. The denser
+circle boundary does not attract extra interior points with ordinary generation.
+For that effect, use [boundary-driven triangulation](triangulation.md).
+
+**Try it:** move the circle by changing its `center`, regenerate the plate, and
+plot it. The removed disk must stay strictly inside the exterior and away from
+the slot. Increase its radius until the gap is visibly narrow, then add nodes
+and inspect spacing. Touching or overlapping holes are rejected.

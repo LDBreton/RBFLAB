@@ -4,7 +4,7 @@ import re
 import pytest
 
 PAGES = ["index", "planar-domains", "parametric-borders", "custom-domains",
-         "labels-normals", "sampling", "volumes-3d", "surfaces-3d", "staggered", "gmsh"]
+         "labels-normals", "sampling", "volumes-3d", "surfaces-3d", "staggered", "gmsh", "padua", "triangulation"]
 
 
 @pytest.mark.parametrize("page", PAGES)
@@ -13,6 +13,8 @@ def test_mesh_generation_tutorial(page, tmp_path, monkeypatch):
     matplotlib = pytest.importorskip("matplotlib")
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
+    if page == "triangulation":
+        pytest.importorskip("meshpy")
     if page == "gmsh":
         pytest.importorskip("gmsh")
     source = Path(__file__).resolve().parents[1] / "docs" / "geometry" / (page + ".md")
