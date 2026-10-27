@@ -51,6 +51,87 @@ body, input { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-s
 .md-typeset code { border-radius: .16rem; font-size: .84em; }
 .md-typeset pre > code { border: 1px solid var(--rbf-line); border-radius: .25rem; padding: 1rem; line-height: 1.65; }
 .md-typeset .highlight { margin: 1.2rem 0; }
+/* Familiar VS Code token colors for fenced code, with independent light/dark palettes. */
+.md-typeset .highlight .c,
+.md-typeset .highlight .ch,
+.md-typeset .highlight .cm,
+.md-typeset .highlight .cp,
+.md-typeset .highlight .cpf,
+.md-typeset .highlight .c1,
+.md-typeset .highlight .cs { color: #008000; }
+.md-typeset .highlight .k,
+.md-typeset .highlight .kc,
+.md-typeset .highlight .kd,
+.md-typeset .highlight .kn,
+.md-typeset .highlight .kp,
+.md-typeset .highlight .kr,
+.md-typeset .highlight .kt,
+.md-typeset .highlight .ow { color: #0000ff; }
+.md-typeset .highlight .s,
+.md-typeset .highlight .sa,
+.md-typeset .highlight .sb,
+.md-typeset .highlight .sc,
+.md-typeset .highlight .dl,
+.md-typeset .highlight .sd,
+.md-typeset .highlight .s2,
+.md-typeset .highlight .se,
+.md-typeset .highlight .sh,
+.md-typeset .highlight .si,
+.md-typeset .highlight .sx,
+.md-typeset .highlight .sr,
+.md-typeset .highlight .s1,
+.md-typeset .highlight .ss { color: #a31515; }
+.md-typeset .highlight .m,
+.md-typeset .highlight .mb,
+.md-typeset .highlight .mf,
+.md-typeset .highlight .mh,
+.md-typeset .highlight .mi,
+.md-typeset .highlight .mo,
+.md-typeset .highlight .il { color: #098658; }
+.md-typeset .highlight .nf { color: #795e26; }
+.md-typeset .highlight .nc,
+.md-typeset .highlight .nb,
+.md-typeset .highlight .bp { color: #267f99; }
+[data-md-color-scheme="slate"] .md-typeset .highlight .c,
+[data-md-color-scheme="slate"] .md-typeset .highlight .ch,
+[data-md-color-scheme="slate"] .md-typeset .highlight .cm,
+[data-md-color-scheme="slate"] .md-typeset .highlight .cp,
+[data-md-color-scheme="slate"] .md-typeset .highlight .cpf,
+[data-md-color-scheme="slate"] .md-typeset .highlight .c1,
+[data-md-color-scheme="slate"] .md-typeset .highlight .cs { color: #6a9955; }
+[data-md-color-scheme="slate"] .md-typeset .highlight .k,
+[data-md-color-scheme="slate"] .md-typeset .highlight .kc,
+[data-md-color-scheme="slate"] .md-typeset .highlight .kd,
+[data-md-color-scheme="slate"] .md-typeset .highlight .kn,
+[data-md-color-scheme="slate"] .md-typeset .highlight .kp,
+[data-md-color-scheme="slate"] .md-typeset .highlight .kr,
+[data-md-color-scheme="slate"] .md-typeset .highlight .kt,
+[data-md-color-scheme="slate"] .md-typeset .highlight .ow { color: #569cd6; }
+[data-md-color-scheme="slate"] .md-typeset .highlight .s,
+[data-md-color-scheme="slate"] .md-typeset .highlight .sa,
+[data-md-color-scheme="slate"] .md-typeset .highlight .sb,
+[data-md-color-scheme="slate"] .md-typeset .highlight .sc,
+[data-md-color-scheme="slate"] .md-typeset .highlight .dl,
+[data-md-color-scheme="slate"] .md-typeset .highlight .sd,
+[data-md-color-scheme="slate"] .md-typeset .highlight .s2,
+[data-md-color-scheme="slate"] .md-typeset .highlight .se,
+[data-md-color-scheme="slate"] .md-typeset .highlight .sh,
+[data-md-color-scheme="slate"] .md-typeset .highlight .si,
+[data-md-color-scheme="slate"] .md-typeset .highlight .sx,
+[data-md-color-scheme="slate"] .md-typeset .highlight .sr,
+[data-md-color-scheme="slate"] .md-typeset .highlight .s1,
+[data-md-color-scheme="slate"] .md-typeset .highlight .ss { color: #ce9178; }
+[data-md-color-scheme="slate"] .md-typeset .highlight .m,
+[data-md-color-scheme="slate"] .md-typeset .highlight .mb,
+[data-md-color-scheme="slate"] .md-typeset .highlight .mf,
+[data-md-color-scheme="slate"] .md-typeset .highlight .mh,
+[data-md-color-scheme="slate"] .md-typeset .highlight .mi,
+[data-md-color-scheme="slate"] .md-typeset .highlight .mo,
+[data-md-color-scheme="slate"] .md-typeset .highlight .il { color: #b5cea8; }
+[data-md-color-scheme="slate"] .md-typeset .highlight .nf { color: #dcdcaa; }
+[data-md-color-scheme="slate"] .md-typeset .highlight .nc,
+[data-md-color-scheme="slate"] .md-typeset .highlight .nb,
+[data-md-color-scheme="slate"] .md-typeset .highlight .bp { color: #4ec9b0; }
 .md-typeset div.arithmatex { background: var(--rbf-surface); border-left: 2px solid #7194bb; padding: .65rem .85rem; margin: 1.25rem 0; overflow-x: auto; }
 .md-typeset table:not([class]) { border-color: var(--rbf-line); border-radius: .2rem; font-size: .72rem; }
 .md-typeset table:not([class]) th { background: var(--rbf-surface); color: var(--rbf-ink); font-weight: 650; }

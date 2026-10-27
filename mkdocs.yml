@@ -54,6 +54,9 @@ markdown_extensions:
   - md_in_html
   - toc:
       permalink: true
+  - pymdownx.highlight:
+      pygments_lang_class: true
+      guess_lang: false
   - pymdownx.superfences
   - pymdownx.arithmatex:
       generic: true
@@ -71,6 +74,7 @@ nav:
       - Your first RBF problem: getting-started.md
   - Mesh generation:
       - Construction overview: geometry/index.md
+      - Visual mesh atlas: geometry/gallery.md
       - 2D domains:
           - Built-in shapes and holes: geometry/planar-domains.md
           - Oriented borders: geometry/parametric-borders.md

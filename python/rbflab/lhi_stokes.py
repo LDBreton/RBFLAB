@@ -15,7 +15,7 @@ from scipy.sparse import coo_matrix
 from scipy.sparse.linalg import splu
 from .precision import Precision
 from .nodal import Arithmetic
-from .kernels import ScalarKernel,Hybrid
+from .kernels import ScalarKernel,Hybrid,resolve_polynomial_degree
 from .operators import Identity,Derivative,Laplacian
 from .methods import _query
 from .stencils import StencilPolicy,neighbors,geometry_quality
@@ -63,9 +63,9 @@ class LHIUnsteadyStokes:
 
     Small solve residuals or patchwise zero divergence are not validation.
     pressure_kernel defaults to the velocity scalar potential. Hybrid potentials
-    require polynomial_degree or explicit legacy_unaugmented_hybrid=True.
-    Polynomial augmentation uses solenoidal velocity degree d and pressure degree
-    d-1 modulo constants. It is experimental: reproduction does not imply stable
+    accept explicit augmentation choices even below the kernel recommendation.
+    Velocity and pressure polynomial degrees are independent (pressure modulo
+    constants). It is experimental: reproduction does not imply stable
     time evolution. Velocity requires six continuous derivatives, pressure two.
     min_boundary_centers adds nearest boundary data only to stencils already
     touching the boundary. Existing solution centers are retained.
@@ -80,26 +80,28 @@ class LHIUnsteadyStokes:
     polynomial_degree: int | None = None
     min_boundary_centers: int = 0
     local_backend: object = None
+    pressure_polynomial_degree: object = None
+
+    @property
+    def has_polynomials(self):
+        return self.polynomial_degree is not None or self.pressure_polynomial_degree not in (None,0)
 
     def assemble(self,problem,cloud):
         if cloud.dimension != 2:
             raise NotImplementedError("Stokes solvers currently support 2D only")
         if not isinstance(problem,UnsteadyStokesProblem):raise TypeError("Expected UnsteadyStokesProblem")
-        if self.polynomial_degree is not None and (type(self.polynomial_degree) is not int or not 2<=self.polynomial_degree<=4):
-            raise ValueError("polynomial_degree must be None or an integer from 2 through 4")
         if type(self.min_boundary_centers) is not int or self.min_boundary_centers<0:
             raise ValueError("min_boundary_centers must be a nonnegative integer")
         pressure_kernel=self.kernel if self.pressure_kernel is None else self.pressure_kernel
+        self.polynomial_degree=resolve_polynomial_degree(self.kernel,self.polynomial_degree,
+            minimum_degree=max(-1,getattr(self.kernel,'minimum_degree',-1)-1))
+        self.pressure_polynomial_degree=resolve_polynomial_degree(pressure_kernel,self.pressure_polynomial_degree)
         for kernel,order in ((self.kernel,6),(pressure_kernel,2)):
             if isinstance(kernel,Hybrid):
-                if not self.legacy_unaugmented_hybrid and self.polynomial_degree is None:
-                    raise ValueError("Set legacy_unaugmented_hybrid=True to use the experimental legacy hybrid without polynomial tails")
                 if kernel.phs.power-1<order:
                     raise ValueError(f"This block requires continuous derivatives through order {order}")
             elif not isinstance(kernel,(ScalarKernel,BoundKernel)):
                 raise NotImplementedError("Vector PHS polynomial augmentation is not implemented")
-        if isinstance(pressure_kernel,Hybrid) and self.polynomial_degree is not None and self.polynomial_degree-1<pressure_kernel.phs.minimum_degree:
-            raise ValueError("Pressure PHS requires a higher polynomial_degree")
         if not isinstance(self.precision,Precision) or self.precision.global_digits is not None:
             raise ValueError("LHI uses local_digits and global_dtype")
         if not isinstance(self.stencil_policy,StencilPolicy):raise TypeError("Expected StencilPolicy")
@@ -152,10 +154,10 @@ class LHIUnsteadyStokes:
             gram=_blocks(a,points,ops,points,ops,scale)
             basis=None
             diagnostics=geometry_quality(cloud.points[np.unique(sc+bc+pc)],cloud.points[center],1)
-            if self.polynomial_degree is not None:
+            if self.has_polynomials:
                 sqrt=a.ctx.sqrt if a.ctx else np.sqrt
                 radius=max(sqrt(sum((a.number(v)-a.number(w))**2 for v,w in zip(point,cloud.points[center]))) for point in points)
-                basis=StokesPolynomialBasis(a,cloud.points[center],radius,self.polynomial_degree)
+                basis=StokesPolynomialBasis(a,cloud.points[center],radius,self.polynomial_degree,self.pressure_polynomial_degree)
                 poly=basis.matrix(points,ops);ratio=rank_ratio(poly)
                 diagnostics['functional_polynomial_ratio']=ratio
                 if ratio<1e-12:raise ValueError(f"Polynomial functionals are rank deficient at center {center}; enlarge or rebalance the stencil")
@@ -185,18 +187,20 @@ class LHIStokesSystem:
         self.SY,self.SL,self.mass=_matrix(sy,g),_matrix(sl,g),_matrix(mass,g)
         self.tree=cKDTree(cloud.interior);self._factors={}
 
-    def polynomial_consistency_diagnostics(self,degree=2):
+    def polynomial_consistency_diagnostics(self,degree=2,pressure_degree=None):
         """Compact momentum defects on normalized solenoidal polynomials.
 
         Uses assembled weights in their global precision, including any cast
         from MP local solves. Reports relative componentwise moment defects.
         Geometry/rank screening remains Float64.
         """
-        if type(degree) is not int or not 2<=degree<=4:raise ValueError("degree must be 2 through 4")
+        for value in (degree,pressure_degree):
+            if value is not None and (type(value) is not int or value<0):
+                raise ValueError("Diagnostic polynomial degrees must be nonnegative integers or None")
         a=self.arithmetic;rows=[];ni=len(self.cloud.interior)
         momentum=[{c:-(Laplacian()*self.problem.viscosity),2:Derivative(c)} for c in (0,1)]
         for owner,s in enumerate(self.stencils):
-            basis=StokesPolynomialBasis(a,self.cloud.points[s.center],s.geometry_diagnostics['radius'],degree)
+            basis=StokesPolynomialBasis(a,self.cloud.points[s.center],s.geometry_diagnostics['radius'],degree,pressure_degree)
             poly=basis.matrix(s.points,s.functionals)
             target=basis.matrix(np.repeat(self.cloud.points[[s.center]],2,axis=0),momentum)
             defect=0.
@@ -208,7 +212,7 @@ class LHIStokesSystem:
                     value=sum(terms,a.number(0));scale=max(a.number(1),abs(target[c,k]),sum(map(abs,terms)))
                     defect=max(defect,float(abs(value-target[c,k])/scale))
             rows.append({'center':s.center,'touches_boundary':any(g=='boundary' for g,j in s.slots),'relative_moment_defect':defect})
-        return {'degree':degree,'max_relative_moment_defect':max(r['relative_moment_defect'] for r in rows),'stencils':rows}
+        return {'degree':degree,'pressure_degree':pressure_degree,'max_relative_moment_defect':max(r['relative_moment_defect'] for r in rows),'stencils':rows}
 
     def stability_diagnostics(self,max_unknowns=300):
         """Small-system Float64 diagnostic, even for an MP-assembled system.

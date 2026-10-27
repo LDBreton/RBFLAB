@@ -59,7 +59,7 @@ class LegacyCppLHIBackend:
         pk=method.pressure_kernel or method.kernel
         if cloud.dimension!=2 or any(not isinstance(k,ScalarKernel) or k.family!='imq' for k in (method.kernel,pk)):
             raise NotImplementedError('Legacy C++ bridge supports only 2D IMQ Stokes')
-        if method.polynomial_degree is not None or method.min_boundary_centers or method.pde_stencil_size is not None or method.stencil_policy.scaling!='physical' or method.stencil_policy.selection!='nearest':
+        if method.has_polynomials or method.min_boundary_centers or method.pde_stencil_size is not None or method.stencil_policy.scaling!='physical' or method.stencil_policy.selection!='nearest':
             raise NotImplementedError('Legacy C++ bridge needs unaugmented nearest stencils in physical coordinates')
         digits=method.precision.local_digits
         if digits is None:raise ValueError('Set local_digits explicitly for the MPFR backend')

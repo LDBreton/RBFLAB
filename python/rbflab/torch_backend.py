@@ -224,7 +224,7 @@ class TorchBackend(BackendSettings):
     def assemble(self, method, problem, cloud):
         from .lhi_backends import _prepare, _finish
         begin = time.perf_counter()
-        if method.stencil_policy.scaling != 'physical' or method.polynomial_degree is not None:
+        if method.stencil_policy.scaling != 'physical' or method.has_polynomials:
             raise NotImplementedError('Torch LHI currently requires unaugmented physical-coordinate stencils')
         vk, pk = self.prepare(method.kernel, method.pressure_kernel or method.kernel, method.precision, cloud.dimension)
         prepared = time.perf_counter()

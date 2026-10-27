@@ -57,7 +57,7 @@ class CudaLHIBackend:
     def assemble(self,method,problem,cloud):
         begin=time.perf_counter()
         if method.precision.local_digits is not None or method.precision.global_dtype!='float64':raise ValueError('CUDA prototype requires Float64 local/global arithmetic')
-        if cloud.dimension!=2 or method.stencil_policy.scaling!='physical' or method.polynomial_degree is not None:raise NotImplementedError('CUDA prototype requires unaugmented physical-coordinate 2D stencils')
+        if cloud.dimension!=2 or method.stencil_policy.scaling!='physical' or method.has_polynomials:raise NotImplementedError('CUDA prototype requires unaugmented physical-coordinate 2D stencils')
         pk=method.pressure_kernel or method.kernel
         start=time.perf_counter();executable=compile_cuda(method.kernel,pk,self.cache_dir);compile_seconds=time.perf_counter()-start
         a,tasks,stencils=_prepare(method,problem,cloud,self.shape_rule)

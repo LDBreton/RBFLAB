@@ -110,20 +110,20 @@ class MethodContract:
                 from .space_stokes import select_spaces
                 _,_,vd,pd=select_spaces(self,problem)
                 if cloud is not None and cloud.dimension!=2:raise NotImplementedError('Stokes LHI currently supports 2D only')
-                if (vd is None and pd is not None) or (vd is not None and (vd<2 or vd>4 or pd!=vd-1)):raise NotImplementedError('Stokes LHI requires no tails or velocity degree 2..4 and pressure degree one lower')
-                if isinstance(backend,TorchBackend) and vd is not None:raise NotImplementedError('Torch Stokes LHI currently supports unaugmented spaces only')
+                has_polynomials=vd is not None or pd not in (None,0)
+                if isinstance(backend,TorchBackend) and has_polynomials:raise NotImplementedError('Torch Stokes LHI currently supports unaugmented spaces only')
                 if isinstance(backend,CppBackend) and self.stencil_policy.scaling!='physical':raise NotImplementedError('C++ Stokes LHI requires physical kernel coordinates')
-                if self.stencil_policy.shape_rule=='hardy' and (vd is not None or self.stencil_policy.scaling!='physical' or self.stencil_policy.selection!='nearest' or self.min_boundary_centers or self.pde_stencil_size is not None):raise NotImplementedError('Hardy Stokes scaling needs unaugmented physical nearest stencils with the default PDE selection')
+                if self.stencil_policy.shape_rule=='hardy' and (has_polynomials or self.stencil_policy.scaling!='physical' or self.stencil_policy.selection!='nearest' or self.min_boundary_centers or self.pde_stencil_size is not None):raise NotImplementedError('Hardy Stokes scaling needs unaugmented physical nearest stencils with the default PDE selection')
                 if isinstance(backend,TorchBackend) and self.stencil_policy.shape_rule not in ('fixed','hardy'):raise NotImplementedError('Torch Stokes supports fixed or Hardy shape policies')
         if name!='RBFFD' and not flow and not block:
             from .spaces import ScalarSpace, DivergenceFreeSpace
-            from .kernels import validate_polynomial_degree
+            from .kernels import resolve_polynomial_degree
             if self.spaces:
                 if len(self.spaces)!=1:raise ValueError('Scalar problems require one ScalarSpace')
                 descriptor=next(iter(self.spaces.values()))
                 if not isinstance(descriptor,ScalarSpace) or isinstance(descriptor,DivergenceFreeSpace):raise TypeError('Scalar problems require ScalarSpace')
                 descriptor.degree()
-            else:validate_polynomial_degree(self.kernel,self.polynomial_degree)
+            else:resolve_polynomial_degree(self.kernel,self.polynomial_degree)
         if block:
             from .spaces import ScalarSpace
             if not self.spaces or set(self.spaces)!=set(problem.fields):raise ValueError('Block problems require one space for each symbolic field')
@@ -263,7 +263,9 @@ def assembled(fn):
             from .discrete_operators import scalar_method
             method=scalar_method(self)
         from .rbf_fd import RBFFD
-        if isinstance(method,RBFFD) and method.polynomial_degree=='auto':method=replace(method,polynomial_degree=2)
+        if method.kernel is not None and method.polynomial_degree=='auto':
+            from .kernels import resolve_polynomial_degree
+            method=replace(method,polynomial_degree=resolve_polynomial_degree(method.kernel,method.polynomial_degree,warn=False))
         system=fn(method,problem,cloud)
         return expose_system(system,method,cloud,problem)
     return assemble

@@ -12,6 +12,15 @@ compatible. `ScalarSpace` fits `(N, C)` independent scalar outputs, whereas
 existing diagnostics without dispatching computation; unknown routes remain
 null. Geometry remains Float64 even with extended arithmetic.
 
+Polynomial degree selection is per space. `None` (the default) omits polynomial
+columns, an integer selects exactly that degree even below a kernel's CPD
+minimum, and `"auto"` selects the kernel minimum. A below-minimum choice may
+affect solvability and accuracy; the minimum is diagnostic guidance, not a
+rejection threshold. Velocity and pressure augmentations are independent.
+`PressureSpace` always omits the additive pressure constant modulo its gauge;
+`polynomial_degree=None` additionally requests no pressure polynomial tail.
+These choices do not establish a general stability guarantee.
+
 | Capability | Python | C++ double | C++ MPFR | PyTorch |
 |---|---|---|---|---|
 | Scalar stationary global collocation, 2D/3D | Yes | Yes, `CppGlobalBackend` from source checkout | Yes, `Precision(global_digits=...)` | — |
@@ -45,7 +54,9 @@ worker retains the factors for repeated right-hand sides. Scalar input geometry
 remains Float64; MPFR preserves extended arithmetic after input conversion.
 Stationary `SymbolicStokes` also accepts this backend with symmetric collocation,
 `DivergenceFreeSpace` velocity and scalar pressure spaces, including solenoidal
-polynomial augmentation in 2D/3D. Velocity, pressure (modulo constants), pressure
+polynomial augmentation in 2D/3D. The Python and C++ MPFR routes also support a
+degree-zero velocity polynomial space together with
+`PressureSpace(..., polynomial_degree=None)`. Velocity, pressure (modulo constants), pressure
 gradient, divergence and momentum residuals have native expansion evaluation.
 Supported symbolic forcing and velocity boundary data also evaluate in the
 native worker, with Python fallback for arbitrary callbacks or unsupported

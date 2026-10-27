@@ -89,6 +89,27 @@ loop. Existing PDE convenience interfaces remain available.
 These interfaces are included in **RBFLAB 0.5.0**. Upgrade with
 `python -m pip install --upgrade "rbflab>=0.5"`.
 
+Stokes velocity and pressure spaces choose polynomial augmentation independently.
+`None` omits polynomial columns, an integer selects exactly that degree, and
+`"auto"` selects the kernel minimum. For example, a degree-zero velocity tail
+can be paired with no pressure polynomial tail (the pressure constant remains
+omitted as the gauge):
+
+```python
+model = rbf.SymbolicStokes(2)
+spaces = {
+    model.velocity: rbf.DivergenceFreeSpace(rbf.PHS(5), polynomial_degree=0),
+    model.pressure: rbf.PressureSpace(rbf.PHS(5), polynomial_degree=None),
+}
+method = rbf.GlobalCollocation(spaces=spaces)  # Python assembly
+# C++ MPFR: add backend=rbf.CppGlobalBackend(...) and
+# precision=rbf.Precision(global_digits=...) to GlobalCollocation.
+```
+
+Explicit degrees below the kernel's conventional CPD minimum are accepted, but
+may affect solvability and accuracy. This degree choice is not a general
+stability guarantee; see the [space API](https://ldbreton.github.io/RBFLAB/api/equations-spaces/).
+
 ```python
 import numpy as np
 import rbflab as rbf

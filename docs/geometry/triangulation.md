@@ -1,6 +1,9 @@
 # Create a boundary-refined triangle mesh
 
-This lesson turns a labeled annulus into connected triangles, then exposes its vertices and edge midpoints as RBF clouds. Run the blocks in order in one script.
+This lesson follows the boundary-first workflow familiar from FreeFEM++: sample
+the labeled contours, request an interior size field, then inspect the connected
+triangles. RBFLAB uses Triangle through MeshPy here; the mesh is not produced by
+FreeFEM++/BAMG. Its vertices and edge midpoints can then be exposed as point clouds.
 
 ## Step 1 — Sample and triangulate the boundary
 

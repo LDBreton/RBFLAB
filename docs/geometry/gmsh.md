@@ -1,7 +1,10 @@
 # Import a connected 2D mesh from Gmsh
 
 Use Gmsh when you need explicit triangle connectivity, its geometry tools, or
-its mesh-size controls. Built-in RBFLAB curve generation does not require Gmsh.
+its mesh-size controls. The workflow follows the boundary-first pattern familiar
+from finite-element tools: define labeled curves, create a surface, generate
+triangles, then transfer coordinates and labels. Built-in RBFLAB curve
+generation does not require Gmsh.
 
 ```sh
 python -m pip install "rbflab[mesh,examples]"
@@ -34,16 +37,21 @@ Create your geometry and first-order triangles with Gmsh, then call
 `meshgen.from_gmsh()` while that model is active. The essentials of boundary naming are:
 
 ```python
-# In your initialized Gmsh model, after creating and synchronizing curves:
-# group = gmsh.model.addPhysicalGroup(1, curve_tags)
-# gmsh.model.setPhysicalName(1, group, "wall")
-# gmsh.model.mesh.generate(2)
-# mesh, original_node_tags = meshgen.from_gmsh()
+import gmsh
+from rbflab import meshgen
+
+# Run this after creating/synchronizing the geometry, assigning physical
+# curve groups, and generating a 2D mesh in this Gmsh session.
+if not gmsh.isInitialized():
+    raise RuntimeError("Initialize and mesh the Gmsh model before importing")
+mesh, original_node_tags = meshgen.from_gmsh()
 ```
 
 A physical curve group can contain several curve tags; they become one boundary
 label. Every exterior edge must be covered when using explicit labels. The adapter
-reads an existing model: it does not initialize, clear, remesh or finalize it.
+reads an existing, synchronized model after a 2D mesh has been generated. It does
+not initialize, clear, remesh or finalize the model; keep `gmsh.finalize()` in
+the code that owns the Gmsh session, after import.
 
 The current adapter expects first-order, three-node triangles in an XY-parallel
 plane and first-order boundary lines. Construction-only points are discarded.

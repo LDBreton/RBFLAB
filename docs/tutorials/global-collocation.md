@@ -84,7 +84,10 @@ record that ordering. Do not assume array layouts from a different scheme.
 
 - Change the symbolic equation or boundary data to change the imposed rows.
 - Change `kernel` to change the trial functions.
-- Add `polynomial_degree=...` when polynomial augmentation is desired or required;
+- Select polynomial augmentation on the space: `None` omits polynomial columns,
+  an integer requests that exact degree, and `"auto"` selects the kernel minimum.
+  Below-minimum integers are accepted, but may affect solvability and accuracy;
+  see [equations and spaces](../api/equations-spaces.md);
   the resulting system also includes polynomial coefficients and side conditions.
 - Use `solution.evaluate(query, rbf.Derivative(0))` for a derivative of the solution.
 

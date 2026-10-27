@@ -4,7 +4,22 @@ After fixing the geometry, choose how many samples to generate and how to
 place them. Sampling choices affect spacing and the quality of local stencils;
 they do not change the meaning of boundary labels.
 
-## Step 1 — Compare interior samplers
+## Step 1 — Choose a distribution
+
+`meshgen.generate` returns a labeled `PointCloud`; it does not create mesh cells.
+Choose a sampler based on the pattern you want, then inspect the actual nodes.
+
+| Method | Dimensions | Resolution control | Result and limitation |
+|---|---|---|---|
+| `random` | 2D, 3D volumes, parametric surfaces | Requested count | Stochastic; no minimum-spacing constraint |
+| `halton`, `sobol` | 2D and 3D volumes | Requested count | Low-discrepancy candidates; clipping/rejection changes their balance; no minimum spacing |
+| `padua` | Planar geometry | Positive `degree` | Deterministic clipped reference grid; retained count varies with geometry |
+| `mapped_padua` | Planar outer contour with separated holes | Degree per hole patch | Experimental radial map; requires strict star-shapedness and can cluster nodes |
+| `triangulate` | One planar outer contour with disjoint holes | Boundary counts and sizing targets | Optional Triangle/MeshPy mesh; produces connectivity, not a fixed interior count |
+
+The unified `generate(..., method=...)` entry point handles the first three
+rows; `mapped_padua` and `triangulate` have separate functions because they have
+different geometric constraints and outputs.
 
 ```python
 from rbflab import geometry as g, meshgen, viz
@@ -17,7 +32,7 @@ fig, ax = viz.plot_cloud(cloud)
 
 ![Random, Halton and Sobol interior clouds on the same disk](../assets/meshes/sampling.png)
 
-Run all three methods on the same disk to compare the pattern directly:
+Compare the three count-based samplers on the same geometry:
 
 ```python
 import matplotlib.pyplot as plt
@@ -35,7 +50,9 @@ Random nodes can show clumps and gaps; Halton and Sobol often cover the domain
 more evenly, but check the actual cloud.
 They keep the same domain and boundary count. Halton and Sobol are low-discrepancy
 sequences; rejection at curved boundaries and truncation weaken their original
-balance properties. **None of these methods enforces a minimum inter-node distance.**
+balance properties. **None of random, Halton, or Sobol enforces minimum spacing.**
+For degree-controlled Padua distributions, see [Padua points](padua.md); for
+connectivity and boundary-driven refinement, use [triangulation](triangulation.md).
 
 A fixed seed reproduces a recipe without changing Python/NumPy global random
 state through the unified generator. Use several independent seeds when assessing
@@ -117,10 +134,6 @@ For a deterministic pattern controlled by polynomial degree, follow the
 [clipped and mapped Padua lesson](padua.md). Clipped generation retains existing
 boundary samplers and supports general planar geometry; the experimental mapped
 route concentrates nodes around separated star-shaped holes.
-
-## Experimental mapped Padua points concentrated near holes
-
-See the [mapped recipe and its geometric restrictions](padua.md#experimental-mapped-padua-points-concentrated-near-holes).
 
 ## Boundary-driven triangulation
 

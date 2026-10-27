@@ -24,8 +24,8 @@ class RBFFD(MethodContract):
     Args:
         kernel: Radial basis function used for stencil weights.
         stencil_size: Number of points in each local stencil.
-        polynomial_degree: Highest total polynomial degree. The default auto
-            preserves degree 2 for kernel shorthand; spaces own their degree.
+        polynomial_degree: Highest total polynomial degree, or `None` to
+            disable polynomial augmentation. `"auto"` selects the kernel minimum.
         precision: Local-weight and sparse-solve arithmetic policy.
         stencil_policy: Selection and scaling of local points.
         scheme: Local ansatz scheme; `"standard"` is the default.
@@ -37,7 +37,7 @@ class RBFFD(MethodContract):
     for a scalar PDE system."""
     kernel: object = None
     stencil_size: int = 15
-    polynomial_degree: object = "auto"
+    polynomial_degree: object = None
     precision: Precision = field(default_factory=Precision)
     stencil_policy: StencilPolicy = field(default_factory=StencilPolicy)
 

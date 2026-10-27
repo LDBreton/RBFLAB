@@ -5,7 +5,7 @@ from .assembly import functional_matrix, Factor, relative_residual
 from .precision import Precision, MPBackend, MPFactor, mp_number, mp_values
 from .operators import Identity, bind_operators
 from .stencils import polynomial_powers
-from .kernels import validate_polynomial_degree
+from .kernels import resolve_polynomial_degree
 from .problems import values, boundary_data
 
 
@@ -58,9 +58,8 @@ class NodalBasis:
         self.centers = _query(centers)
         if not len(self.centers) or (source_operators is None and len(np.unique(self.centers,axis=0)) != len(self.centers)):
             raise ValueError("Expected nonempty distinct centers")
-        if degree is not None and (type(degree) is not int or degree < 0):
-            raise ValueError("polynomial_degree must be None or a nonnegative integer")
-        validate_polynomial_degree(arithmetic.kernel,degree)
+        degree=resolve_polynomial_degree(arithmetic.kernel,degree,warn=False)
+        self.degree=degree
         self.powers = [] if degree is None else polynomial_powers(self.centers.shape[1], degree)
         if len(self.powers)>len(self.centers):
             raise ValueError("Too few centers for polynomial basis")
@@ -218,7 +217,7 @@ class LocalNodalStencil:
         return result[:len(self.basis.centers)]
 
 
-def rbf_fd_weights(kernel,centers,target,operator,polynomial_degree=2,precision=None,*,kernel_scaling="physical"):
+def rbf_fd_weights(kernel,centers,target,operator,polynomial_degree=None,precision=None,*,kernel_scaling="physical"):
     """Local derivative weights independent of a PDE or boundary description.
 
     Returns Float64 weights, or unrounded mpmath weights when local_digits is set.
@@ -229,5 +228,6 @@ def rbf_fd_weights(kernel,centers,target,operator,polynomial_degree=2,precision=
         raise TypeError("precision must be Precision")
     if precision.global_digits is not None:
         raise ValueError("Local weights use local_digits")
+    polynomial_degree=resolve_polynomial_degree(kernel,polynomial_degree)
     a=Arithmetic(kernel,precision.local_digits)
     return LocalNodalStencil(a,centers,polynomial_degree,kernel_scaling).weights(target,operator)

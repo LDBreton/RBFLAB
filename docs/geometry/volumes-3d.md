@@ -3,6 +3,9 @@
 A volume cloud contains points **inside a solid region** and labeled points on
 its enclosing surface. This is different from sampling a surface alone. Volume
 clouds have three coordinate columns and can be used by supported 3D operators.
+The construction is boundary-first in the same sense as a finite-element mesh
+workflow: define the material, choose interior and surface resolution, and
+inspect the result. RBFLAB returns a point cloud here, with no tetrahedra.
 
 ## Sphere, box and cylinder
 
@@ -17,6 +20,8 @@ fig, ax = viz.plot_cloud(cloud)
 ```
 
 ![Sphere, box and cylinder clouds with interior and labeled surface samples](../assets/meshes/volumes.png)
+
+![Three-dimensional region and surface sampling examples](../assets/meshes/manual-three-dimensional.png)
 
 Each panel uses 200 interior and 300 surface nodes. Substitute `sphere` or `box`
 for `cylinder` in the generation call to obtain the other constructions.

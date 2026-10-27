@@ -19,7 +19,7 @@ def resolve_space(method, space=None):
     if method.spaces is None:
         if space is not None: raise ValueError('space requires an RBFFD spaces mapping')
         if method.kernel is None: raise ValueError('Specify kernel or spaces')
-        return ScalarSpace(method.kernel, 2 if method.polynomial_degree=="auto" else method.polynomial_degree)
+        return ScalarSpace(method.kernel, method.polynomial_degree)
     if method.kernel is not None: raise ValueError('Specify kernel or spaces, not both')
     if not isinstance(method.spaces, Mapping) or not method.spaces:
         raise ValueError('spaces must be a nonempty field-to-space mapping')
@@ -36,7 +36,6 @@ def scalar_method(method):
     if isinstance(descriptor,DivergenceFreeSpace):
         raise NotImplementedError('Vector spaces are supported by RBFFD.operators; mixed PDE assembly is separate')
     degree=descriptor.degree()
-    if isinstance(descriptor,PressureSpace) and degree is None:degree=0
     return replace(method,kernel=descriptor.kernel,polynomial_degree=degree,spaces=None)
 
 

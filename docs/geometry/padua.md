@@ -1,6 +1,8 @@
 # Padua node distributions
 
-Follow the blocks in order. Start with clipped points; use the experimental mapped recipe when you deliberately want concentration around holes.
+Padua construction has two distinct routes. Clipping is the general planar
+choice; the experimental mapped route is for deliberate concentration around
+holes whose geometry satisfies stronger restrictions.
 
 ## Step 1 — Generate clipped Padua nodes
 
@@ -55,11 +57,6 @@ reference grid. It accepts the same `ParametricDomain`, sampled `Border`
 collections, and `RBFMesh` geometry, with one outer contour and one or more
 separated holes:
 
-This radial construction forms visible rays and can leave unevenly spaced
-interior nodes. Prefer the boundary-driven triangulation below when the goal
-is an unstructured distribution with smooth local refinement. Clipped Padua
-generation remains available for geometry that the radial map rejects.
-
 ```python
 domain = geometry.Annulus(inner_radius=.35, outer_radius=1.)
 cloud = meshgen.mapped_padua(
@@ -69,6 +66,11 @@ cloud = meshgen.mapped_padua(
 # For oriented Border geometry:
 # cloud = meshgen.mapped_padua([outer(80), hole(-40)], degree=20, clustering=2.)
 ```
+
+This radial construction forms visible rays and can leave unevenly spaced
+interior nodes. Prefer [boundary-driven triangulation](triangulation.md) for
+unstructured distributions with local refinement. Clipped Padua generation
+remains available for geometry that the radial map rejects.
 
 `degree` is the reference Padua degree **per hole patch**. Physical boundary
 samples retain their existing coordinates, labels and normals. In particular,

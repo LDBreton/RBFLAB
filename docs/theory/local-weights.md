@@ -41,7 +41,10 @@ The explicit representer construction in `LocalApproximation` uses
 
 $$H=\begin{bmatrix}G&P_\ell\\P_m^T&0\end{bmatrix}.$$
 
-The lower block comes from the **trial** functionals. Replacing it silently by
+The selected polynomial degree is exact. `None` omits polynomial blocks,
+integers below a kernel's conventional CPD minimum are accepted without the
+standard CPD solvability guarantee, and `"auto"` selects that minimum. The
+lower block comes from the **trial** functionals. Replacing it silently by
 $P_\ell^T$ would change the method. A symmetric kernel and matching point/functionals
 give a symmetric Hermite block; source-transformed trial functions with nodal
 data generally do not. Both polynomial functional blocks must have the required

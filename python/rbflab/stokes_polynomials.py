@@ -5,18 +5,19 @@ from .stencils import polynomial_powers
 
 
 class StokesPolynomialBasis:
-    def __init__(self,arithmetic,origin,scale,degree):
+    def __init__(self,arithmetic,origin,scale,degree,pressure_degree=None):
         self.a=arithmetic;self.origin=[arithmetic.number(v) for v in origin]
         self.scale=arithmetic.number(scale);self.degree=degree
         self.columns=[]
         # Curl of normalized stream monomials; no constant stream function.
-        for x,y in polynomial_powers(2,degree+1)[1:]:
+        self.pressure_degree=pressure_degree
+        for x,y in (polynomial_powers(2,degree+1)[1:] if degree is not None else []):
             terms=[]
             if y:terms.append((0,y,(x,y-1)))
             if x:terms.append((1,-x,(x-1,y)))
             self.columns.append(terms)
         # Constant pressure is invisible to velocity/momentum data and excluded.
-        for power in polynomial_powers(2,max(1,degree-1))[1:]:
+        for power in (polynomial_powers(2,pressure_degree)[1:] if pressure_degree is not None else []):
             self.columns.append([(2,1,power)])
 
     def matrix(self,points,functionals):

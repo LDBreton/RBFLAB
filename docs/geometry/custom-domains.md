@@ -1,15 +1,8 @@
-# 2D construction with parametric contours
+# Explicit parametric contours
 
-`ParametricBoundary` describes an individual curve piece. `ParametricDomain`
-connects those pieces into **one outer contour and optional hole contours**.
-Unlike oriented-border construction, the role of a contour is explicit: its
-position in `outer` or `holes` determines whether it encloses material or a void.
+`ParametricBoundary` defines one labeled curve arc. `ParametricDomain` connects arcs into one outer contour and zero or more hole contours. This API makes each contour's role explicit: the outer contour bounds material and each contour in `holes` bounds a void. Unlike the `Border` workflow, clockwise versus counterclockwise traversal does not decide whether a contour is a hole.
 
-This API is useful when you want approximately uniform **arc-length** sampling,
-a boundary-resolution choice separate from the dense geometric representation,
-and automatic outward normals.
-
-## Define one symbolic curve
+## One symbolic curve
 
 ```python
 import sympy as sp
@@ -17,9 +10,7 @@ from rbflab import geometry as g, meshgen, viz
 
 t = sp.symbols("t", real=True)
 wall = g.ParametricBoundary(
-    curve=(2*sp.cos(t), sp.sin(t)),
-    parameter=t,
-    label="wall",
+    (2*sp.cos(t), sp.sin(t)), parameter=t, label="wall",
     interval=(0, 2*sp.pi),
 )
 domain = g.ParametricDomain(wall)
@@ -27,65 +18,41 @@ cloud = meshgen.generate(domain, interior=200, boundary=96, seed=42)
 fig, ax = viz.plot_cloud(cloud, normals=True)
 ```
 
-![The same ellipse sampled with symbolic, explicit and numerical curve derivatives](../assets/meshes/curve-sources.png)
+![Ellipse sampling and normal derivative sources](../assets/meshes/curve-sources.png)
 
-The first panel uses symbolic coordinates. RBFLAB differentiates the expressions
-once when constructing the curve and evaluates the resulting tangent when sampling.
-You do not have to write a tangent or normal formula for this example.
+For symbolic curves RBFLAB differentiates the expressions. The parameter may be inferred if the curve has exactly one free symbol. Substitute other parameters first.
 
-The parameter can be inferred when there is exactly one free symbol. For a formula
-containing `a*cos(t)`, first substitute a value for `a`; only the curve parameter
-may remain free. This prevents a missing geometric dimension from becoming a
-silently unresolved symbolic parameter.
+`ParametricBoundary` also accepts a callable and an optional `tangent=` or
+`normal=` callback. `derivative_source` reports `symbolic`, `explicit`, or
+`finite_difference`; see [labels and normals](labels-normals.md) before using
+numerically differentiated normals in a flux condition.
 
-## Understand every constructor argument
-
-| Argument | Meaning |
-|---|---|
-| `curve` | Two SymPy expressions, or a callable accepting scalar `t` and returning `(x,y)` |
-| `tangent=None` | Optional derivative `(dx/dt,dy/dt)`; otherwise derived symbolically or numerically |
-| `label="boundary"` | Name for this arc; distinct arcs in one `ParametricDomain` need distinct labels |
-| `interval=(0,2*pi)` | Increasing parameter endpoints; physical dimensions belong in the curve formula |
-| `parameter=None` | Optional explicit SymPy parameter symbol |
-| `normal=None` | Explicit outward vector `n(t)`; overrides automatic normals and is normalized |
-| `difference_step=None` | Optional finite-difference step, in parameter units, for ordinary callables |
-
-`boundary.evaluate(t)` evaluates either curve representation.
-`boundary.derivative_source` reports `symbolic`, `explicit`, or `finite_difference`.
-See [normals and derivative choices](labels-normals.md) for precision and orientation.
-
-## Assemble a multi-piece exterior
-
-The channel below has four separate exterior pieces. Write them in connected
-order, with matching endpoints. A closed circle is passed separately as a hole.
+## Assemble arcs and holes
 
 ```python
-bottom = g.ParametricBoundary((3*t, 0), label="bottom", interval=(0,1))
-outlet = g.ParametricBoundary((3, t), label="outlet", interval=(0,1))
-top = g.ParametricBoundary((3*(1-t), 1+sp.sin(sp.pi*t)/4),
-                           label="top", interval=(0,1))
-inlet = g.ParametricBoundary((0, 1-t), label="inlet", interval=(0,1))
+outer = [
+    g.ParametricBoundary((3*t, 0), label="bottom", interval=(0,1)),
+    g.ParametricBoundary((3, t), label="outlet", interval=(0,1)),
+    g.ParametricBoundary((3*(1-t), 1+sp.sin(sp.pi*t)/4), label="top", interval=(0,1)),
+    g.ParametricBoundary((0, 1-t), label="inlet", interval=(0,1)),
+]
 obstacle = g.ParametricBoundary(
-    (1+sp.cos(t)/4, sp.Rational(1,2)+sp.sin(t)/4), label="obstacle",
-)
-domain = g.ParametricDomain([bottom, outlet, top, inlet], holes=[obstacle])
+    (1+sp.cos(t)/4, sp.Rational(1,2)+sp.sin(t)/4), label="obstacle")
+second_hole = g.ParametricBoundary(
+    (2.4+.15*sp.cos(t), .5+.15*sp.sin(t)), label="round_hole")
+domain = g.ParametricDomain(outer, holes=[obstacle, second_hole])
 cloud = meshgen.generate(domain, interior=350, boundary={
-    "bottom":60, "outlet":24, "top":60, "inlet":24, "obstacle":40,
+    "bottom":60, "outlet":24, "top":60, "inlet":24,
+    "obstacle":40, "round_hole":32,
 }, seed=42)
 ```
 
-![Border-based and explicit-contour channel clouds, with the same labeled pieces](../assets/meshes/channels.png)
+![Channel and obstacle built from border and contour descriptions](../assets/meshes/channels.png)
 
-The right panel uses this construction. Compare it with the left panel's
-[oriented-border recipe](parametric-borders.md): both describe the same material,
-but parameter-uniform and arc-length sampling can place boundary nodes differently.
-Their polygonal membership approximations also use different resolutions.
+Arcs in each contour must connect end-to-start and close. Each arc excludes its final endpoint; the next arc owns the junction. Labels must be unique across the domain. Split at corners or wherever the boundary equation changes. Unlike directed borders, both clockwise and counterclockwise contours are accepted; tangent-derived normals are oriented outward from the material, including into holes. An explicit normal override is authoritative and must already have the intended direction.
 
-## How to label only part of a curved boundary
-
-A label belongs to an **arc**, not to the entire geometric shape. Split the
-parameter interval wherever the intended boundary condition changes. For an
-ellipse, four arcs starting at successive quarter turns can be constructed as:
+For example, the four quarter-turn arcs of an ellipse can carry four boundary
+equations while a separate hole carries a fifth:
 
 ```python
 arcs = [
@@ -93,42 +60,22 @@ arcs = [
         label=f"arc_{j}", interval=(j*sp.pi/2, (j+1)*sp.pi/2))
     for j in range(4)
 ]
-hole = g.ParametricBoundary((.3*sp.cos(t), .3*sp.sin(t)), label="hole")
-domain = g.ParametricDomain(arcs, holes=[hole])
-cloud = meshgen.generate(domain, interior=220, boundary={
-    "arc_0":30, "arc_1":30, "arc_2":30, "arc_3":30, "hole":36,
+inner = g.ParametricBoundary((.3*sp.cos(t), .3*sp.sin(t)), label="inner")
+labeled_ellipse = g.ParametricDomain(arcs, holes=[inner])
+labeled_cloud = meshgen.generate(labeled_ellipse, interior=220, boundary={
+    "arc_0":30, "arc_1":30, "arc_2":30, "arc_3":30, "inner":36,
 })
 ```
 
-![Four exterior labels and a separate hole label, with outward normals](../assets/meshes/normals.png)
+The four arcs start at successive quarter turns in local coordinates. Use any
+increasing partition of the parameter interval when boundary conditions change
+at other locations. If several arcs share one equation, keep their unique
+`ParametricDomain` labels and assign that equation to each label later.
 
-You can replace quarter turns by any increasing partition of the parameter
-interval. If several arcs need the same boundary equation, keep distinct names
-here and assign that equation to each label. `Border` also supports shared labels;
-`ParametricDomain` currently requires unique arc names for count allocation.
+## Arc-length counts and geometric approximation
 
-## Multiple holes and contour orientation
+An integer `boundary=N` distributes a total approximately by arc length, with at least three nodes per arc. A dictionary specifies exact counts and must contain every label. Interior sampling is controlled separately by `interior`.
 
-`holes` is a sequence of contours. Each item may be a single closed curve or a
-sequence of connected arcs, just like `outer`. Both clockwise and counterclockwise
-contours are accepted. Tangent-derived normals are corrected to point out of the
-material, including into holes. Explicit `normal=` overrides must already have
-the intended outward direction and are not flipped.
+Membership for generic parametric contours uses a polygon with 2048 segments per arc, while boundary nodes lie on the curves. Increasing boundary counts does not refine this membership table. Thin gaps or demanding geometric tolerances may need a different geometry representation. Built-in disks, ellipses, annuli, and flowers use analytic membership; `with_holes` validates and combines via polygonal shapes.
 
-Contours must be closed and simple. Holes must lie inside the exterior without
-intersecting. At an arc junction, the terminating arc excludes the endpoint and
-the starting arc owns it. Split nonsmooth curves at corners; there is no unique
-smooth normal at a corner.
-
-## Geometry approximation versus node count
-
-Generic membership uses a polygon with 2048 straight segments **per arc**, while
-boundary nodes are sampled on the actual curve. The same dense table estimates
-arc length. An integer boundary total is distributed approximately in proportion
-to arc length, with at least three points per arc; a dictionary gives exact
-per-arc counts.
-
-This is not exact CAD geometry. Very thin features or extremely small requested
-errors may require a finer geometric model than this fixed approximation.
-Increasing `boundary=...` changes node count, not the table resolution. Built-in
-`Disk`, `Ellipse`, `Annulus`, and `Flower` use analytic membership instead.
+For the available tangent/normal sources and their accuracy limits, continue to [labels and normals](labels-normals.md).

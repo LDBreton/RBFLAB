@@ -29,7 +29,7 @@ There are \(N+Q\) equations for \(N+Q\) coefficients. The lower equations constr
 
 If \(d_j=p(x_j)\) for \(p\in\Pi_q\), the choice \(a=0\) and the coefficients of \(p\) solves the system. When \(H\) is nonsingular, uniqueness therefore gives \(s=p\): **polynomial reproduction**.
 
-For conditionally positive definite kernels, the kernel's required polynomial space and polynomial unisolvency matter. Unisolvency means \(P\) has full column rank: the only polynomial in \(\Pi_q\) vanishing at all centers is zero. Having \(N\ge Q\) is necessary, but not sufficient. A symmetric augmented matrix can be indefinite even when the kernel block is positive definite.
+For conditionally positive definite kernels, the kernel's conventional CPD polynomial space and polynomial unisolvency matter to the standard solvability results. Unisolvency means \(P\) has full column rank: the only polynomial in \(\Pi_q\) vanishing at all centers is zero. Having \(N\ge Q\) is necessary, but not sufficient. RBFLAB permits explicitly requested degrees below the conventional CPD minimum; the standard CPD guarantee then does not apply, and solvability must be diagnosed for the selected system. A symmetric augmented matrix can be indefinite even when the kernel block is positive definite.
 
 ## Kernel parameters in RBFLAB
 

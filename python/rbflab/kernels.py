@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from functools import lru_cache
 import numpy as np
 import sympy as sp
+import warnings
 from .operators import Identity
 from fractions import Fraction
 
@@ -22,10 +23,32 @@ def _base_expression(family, dimension=2):
     raise ValueError("Unknown scalar kernel family")
 
 
+def resolve_polynomial_degree(kernel, degree, *, minimum_degree=None, warn=True):
+    """Validate and resolve a polynomial degree without overriding intent.
+
+    ``None`` disables augmentation. ``"auto"`` selects the kernel's minimum
+    CPD degree when one exists, and otherwise disables augmentation. An
+    explicit degree is always retained; using less than the CPD minimum emits
+    a diagnostic warning because the usual CPD well-posedness conditions may
+    not apply.
+    """
+    minimum = getattr(kernel, "minimum_degree", -1) if minimum_degree is None else minimum_degree
+    if degree == "auto":
+        return minimum if minimum >= 0 else None
+    if degree is not None and (type(degree) is not int or degree < 0):
+        raise ValueError("polynomial_degree must be None, 'auto', or a nonnegative integer")
+    if warn and minimum >= 0 and (degree is None or degree < minimum):
+        choice = "no polynomial augmentation" if degree is None else f"polynomial_degree={degree}"
+        warnings.warn(
+            f"{choice} is below this kernel's CPD minimum {minimum}; "
+            "the usual polynomially augmented well-posedness guarantee may not apply",
+            UserWarning, stacklevel=2)
+    return degree
+
+
 def validate_polynomial_degree(kernel, degree):
-    minimum = getattr(kernel, "minimum_degree", -1)
-    if minimum >= 0 and (degree is None or degree < minimum):
-        raise ValueError(f"This kernel requires polynomial_degree >= {minimum}")
+    """Compatibility wrapper for callers that only need validation."""
+    return resolve_polynomial_degree(kernel, degree)
 
 
 @lru_cache(maxsize=128)

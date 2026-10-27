@@ -7,7 +7,7 @@ from scipy.sparse import coo_matrix
 from scipy.sparse.linalg import splu
 from .stencils import neighbors as stencil_neighbors, StencilPolicy, geometry_quality
 from .operators import Identity
-from .kernels import validate_polynomial_degree
+from .kernels import resolve_polynomial_degree
 from .configuration import LocalSolver
 from .precision import Precision, MPBackend, MPFactor, local_weights
 from .problems import values, boundary_data
@@ -22,7 +22,9 @@ class GlobalCollocation(MethodContract):
         kernel (object): Scalar radial kernel or bound symbolic kernel.
         precision (Precision): Arithmetic policy for assembly and solve.
         scheme (str): `"symmetric"` Hermite or `"asymmetric"` nodal collocation.
-        polynomial_degree (int or None): Optional polynomial augmentation degree.
+        polynomial_degree (int, None, or "auto"): `None` disables polynomial
+            augmentation; `"auto"` selects the kernel's CPD minimum. Explicit
+            degrees below that minimum are retained with a warning.
         space (ScalarSpace): Optional ScalarSpace shorthand for scalar problems.
         collocation_scheme (str): Alias for scheme; specify only one spelling.
         spaces (dict or None): Optional field-to-space mapping for coupled Stokes problems.
@@ -34,7 +36,7 @@ class GlobalCollocation(MethodContract):
     kernel: object = None
     precision: Precision = field(default_factory=Precision)
     scheme: str = "symmetric"
-    polynomial_degree: int | None = None
+    polynomial_degree: object = None
     spaces: dict | None = None
     backend: object = None
 
@@ -93,7 +95,6 @@ class GlobalCollocation(MethodContract):
             return assemble_evolution(self, problem, cloud)
         if self.scheme not in ("symmetric", "asymmetric"):
             raise ValueError("scheme must be symmetric or asymmetric")
-        validate_polynomial_degree(self.kernel,self.polynomial_degree)
         if self.scheme == "asymmetric" or self.polynomial_degree is not None:
             from .nodal import assemble_global
             return assemble_global(self.kernel, problem, cloud, self.precision,self.polynomial_degree,self.scheme)
@@ -344,8 +345,9 @@ def interpolate(kernel=_UNSET, centers=_UNSET, data=_UNSET, precision=None, poly
             Row i corresponds to centers[i]. Extended callbacks require
             PrecisionData.
         precision (Precision or None): Optional Precision(global_digits=...) for dense arithmetic.
-        polynomial_degree (int or None): Highest total polynomial degree. Must meet
-            the kernel's minimum augmentation requirement.
+        polynomial_degree (int, None, or "auto"): Highest total polynomial degree.
+            `None` disables augmentation; `"auto"` selects the kernel's CPD
+            minimum. An explicit degree below that minimum is retained with a warning.
         backend (CppGlobalBackend or None): Optional native global assembly,
             factorization and evaluation. Native interpolants own a live worker;
             close them explicitly or use a context manager.
@@ -387,6 +389,8 @@ def interpolate(kernel=_UNSET, centers=_UNSET, data=_UNSET, precision=None, poly
             raise ValueError('Specify polynomial_degree in ScalarSpace only')
         polynomial_degree=kernel.degree()
         kernel=kernel.kernel
+    else:
+        polynomial_degree=resolve_polynomial_degree(kernel,polynomial_degree)
     if patches is not None:
         from .patches import interpolate_patches
         return interpolate_patches(kernel,centers,data,precision or Precision(),polynomial_degree,patches,backend)

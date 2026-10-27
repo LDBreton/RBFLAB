@@ -4,7 +4,7 @@ from dataclasses import dataclass,replace
 import sympy as sp
 from sympy.core.function import AppliedUndef
 from .symbolic import SymbolicScalar,_expr,_number
-from .kernels import ScalarKernel,PHS,Hybrid
+from .kernels import ScalarKernel,PHS,Hybrid,resolve_polynomial_degree
 
 
 @dataclass(frozen=True)
@@ -15,7 +15,7 @@ class ScalarSpace:
         kernel: Scalar radial kernel or bound symbolic kernel.
         polynomial_degree: Degree, `None`, or `"auto"` for the kernel minimum."""
     kernel: object
-    polynomial_degree: object = 'auto'
+    polynomial_degree: object = None
 
     def representers(self, source):
         """Construct trial functions by applying source functionals to the kernel.
@@ -36,9 +36,7 @@ class ScalarSpace:
         if not isinstance(self.kernel,(ScalarKernel,PHS,Hybrid,BoundKernel)):raise TypeError("Expected a scalar radial kernel")
         minimum=getattr(self.kernel,'minimum_degree',-1)
         if isinstance(self,DivergenceFreeSpace):minimum=max(-1,minimum-1)
-        degree=(minimum if minimum>=0 else None) if self.polynomial_degree=='auto' else self.polynomial_degree
-        if degree is not None and (type(degree) is not int or degree<0):raise ValueError("Invalid polynomial degree")
-        if minimum>=0 and (degree is None or degree<minimum):raise ValueError(f"This space requires polynomial degree >= {minimum}")
+        degree=resolve_polynomial_degree(self.kernel,self.polynomial_degree,minimum_degree=minimum)
         order=6 if isinstance(self,DivergenceFreeSpace) else 2
         phs=self.kernel.phs if isinstance(self.kernel,Hybrid) else self.kernel if isinstance(self.kernel,PHS) else None
         if phs and phs.power-1<order:raise ValueError(f"This space requires continuous kernel derivatives through order {order}")

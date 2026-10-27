@@ -11,6 +11,8 @@ It does not decide which PDE field belongs to which cloud.
 
 ![Four vertices, five unique edge midpoints, and their interlaced layout](../assets/meshes/staggered.png)
 
+![Vertex and edge-midpoint sampling in a manual staggered layout](../assets/meshes/manual-staggered.png)
+
 ## Build the geometry shown above
 
 ```python
@@ -27,6 +29,7 @@ mesh = TriangleMesh2D(
 layout = staggered_clouds(mesh)
 vertex_cloud = layout.vertices
 midpoint_cloud = layout.edge_midpoints
+print("vertices:", vertex_cloud.points.shape, "edge midpoints:", midpoint_cloud.points.shape)
 ```
 
 There are four vertices and two triangles, but **five unique edges**. The shared

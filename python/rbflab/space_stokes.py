@@ -296,8 +296,6 @@ class LocalFlowSystem:
     def __init__(self,method,problem,cloud,velocity,pressure,vd,pd):
         from .lhi_stokes import LHIUnsteadyStokes
         if cloud.dimension!=2:raise NotImplementedError("Divergence-free LHI space assembly currently supports 2D; global supports 2D/3D")
-        if (vd is None and pd is not None) or (vd is not None and (vd<2 or pd!=vd-1)):
-            raise NotImplementedError("LHI currently needs no polynomial tails, or velocity degree 2..4 and pressure degree one lower")
         # Steady data have no time symbol, so binding time does not change them.
         from .legacy_cpp import LegacyCppLHIBackend
         if isinstance(method.local_backend,LegacyCppLHIBackend) and problem.transient:
@@ -308,7 +306,8 @@ class LocalFlowSystem:
         backend=LHIUnsteadyStokes(velocity.kernel,method.stencil_size,method.precision,method.stencil_policy,
             method.pde_stencil_size,pressure_kernel=pressure.kernel,polynomial_degree=vd,
             legacy_unaugmented_hybrid=False,
-            min_boundary_centers=method.min_boundary_centers,local_backend=configured_backend(method))
+            min_boundary_centers=method.min_boundary_centers,local_backend=configured_backend(method),
+            pressure_polynomial_degree=pd)
         self.base=backend.assemble(native,cloud);self.problem=problem
         self.matrix=self.base.SY;self.mass=self.base.mass;self.arithmetic=self.base.arithmetic;self.factor=None
         if not problem.transient:

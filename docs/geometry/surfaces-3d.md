@@ -3,6 +3,8 @@
 A parametric surface maps two parameters to a spatial point:
 $F(u,v)=(x(u,v),y(u,v),z(u,v))$. It provides surface samples and normals, without
 sampling an enclosed volume or constructing surface triangles.
+Use this path when the requested unknowns live on a surface; a volume mesh or
+tetrahedral connectivity is not implied by the parametrization.
 
 ## Example: a torus
 

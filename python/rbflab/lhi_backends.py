@@ -31,8 +31,8 @@ def _build(task,a=None):
     if a is None:a=StokesArithmetic(task['vk'],task['pk'],task['digits'])
     p=task['points'];ops=task['ops'];scale=a.number(task['scale']) if task['scale'] is not None else None
     G=_blocks(a,p,ops,p,ops,scale);basis=None
-    if task['degree'] is not None:
-        basis=StokesPolynomialBasis(a,task['origin'],a.number(task['radius']),task['degree'])
+    if task['degree'] is not None or task.get('pressure_degree') not in (None,0):
+        basis=StokesPolynomialBasis(a,task['origin'],a.number(task['radius']),task['degree'],task.get('pressure_degree'))
         poly=basis.matrix(p,ops)
         if rank_ratio(poly)<1e-12:raise ValueError('Polynomial functionals are rank deficient; enlarge stencil')
         n=len(p);m=len(basis.columns);A=a.zeros(n+m,n+m);A[:n,:n]=G;A[:n,n:]=poly;A[n:,:n]=poly.T;G=A
@@ -97,7 +97,7 @@ def _prepare(method,problem,cloud,shape_rule):
     if shape_rule not in ('fixed', 'hardy', 'radius_scaled', 'separation_scaled'):raise ValueError('Unknown shape rule')
     if shape_rule == 'hardy':
         if method.stencil_policy.scaling != 'physical':raise ValueError('Hardy shape rule uses physical coordinates')
-        if method.polynomial_degree is not None:raise NotImplementedError('Hardy scaling currently requires unaugmented kernels')
+        if method.has_polynomials:raise NotImplementedError('Hardy scaling currently requires unaugmented kernels')
         if method.stencil_policy.selection != 'nearest' or method.min_boundary_centers or method.pde_stencil_size is not None:
             raise NotImplementedError('Historical Hardy scaling requires the original nearest-stencil layout')
     pk=method.pressure_kernel if method.pressure_kernel is not None else method.kernel
@@ -149,8 +149,8 @@ def _prepare(method,problem,cloud,shape_rule):
                 local.ctx=a.ctx;local.backend.ctx=a.ctx;local.pressure_arithmetic.ctx=a.ctx;local.pressure_arithmetic.backend.ctx=a.ctx
         encode=lambda v:a.ctx.nstr(v,a.ctx.dps+5) if a.ctx else float(v)
         scale=radius if method.stencil_policy.scaling=='local' else None
-        task=dict(vk=local.kernel,pk=local.pressure_arithmetic.kernel,digits=method.precision.local_digits,points=points,ops=ops,origin=cloud.points[center],mu=problem.viscosity,scale=encode(scale) if scale is not None else None,radius=encode(radius),degree=method.polynomial_degree,codes=codes)
-        basis=StokesPolynomialBasis(a,cloud.points[center],radius,method.polynomial_degree) if method.polynomial_degree is not None else None
+        task=dict(vk=local.kernel,pk=local.pressure_arithmetic.kernel,digits=method.precision.local_digits,points=points,ops=ops,origin=cloud.points[center],mu=problem.viscosity,scale=encode(scale) if scale is not None else None,radius=encode(radius),degree=method.polynomial_degree,pressure_degree=method.pressure_polynomial_degree,codes=codes)
+        basis=StokesPolynomialBasis(a,cloud.points[center],radius,method.polynomial_degree,method.pressure_polynomial_degree) if method.has_polynomials else None
         stencil=VectorHermiteStencil(int(center),points,ops,slots,None,scale,geometry_quality(cloud.points[np.unique(sc+bc+pc)],cloud.points[center],1),basis)
         stencil.local_arithmetic=local;tasks.append(task);stencils.append(stencil)
     return a,tasks,stencils
@@ -273,8 +273,8 @@ class CppBackend(BackendSettings):
         for task in tasks:
             task['condition']=self.compute_condition
             basis=None
-            if task['degree'] is not None:
-                basis=StokesPolynomialBasis(a,task['origin'],a.number(task['radius']),task['degree'])
+            if task['degree'] is not None or task.get('pressure_degree') not in (None,0):
+                basis=StokesPolynomialBasis(a,task['origin'],a.number(task['radius']),task['degree'],task.get('pressure_degree'))
                 P=basis.matrix(task['points'],task['ops'])
                 if rank_ratio(P)<1e-12:raise ValueError('Polynomial functionals are rank deficient; enlarge stencil')
                 targets=[{j:-Laplacian()*task['mu'],2:Derivative(j)} for j in (0,1)]+[{2:Derivative(j)} for j in (0,1)]
