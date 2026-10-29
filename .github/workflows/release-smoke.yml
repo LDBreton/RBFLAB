@@ -45,6 +45,9 @@ jobs:
           python -m examples.tutorials.lhi_centers
           python -m examples.tutorials.custom_assembly
           python -m examples.tutorials.heat_equation
+          python -m examples.mixed_local_maps
+          python -m examples.stokes_lhi_weights --help
+          python -m examples.stokes_lhi_baseline --help
           python -c 'import sys; from rbflab import geometry, meshgen; assert len(meshgen.generate(geometry.Sphere(), interior=10, boundary=12).points) == 22; assert not any(m in sys.modules for m in ("torch", "gmsh", "matplotlib"))'
           python -c 'import sympy as s; from rbflab import geometry as g, meshgen as m; t=s.Symbol("t"); b=g.Border((s.cos(t),s.sin(t)),"wall",0,2*s.pi); assert len(m.generate([b(32)],interior=10).points)==42; c=g.ParametricBoundary((s.cos(t),s.sin(t)),interval=(0,2*s.pi)); assert len(m.generate(g.ParametricDomain(c),interior=10,boundary=32).points)==42'
           python -c 'from examples.annulus import run; assert run()[3]["off_node_max"] < .015'
@@ -57,6 +60,20 @@ jobs:
           python -c 'from operators_3d import run; assert max(run()) < 1e-8'
           python -c 'from custom_kernel import run; assert run() < 0.05'
 
+  mixed-python:
+    strategy:
+      matrix:
+        os: [ubuntu-24.04, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -e '.[test]'
+      - name: Verify mixed API and Stokes contracts
+        run: python -m pytest tests/test_mixed_quality_selection.py tests/test_local_scaling_conventions.py tests/test_mixed_local_approximation.py tests/test_mixed_quotient.py tests/test_pressure_space_local.py tests/test_stokes_execution.py tests/test_stokes_local_migration.py tests/test_simple_mixed_examples.py -q
+
   native-ubuntu:
     runs-on: ubuntu-24.04
     steps:
@@ -65,10 +82,19 @@ jobs:
         with:
           python-version: '3.12'
       - run: python -m pip install -e '.[test]'
+      - run: sudo apt-get update && sudo apt-get install -y openmpi-bin
       - run: bash cpp/prepare_dependencies.sh
       - run: python -m examples.build_cpp_backend
       - name: Verify native local operators
         run: RBFLAB_CPP_TESTS=1 python -m pytest tests/test_discrete_operators.py tests/test_functional_backends.py tests/test_symbolic_kernel.py tests/test_curved_examples.py::test_optional_curved_backend_parity -q
+      - name: Verify mixed and Stokes Python/C++/MPI parity
+        env:
+          RBFLAB_CPP_TESTS: '1'
+          RBFLAB_MPI_TESTS: '1'
+          # Three-rank tests include idle-rank restoration; runners may have
+          # fewer physical cores. This still launches real MPI processes.
+          OMPI_MCA_rmaps_base_oversubscribe: '1'
+        run: python -m pytest tests/test_mixed_backends.py tests/test_mixed_local_approximation.py tests/test_mixed_quality_selection.py tests/test_stokes_execution.py tests/test_stokes_local_migration.py tests/test_simple_mixed_examples.py -q
 
   gallery-ubuntu:
     runs-on: ubuntu-24.04

@@ -15,6 +15,8 @@ shape parameters, see [local stencil scaling](../theory/conditioning.md#local-st
 
 ::: rbflab.CppBackend
 
+::: rbflab.LocalExecution
+
 ::: rbflab.CppGlobalBackend
 
 `CppGlobalBackend` selects native dense assembly, factorization and evaluation

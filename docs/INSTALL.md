@@ -53,15 +53,18 @@ solver into a GPU solver. The documented path is CPU Float64.
 
 ### Check that the new local API is installed
 
-The current manual targets **RBFLAB 0.5.0**. If an older environment is active,
-upgrade using the same Python interpreter that runs your code:
+The current source manual targets **RBFLAB 0.6.0**. Mixed-field local maps,
+MPI scheduling and the shared Stokes LU weight path require this source version.
+Install the checkout with the same Python interpreter that runs your code:
 
 ```sh
-python -m pip install --upgrade "rbflab>=0.5"
-python -c "from rbflab import Samples, LocalApproximation; from importlib.metadata import version; print(version('rbflab'))"
+python -m pip install -e .
+python -c "from rbflab import Samples, LocalApproximation, MixedSpace, FieldOperator, LocalExecution; from importlib.metadata import version; print(version('rbflab'))"
 ```
 
-Release 0.5 also includes breaking research-API cleanup from 0.4. Consult the
+The 0.6.0 changelog is marked unreleased; installing the released package alone
+does not imply that these source features are present. Release 0.5 also includes
+breaking research-API cleanup from 0.4. Consult the
 [changelog](https://github.com/LDBreton/RBFLAB/blob/v0.5.0/CHANGELOG.md) when adapting
 older scripts. The supported symbolic PDE examples still use the explicit
 `RBFFD`/`LHI` adapters; these are distinct from the matrix-building interface.

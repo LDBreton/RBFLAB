@@ -58,9 +58,47 @@ class PressureSpace(ScalarSpace):
     """Pressure modulo additive constants.
 
     This space omits an independent constant polynomial or gauge row.
-    Pressure gradients are gauge-invariant; absolute pressure evaluation
-    requires an explicitly chosen reference.
+    In LocalApproximation, source, trial and target functionals must
+    annihilate constants. Use ScalarSpace for absolute pressure observations
+    or evaluation and impose any global reference in the assembled equations.
+    Specialized Stokes methods retain their documented pressure output rules.
     """
+
+
+@dataclass(frozen=True)
+class MixedSpace:
+    """Named direct sum of scalar and divergence-free approximation spaces.
+
+    Field names describe layout only, not PDE roles. Mixed local construction
+    currently uses matching Hermite representers with explicit FieldOperator
+    samples. A scalar factor retains its constant. A quotient PressureSpace
+    factor omits constant polynomials and only admits observations and targets
+    that annihilate its additive constant.
+    """
+    spaces: object
+
+    def __post_init__(self):
+        from collections.abc import Mapping
+        import copy
+        if not isinstance(self.spaces, Mapping) or not self.spaces:
+            raise ValueError('MixedSpace requires a nonempty field-to-space mapping')
+        fields = {}
+        for name, space in self.spaces.items():
+            if not isinstance(name, str) or not name:
+                raise ValueError('Field names must be nonempty strings')
+            if not isinstance(space, ScalarSpace):
+                raise TypeError('Mixed fields require ScalarSpace or DivergenceFreeSpace')
+            space.degree()
+            fields[name] = copy.deepcopy(space)
+        object.__setattr__(self, 'spaces', fields)
+
+    def representers(self, source):
+        """Apply whole mixed sample functionals to the block kernel."""
+        from .samples import KernelTrial
+        return KernelTrial(self, source)
+
+    def translates(self, points):
+        raise NotImplementedError('Mixed translates require an explicit field/component trial layout; use representers')
 
 
 @dataclass(frozen=True)

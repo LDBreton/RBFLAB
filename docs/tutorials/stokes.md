@@ -24,7 +24,56 @@ For the 25-node cloud, both global systems were \(61\times61\). A verified stead
 
 BDF2 starts with one backward Euler step. The initial condition sets velocity, not pressure. Try changing \(\mu\) and rederive forcing. See [equations and spaces](../api/equations-spaces.md).
 
+## A simple local Stokes example
+
+`examples/stokes_lhi_baseline.py` follows five steps: choose an exact solution,
+derive its forcing, declare the kernels and spaces, assemble `LHI`, then compare
+the nodal solution with the exact fields. It uses homogeneous walls, 37-point
+stencils, velocity/pressure augmentation 6/1 and the fully mesh-scaled kernels
+with pressure coefficient `cbar_p=1`.
+
+```bash
+python -m examples.stokes_lhi_baseline
+python -m examples.stokes_lhi_baseline --ranks 2
+```
+
+The default is a small 81-node example with C++ weights. MPI requires a launcher
+as described in [installation](../INSTALL.md). Both time steps run to `T=0.1`;
+the printed errors are absolute vector RMS values at interior mesh nodes.
+The coarse default demonstrates the workflow; use the fine meshes to study
+the accuracy of the baseline.
+For the larger meshes, use `--cells 89` (8,100 nodes) or `--cells 126`
+(16,129 nodes). This direct teaching route constructs every stencil and can
+take substantially longer than a specialized batched reproduction driver.
+
+??? example "Complete local Stokes script"
+
+    ```python
+    --8<-- "examples/stokes_lhi_baseline.py"
+    ```
+
+To inspect a single local weight construction, start with
+`python -m examples.stokes_lhi_weights`. It shows `MixedSpace`, `FieldOperator`,
+`Samples` and `LocalApproximation` directly. Add `--backend cpp --digits 80 --mpi 2`
+for native MPI weights. The simpler two-scalar-field example is
+`python -m examples.mixed_local_maps`.
+
 ## Native global fields
+
+For the local Stokes method in source version 0.6.0, see
+[shared local weight construction](../guides/research-api.md#existing-stokes-lhi-through-the-common-engine).
+Python/C++ LU `LHI(spaces=...)` now uses `LocalApproximation` for weights, while
+retaining the compact mass matrix and local pressure-gradient output. Add
+`execution=LocalExecution(scheduler="mpi", ranks=2)` with `CppBackend` to
+distribute those local weights. This does not select a native global solver or
+introduce a scalar pressure gauge field.
+For fixed kernel parameters, this C++ LU path also accepts
+`stencil_policy=StencilPolicy(scaling="local")`, including with MPI. Its radius
+is measured from each target to the selected source points, matching Python
+Stokes LHI. Returned derivatives already include their physical scaling factors.
+Keep physical coordinates when reproducing a recipe whose kernel parameters
+already include the desired mesh scaling. Native SVD and historical custom
+executables retain their physical-coordinate requirement.
 
 The stationary problem above can use C++ for kernel and polynomial assembly,
 LU, repeated solves, and field evaluation. Select the backend on the same method:

@@ -45,9 +45,13 @@ class StencilPolicy:
     Args:
         scaling: ``"physical"`` (default) evaluates the kernel at physical
             displacements. ``"local"`` evaluates K((x-y)/h), where h is the
-            maximum Euclidean distance from the first source center (one if
-            zero). Physical derivative factors h**(-order) are included
-            automatically; do not rescale returned weights. Shape parameters
+            local radius. Single-field LocalApproximation measures the maximum
+            distance over selected source and trial centers from the first
+            selected source center. Mixed LocalApproximation and Stokes LHI
+            use matching source/trial sites and measure it from the target.
+            Zero radius uses one.
+            Physical derivative factors h**(-order) are included automatically;
+            do not rescale returned weights. Shape parameters
             then refer to dimensionless distances, so switching policy with
             the same numeric parameter can change the approximation.
         shape_rule: ``"fixed"`` uses the supplied kernel parameter. Stokes
@@ -56,10 +60,17 @@ class StencilPolicy:
         selection: ``"nearest"`` keeps the requested stencil size.
             ``"quality"`` grows a nearest-neighbor set until polynomial-rank
             and node-separation thresholds are met, or raises an error.
+            Mixed LocalApproximation checks the combined functional polynomial
+            matrix and grows eligible sized groups together; explicit indices
+            and groups using all samples remain fixed.
         max_size: Largest stencil considered by quality selection. If None,
             use min(number of source points, 2 * stencil_size).
+            For mixed samples this limit is per sized group, using eligible
+            points after target exclusion and twice that group's size.
         min_polynomial_ratio: Minimum singular-value ratio of the normalized,
             column-scaled polynomial matrix in quality selection.
+            Mixed selection uses the joint functional matrix with row and
+            column scaling, and the strictest participating group threshold.
         min_separation_ratio: Minimum node separation divided by the radius
             measured from the target, used only in quality selection.
 

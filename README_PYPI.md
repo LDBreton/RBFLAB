@@ -76,7 +76,7 @@ fig.savefig("solution.png", dpi=180)
 
 ## Construct your own numerical method
 
-RBFLAB 0.5 exposes **sampled functionals, trial functions and named
+RBFLAB exposes **sampled functionals, trial functions and named
 sparse blocks** through `LocalApproximation`. Ordinary RBF-FD and local Hermite
 interpolation use the same mathematical construction. Assemble stiffness, mass,
 forcing and boundary contributions yourself, then write a SciPy solve or time
@@ -88,6 +88,14 @@ loop. Existing PDE convenience interfaces remain available.
 
 These interfaces are included in **RBFLAB 0.5.0**. Upgrade with
 `python -m pip install --upgrade "rbflab>=0.5"`.
+
+The **0.6.0 source version** adds `MixedSpace`, coupled `FieldOperator` maps,
+native mixed weights and MPI scheduling through `LocalExecution`. Existing
+Python/C++ LU Stokes LHI now uses `LocalApproximation` for its weights while
+preserving compact matrices and pressure-gradient reconstruction. This source
+version is marked unreleased; install a checkout with
+`python -m pip install -e .` to exercise the new paths. The pinned 0.5.0 asset
+links below retain their existing released targets.
 
 Stokes velocity and pressure spaces choose polynomial augmentation independently.
 `None` omits polynomial columns, an integer selects exactly that degree, and

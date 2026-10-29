@@ -38,19 +38,35 @@ you do not rescale the returned weights yourself.
 
 ### Which radius and which default?
 
-For source centers $X_i=\{x_{i1},\ldots,x_{in_i}\}$, the current implementation uses
+For selected source centers $X_i=\{x_{i1},\ldots,x_{in_i}\}$ and selected trial
+centers $Z_i$, the single-field local approximation uses
 
 $$
-h_i=\max_j\|x_{ij}-x_{i1}\|_2,\qquad
+h_i=\max_{z\in X_i\cup Z_i}\|z-x_{i1}\|_2,\qquad
 \widehat x=\frac{x-x_{i1}}{h_i},\qquad
 \widehat r=\frac{\|x-y\|_2}{h_i}.
 $$
 
-The anchor is the **first source center**. For a nearest-neighbor stencil evaluated
+Matching representers have $Z_i=X_i$; independent trial centers can increase
+the radius. The anchor is the **first selected source center**. For a nearest-neighbor stencil evaluated
 at one of its own nodes, this is normally the target node. For an off-node target,
 it need not be; the kernel radius is not generally the diagnostic radius measured
 from that target. A zero-radius source set uses a fallback scale of one, though a
 useful derivative stencil needs distinct nodes and sufficient polynomial rank.
+
+Mixed `LocalApproximation` and Stokes LHI retain a different, target-centered
+convention. For target $\xi_i$, they use
+
+$$
+h_i=\max_j\|x_{ij}-\xi_i\|_2.
+$$
+
+The maximum is taken over the selected source points across observation groups;
+repeated physical sites from different Hermite functionals do not change it.
+The zero-radius fallback is again one. Python and C++ use the same radius for a
+given route, including MPI execution of native mixed or Stokes LU weights.
+Changing between single-field and mixed descriptions can therefore change a
+locally scaled kernel when their anchors differ, even for the same point set.
 
 | Setting | Kernel evaluated on a stencil |
 |---|---|

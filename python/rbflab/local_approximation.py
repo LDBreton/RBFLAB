@@ -11,7 +11,7 @@ import copy
 import numpy as np
 from scipy.sparse import csr_matrix
 from .samples import Samples, KernelTrial, sample_groups, points_array
-from .spaces import ScalarSpace, DivergenceFreeSpace, PressureSpace
+from .spaces import ScalarSpace, DivergenceFreeSpace, PressureSpace, MixedSpace
 from .operators import Identity, bind_operators
 from .precision import Precision
 from .configuration import LocalSolver
@@ -51,6 +51,8 @@ def _polynomials(owner, points):
     poly = NodalBasis(Arithmetic(IMQ(), owner.precision.local_digits), points,
                       source_operators=[Identity(owner.dimension)] * len(points))
     poly.powers = [] if owner.degree is None else polynomial_powers(owner.dimension, owner.degree)
+    if getattr(owner, 'quotient_pressure', False):
+        poly.powers = [power for power in poly.powers if any(power)]
     if a.ctx:
         poly.arithmetic.ctx = a.ctx
         poly.arithmetic.backend.ctx = a.ctx
@@ -87,6 +89,17 @@ def _check_distinct(points, ops):
         raise ValueError('Duplicate sampled functional in a local stencil')
     if any(not op.terms for op in ops):
         raise ValueError('A zero functional cannot be used as a source or trial sample')
+
+
+def _pressure_functionals(*collections):
+    """A quotient pressure field admits only constant-invariant functionals."""
+    if any(coefficient and not any(alpha)
+           for operators in collections for op in operators
+           for alpha, coefficient in op.terms):
+        raise ValueError(
+            'PressureSpace represents pressure modulo constants; value functionals '
+            'require an explicit reference. Use ScalarSpace for absolute pressure samples '
+            'or targets, and impose any global gauge in your equations.')
 
 
 class SampleMap:
@@ -229,6 +242,8 @@ class LocalApproximation:
         precision: Local arithmetic and sparse storage policy.
         stencil_policy: Default selection and common kernel scaling.
         local_solver: Local factorization (currently LU).
+        execution: Optional LocalExecution for mixed native jobs (serial/MPI
+            scheduling and exact request reuse). Other routes reject it.
 
     This object has no forcing or PDE solve. Use operators() or weights(), then
     assemble your own equations. Full MP sparse maps preserve precision;
@@ -243,8 +258,13 @@ class LocalApproximation:
     precision: Precision = field(default_factory=Precision)
     stencil_policy: StencilPolicy = field(default_factory=StencilPolicy)
     local_solver: LocalSolver = field(default_factory=LocalSolver)
+    execution: object = None
 
     def __post_init__(self):
+        if isinstance(self.space, MixedSpace) or isinstance(getattr(self.trial, 'space', None), MixedSpace):
+            from .mixed_local import initialize
+            initialize(self)
+            return
         if self.trial is not None and self.space is not None:
             raise ValueError('Specify trial or space, not both')
         raw = not isinstance(self.source, (Mapping, Samples))
@@ -276,6 +296,15 @@ class LocalApproximation:
 
     def preflight(self):
         """Validate configuration before kernel compilation or matrix assembly."""
+        if isinstance(getattr(self.trial, 'space', None), MixedSpace):
+            from .mixed_local import preflight
+            return preflight(self)
+        if getattr(self, 'execution', None) is not None:
+            raise NotImplementedError('LocalExecution currently applies to explicit mixed approximations only')
+        from .mixed import FieldOperator
+        if any(isinstance(op, FieldOperator) for group in list(self.source.values()) + list(self.trial.source.values())
+               for op in group._operators):
+            raise TypeError('FieldOperator samples require a MixedSpace trial')
         if not isinstance(self.backend, (PythonBackend, CppBackend, TorchBackend)):
             raise TypeError('Expected PythonBackend, CppBackend or TorchBackend')
         if not isinstance(self.precision, Precision) or self.precision.global_digits is not None:
@@ -311,6 +340,9 @@ class LocalApproximation:
         target operators require targets to carry matching normals. Members
         are chosen once per target and shared by every requested operator.
         """
+        if isinstance(getattr(self.trial, 'space', None), MixedSpace):
+            from .mixed_local import operators as mixed_operators
+            return mixed_operators(self, targets, operators)
         from .functional_backends import execute
         self.preflight()
         if not isinstance(operators, Mapping) or not operators or any(not isinstance(k, str) or not k for k in operators):
@@ -319,13 +351,12 @@ class LocalApproximation:
         query = points_array(targets, d)
         descriptor = self.trial.space
         degree = descriptor.degree()
-        if isinstance(descriptor, PressureSpace) and degree is None:
-            degree = 0
         vector = isinstance(descriptor, DivergenceFreeSpace)
         c = d if vector else 1
         owner = SimpleNamespace(kernel=copy.deepcopy(descriptor.kernel), precision=copy.deepcopy(self.precision),
             backend=copy.deepcopy(self.backend), arithmetic=Arithmetic(descriptor.kernel, self.precision.local_digits),
-            dimension=d, components=c, vector=vector, degree=degree, source=copy.deepcopy(self.source),
+            dimension=d, components=c, vector=vector, degree=degree,
+            quotient_pressure=isinstance(descriptor, PressureSpace), source=copy.deepcopy(self.source),
             targets=query.copy(), jobs=[], memberships=[], trial_memberships=[], indices=[], layout={})
         offset = 0
         for name, group in self.source.items():
@@ -352,6 +383,8 @@ class LocalApproximation:
             _check_distinct(x, left)
             _check_distinct(z, right)
             req = [target_ops[name][row] for name in operators]
+            if isinstance(descriptor, PressureSpace):
+                _pressure_functionals(left, right, req)
             order = max(sum(alpha) for op in left+req for alpha, coeff in op.terms) + max(sum(alpha) for op in right for alpha, coeff in op.terms) + (2 if vector else 0)
             from .kernels import PHS, Hybrid
             phs = descriptor.kernel.phs if isinstance(descriptor.kernel, Hybrid) else descriptor.kernel if isinstance(descriptor.kernel, PHS) else None

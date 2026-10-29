@@ -59,7 +59,7 @@ class Samples:
                 or self.policy.scaling != 'physical' or self.policy.shape_rule != 'fixed'):
             raise ValueError('Group policy only selects points; configure scaling on the approximation')
         normals = self.normals
-        if normals is None and any(isinstance(op, (NormalDerivative, Robin)) for op in (self.operator if isinstance(self.operator, (list, tuple)) else [self.operator])):
+        if normals is None and any(isinstance(op, (NormalDerivative, Robin)) or getattr(op, 'requires_normals', False) for op in (self.operator if isinstance(self.operator, (list, tuple)) else [self.operator])):
             normals = getattr(original, 'normals', None)
         if normals is not None:
             normals = np.array(normals, dtype=float, copy=True)
@@ -75,6 +75,10 @@ class Samples:
             raise ValueError('Provide one operator per sample')
         bound = []
         for i, op in enumerate(ops):
+            from .mixed import FieldOperator
+            if isinstance(op, FieldOperator):
+                bound.append(op.at_point(p[i], None if normals is None else normals[i]))
+                continue
             if isinstance(op, (NormalDerivative, Robin)):
                 if normals is None:
                     raise ValueError('Normal-dependent samples require normals')

@@ -49,6 +49,23 @@ class MethodContract:
         flow=isinstance(problem,SpaceStokesProblem);block=isinstance(problem,BlockPDE)
         evolution=isinstance(problem,EvolutionPDE)
         backend=getattr(self,'local_backend',None)
+        execution=getattr(self,'execution',None)
+        if execution is not None:
+            from .mixed_backends import LocalExecution
+            if not isinstance(execution,LocalExecution):
+                raise TypeError('execution must be LocalExecution')
+            if name!='LHI' or not flow:
+                raise NotImplementedError('Method-level LocalExecution currently supports Stokes LHI only')
+            if not isinstance(self.local_solver,LocalSolver):
+                raise TypeError('Expected LocalSolver')
+            if self.local_solver.method!='lu':
+                raise NotImplementedError('LocalExecution requires the common LU weight path, not SVD')
+            if backend is not None and not isinstance(backend,(PythonBackend,CppBackend)):
+                raise NotImplementedError('LocalExecution supports PythonBackend or CppBackend Stokes weights only')
+            if (execution.scheduler=='mpi' or execution.reuse!='none') and not isinstance(backend,CppBackend):
+                raise NotImplementedError('MPI and exact request reuse require CppBackend')
+            if isinstance(backend,CppBackend) and backend.executable is not None:
+                raise NotImplementedError('LocalExecution is not supported with a historical custom executable')
         if backend is not None and not isinstance(backend,(PythonBackend,CppBackend,TorchBackend)):
             raise TypeError('Stable methods support PythonBackend, CppBackend and TorchBackend only')
         if isinstance(backend,TorchBackend) and precision.local_digits is not None:
@@ -112,7 +129,10 @@ class MethodContract:
                 if cloud is not None and cloud.dimension!=2:raise NotImplementedError('Stokes LHI currently supports 2D only')
                 has_polynomials=vd is not None or pd not in (None,0)
                 if isinstance(backend,TorchBackend) and has_polynomials:raise NotImplementedError('Torch Stokes LHI currently supports unaugmented spaces only')
-                if isinstance(backend,CppBackend) and self.stencil_policy.scaling!='physical':raise NotImplementedError('C++ Stokes LHI requires physical kernel coordinates')
+                if isinstance(backend,CppBackend) and self.stencil_policy.scaling!='physical' and (self.local_solver.method!='lu' or backend.executable is not None):
+                    raise NotImplementedError('Specialized C++ Stokes SVD and custom executables require physical kernel coordinates')
+                if self.stencil_policy.scaling!='physical' and self.stencil_policy.shape_rule!='fixed':
+                    raise NotImplementedError('Stokes geometry shape rules require physical kernel coordinates')
                 if self.stencil_policy.shape_rule=='hardy' and (has_polynomials or self.stencil_policy.scaling!='physical' or self.stencil_policy.selection!='nearest' or self.min_boundary_centers or self.pde_stencil_size is not None):raise NotImplementedError('Hardy Stokes scaling needs unaugmented physical nearest stencils with the default PDE selection')
                 if isinstance(backend,TorchBackend) and self.stencil_policy.shape_rule not in ('fixed','hardy'):raise NotImplementedError('Torch Stokes supports fixed or Hardy shape policies')
         if name!='RBFFD' and not flow and not block:
@@ -142,6 +162,7 @@ def recipe(method,problem=None):
         polynomial_degree=method.polynomial_degree,independent_centers=getattr(method,'centers',None) is not None,
         stencil_policy=asdict(method.stencil_policy) if hasattr(method,'stencil_policy') else None,
         local_solver=asdict(method.local_solver) if hasattr(method,'local_solver') else None,
+        execution=asdict(method.execution) if getattr(method,'execution',None) is not None else None,
         backend=repr(getattr(method,'backend',None) or getattr(method,'local_backend',None)) if (getattr(method,'backend',None) or getattr(method,'local_backend',None)) is not None else 'Python (default)',precision=asdict(p),
         arithmetic=dict(coordinates='float64',local_digits=p.local_digits,global_digits=p.global_digits,
                         sparse_storage=p.global_dtype,global_solve_digits=p.global_digits if type(method).__name__=='GlobalCollocation' else p.local_digits if p.global_dtype=='mpmath' else None,default_output='float64'),

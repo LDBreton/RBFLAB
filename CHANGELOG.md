@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.6.0 — mixed local approximation and shared Stokes weights (unreleased)
+
+- Add `MixedSpace` and field-block `FieldOperator` to `LocalApproximation`, with independent source/target arities, named sparse maps, degree-generated scalar/solenoidal polynomial tails, and inspected local algebra.
+- Support Python Float64/mpmath and native C++ Float64/MPFR mixed Hermite construction, with real MPI scheduling and exact identical-request reuse through `LocalExecution`.
+- Route existing LU Stokes LHI weight construction through `LocalApproximation`, preserving stencil memberships, kernel policies, quotient-pressure augmentation, compact matrices and local pressure-gradient reconstruction. Global PDE assembly and time integration retain their existing roles.
+- Add `LHI(..., execution=LocalExecution(...))` for supported Stokes LU weight scheduling. MPI requires C++; the global sparse solve remains separate. SVD and experimental backends retain their explicit specialized paths.
+- Correct direct `PressureSpace` handling: omit constant polynomial columns and require constant-invariant local samples/trials/targets; absolute values use `ScalarSpace`. Permit quotient-pressure factors in mixed Hermite requests with the same invariant-functional checks.
+- Preserve the historical normalized streamfunction-curl basis for generic 2D solenoidal polynomials; 3D uses the solenoidal nullspace basis.
+- Add saved-weight, compact-matrix, native/MPI parity checks and a runnable generic coupled-field example. These checks do not establish cavity stability or a globally reconciled pressure field.
+- Fix mixed quality selection to grow eligible sample groups against the joint functional polynomial matrix; preserve explicit memberships and nearest-stencil behavior.
+- Enable target-centered local kernel scaling for standard C++ LU Stokes weights and MPI, preserving the Python method's radius and derivative chain factors. Native SVD/custom-executable paths and geometry-dependent shape rules retain physical-coordinate restrictions.
+- Document the existing radius conventions for single-field and mixed/Stokes local scaling. Add mixed/Stokes contracts to Python CI, native/MPI parity to the Linux native job, and the generic mixed example to installed-wheel smoke checks.
+- Add short, numbered public examples for coupled scalar maps, one 37-point Stokes stencil, and a complete local Stokes solve. Keep the checkpointed measured driver in the research tree.
+
+This source-version change does not publish a package or create a release tag.
+
 ## 0.5.0 — functional approximation and matrix algorithms
 
 - Support unsteady divergence-free global Stokes with `CppGlobalBackend`: native stiffness/mass assembly, backward Euler/BDF2 shifted LU caching and mass products in double/MPFR, with public time-dependent data and field APIs.

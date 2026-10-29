@@ -25,7 +25,7 @@ def execution_info(obj: object) -> dict:
     from .global_vector_interpolation_backend import (
         ComponentwiseInterpolant, VectorInterpolant, CppVectorInterpolant)
     from .evolution import EvolutionSystem, EvolutionState, EvolutionTrajectory
-    from .space_stokes import GlobalFlowSystem, GlobalFlowSolution
+    from .space_stokes import GlobalFlowSystem, GlobalFlowSolution, LocalFlowSystem
     from .local_approximation import LocalApproximation
     from .patches import PatchInterpolant, NativePatchInterpolant
     from .dfpu import DivergenceFreePatchInterpolant, NativeDivergenceFreePatchInterpolant
@@ -96,6 +96,24 @@ def execution_info(obj: object) -> dict:
         _record(result, obj)
         return result
     locations = result['locations']
+    if isinstance(obj, LocalFlowSystem):
+        import copy
+        info = getattr(obj.base, 'backend_diagnostics', {})
+        native_weights = str(info.get('backend', '')).startswith('cpp')
+        local = obj.base.local_arithmetic
+        digits = local.ctx.dps if local.ctx else None
+        result.update(supported=True, evidence='implementation', geometry='float64',
+            backend=info.get('backend', 'python'), digits=digits,
+            arithmetic=('mpfr' if native_weights else 'mpmath') if digits else 'float64',
+            linear_solver='mpmath sparse LU' if obj.base.arithmetic.ctx else 'scipy sparse LU',
+            local_weight_engine=info.get('local_weight_engine', 'specialized Stokes'),
+            local_execution=copy.deepcopy(info.get('local_execution', [])),
+            global_arithmetic='mpmath' if obj.base.arithmetic.ctx else 'float64')
+        locations.update(assembly='cpp local weights; python global assembly' if native_weights
+                         else 'python local weights and global assembly',
+                         solve='python', evaluation='python patchwise reconstruction',
+                         data='python', time_stepping='python' if obj.problem.transient else None)
+        return result
     if isinstance(obj, LocalApproximation):
         result.update(supported=True, evidence='configured', geometry='float64',
                       backend=type(obj.backend).__name__, digits=obj.precision.local_digits)

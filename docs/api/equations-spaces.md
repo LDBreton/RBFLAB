@@ -67,6 +67,17 @@ These options do not imply a general stability guarantee.
 
 ::: rbflab.PressureSpace
 
+::: rbflab.MixedSpace
+
+::: rbflab.FieldOperator
+
+For direct local approximation, `PressureSpace` admits only constant-invariant
+source, trial and target functionals, such as pressure derivatives. It never
+inserts a constant polynomial, including when the requested degree is `None`.
+Absolute nodal pressure data or value targets use `ScalarSpace`; any global
+gauge belongs to the assembled equations. This resolves the earlier local-engine
+behavior that silently added a constant and accepted absolute observations.
+
 ::: rbflab.EvolutionPDE
 
 ::: rbflab.SymbolicStokes

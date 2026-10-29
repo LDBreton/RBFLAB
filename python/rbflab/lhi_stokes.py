@@ -18,9 +18,9 @@ from .nodal import Arithmetic
 from .kernels import ScalarKernel,Hybrid,resolve_polynomial_degree
 from .operators import Identity,Derivative,Laplacian
 from .methods import _query
-from .stencils import StencilPolicy,neighbors,geometry_quality
-from .stokes import _blocks,StokesArithmetic
-from .stokes_polynomials import StokesPolynomialBasis,append_columns,rank_ratio
+from .stencils import StencilPolicy
+from .stokes import _blocks
+from .stokes_polynomials import StokesPolynomialBasis,append_columns
 from .unsteady_stokes import UnsteadyStokesProblem,_at,_InitialVelocity,StokesTrajectory
 from .sparse_precision import MPSparseMatrix,MPSparseLU
 
@@ -81,6 +81,7 @@ class LHIUnsteadyStokes:
     min_boundary_centers: int = 0
     local_backend: object = None
     pressure_polynomial_degree: object = None
+    execution: object = None
 
     @property
     def has_polynomials(self):
@@ -114,70 +115,12 @@ class LHIUnsteadyStokes:
             from .cuda_backend import CudaLHIBackend
             from .torch_backend import TorchBackend
             if not isinstance(self.local_backend,(LegacyCppLHIBackend,PythonBackend,CppBackend,CudaLHIBackend,TorchBackend)):raise TypeError('Expected an LHI numerical backend')
+            if self.execution is not None and not isinstance(self.local_backend,(PythonBackend,CppBackend)):
+                raise NotImplementedError('LocalExecution requires a common Python/C++ Stokes LHI weight backend')
             return self.local_backend.assemble(self,problem,cloud)
-        a=StokesArithmetic(self.kernel,self.pressure_kernel,self.precision.local_digits)
-        g=a if self.precision.global_dtype=='mpmath' else Arithmetic(self.kernel)
-        ii,bi=cloud.interior_indices,cloud.boundary_indices;ni,nb=len(ii),len(bi)
-        if not ni or not nb:raise ValueError("Interior and boundary nodes are required")
-        if type(self.stencil_size) is not int or not 3<=self.stencil_size<=len(cloud.points):
-            raise ValueError("Invalid stencil_size")
-        if self.pde_stencil_size is not None and (type(self.pde_stencil_size) is not int or not 0<=self.pde_stencil_size<ni):
-            raise ValueError("Invalid pde_stencil_size")
-        imap={int(j):i for i,j in enumerate(ii)};bmap={int(j):i for i,j in enumerate(bi)}
-        if self.min_boundary_centers>nb:raise ValueError("min_boundary_centers exceeds boundary count")
-        tree=cKDTree(cloud.points);ptree=cKDTree(cloud.interior);btree=cKDTree(cloud.points[bi])
-        momentum=[{c:-(Laplacian()*problem.viscosity),2:Derivative(c)} for c in (0,1)]
-        sy=[{} for _ in range(2*ni)];sl=[{} for _ in range(2*ni)];sb=[{} for _ in range(2*ni)];stencils=[]
-        for owner,center in enumerate(ii):
-            selected=self.stencil_policy.select(tree,cloud.points[center],self.stencil_size)
-            sc=[int(j) for j in selected if int(j) in imap]
-            bc=[int(j) for j in selected if int(j) in bmap]
-            if bc and len(bc)<self.min_boundary_centers:
-                extra=bi[neighbors(btree,cloud.points[center],self.min_boundary_centers)]
-                bc=sorted(set(bc)|set(map(int,extra)))
-            pc=[j for j in sc if j!=center]
-            if self.pde_stencil_size is not None:
-                candidate=ii[neighbors(ptree,cloud.points[center],self.pde_stencil_size+1)]
-                pc=[int(j) for j in candidate if j!=center][:self.pde_stencil_size]
-            if not pc:
-                raise ValueError("Each Stokes stencil needs auxiliary PDE centers; enlarge the stencil")
-            points=[];ops=[];slots=[]
-            for group,ids,mapping,size in [('solution',sc,imap,ni),('boundary',bc,bmap,nb),('pde',pc,imap,ni)]:
-                for c in (0,1):
-                    for j in ids:
-                        points.append(cloud.points[j]);ops.append(momentum[c] if group=='pde' else {c:Identity()})
-                        slots.append((group,mapping[j]+c*size))
-            points=np.asarray(points);scale=None
-            if self.stencil_policy.scaling=='local':
-                sqrt=a.ctx.sqrt if a.ctx else np.sqrt
-                scale=max(sqrt(sum((a.number(v)-a.number(w))**2 for v,w in zip(point,cloud.points[center]))) for point in points)
-            gram=_blocks(a,points,ops,points,ops,scale)
-            basis=None
-            diagnostics=geometry_quality(cloud.points[np.unique(sc+bc+pc)],cloud.points[center],1)
-            if self.has_polynomials:
-                sqrt=a.ctx.sqrt if a.ctx else np.sqrt
-                radius=max(sqrt(sum((a.number(v)-a.number(w))**2 for v,w in zip(point,cloud.points[center]))) for point in points)
-                basis=StokesPolynomialBasis(a,cloud.points[center],radius,self.polynomial_degree,self.pressure_polynomial_degree)
-                poly=basis.matrix(points,ops);ratio=rank_ratio(poly)
-                diagnostics['functional_polynomial_ratio']=ratio
-                if ratio<1e-12:raise ValueError(f"Polynomial functionals are rank deficient at center {center}; enlarge or rebalance the stencil")
-                n=len(points);m=len(basis.columns);aug=a.zeros(n+m,n+m)
-                aug[:n,:n]=gram;aug[:n,n:]=poly;aug[n:,:n]=poly.T;gram=aug
-            factor=a.factor(gram)
-            target=np.repeat(cloud.points[[center]],2,axis=0)
-            q=_blocks(a,target,momentum,points,ops,scale)
-            if basis is not None:q=append_columns(a,q,basis.matrix(target,momentum))
-            weights=factor.solve(q.T,transpose=True)
-            for c in (0,1):
-                row=owner+c*ni
-                for j,(group,col) in enumerate(slots):
-                    _add({'solution':sy,'boundary':sb,'pde':sl}[group][row],col,g.number(weights[j,c]))
-            stencils.append(VectorHermiteStencil(int(center),points,ops,slots,factor,scale,
-                diagnostics,basis))
-        mass=[{i:g.number(1)} for i in range(2*ni)]
-        for i,row in enumerate(sl):
-            for j,v in row.items():_add(mass[i],j,-v)
-        return LHIStokesSystem(problem,cloud,a,g,stencils,sy,sb,sl,mass)
+        from .lhi_backends import PythonBackend
+        return PythonBackend().assemble(self,problem,cloud)
+
 
 
 class LHIStokesSystem:

@@ -14,7 +14,9 @@ from .problems import LinearPDE, BoundaryCondition, Dirichlet
 from .evolution import EvolutionPDE
 from .symbolic import SymbolicScalar
 from .symbolic_system import SymbolicSystem
-from .spaces import ScalarSpace, DivergenceFreeSpace, PressureSpace, SymbolicStokes
+from .spaces import ScalarSpace, DivergenceFreeSpace, PressureSpace, MixedSpace, SymbolicStokes
+from .mixed import FieldOperator
+from .mixed_backends import LocalExecution
 from .stencils import StencilPolicy
 from .samples import Samples
 from .local_approximation import LocalApproximation
@@ -34,7 +36,7 @@ __all__ = [
     'Identity', 'Derivative', 'Laplacian', 'NormalDerivative', 'Robin', 'SpatialOperator',
     'LinearPDE', 'BoundaryCondition', 'Dirichlet', 'EvolutionPDE',
     'SymbolicScalar', 'SymbolicSystem', 'SymbolicStokes',
-    'ScalarSpace', 'DivergenceFreeSpace', 'PressureSpace', 'StencilPolicy', 'Samples', 'LocalApproximation', 'CenterGroup',
+    'ScalarSpace', 'DivergenceFreeSpace', 'PressureSpace', 'MixedSpace', 'FieldOperator', 'StencilPolicy', 'Samples', 'LocalApproximation', 'CenterGroup',
     'GlobalCollocation', 'LHI', 'RBFFD', 'interpolate', 'PatchCover', 'DiscreteOperator', 'OperatorSet',
-    'PythonBackend', 'CppBackend', 'CppGlobalBackend', 'TorchBackend', 'execution_info',
+    'PythonBackend', 'CppBackend', 'CppGlobalBackend', 'TorchBackend', 'LocalExecution', 'execution_info',
 ]

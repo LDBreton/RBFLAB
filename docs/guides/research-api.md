@@ -28,11 +28,15 @@ construction. Direct `LocalApproximation` retains native matrix storage.
 Scalar `LHI.assemble` also uses the shared weight engine, while its adapter
 retains the earlier known-data assembly and solution reconstruction.
 
-Specialized Stokes and coupled-block convenience implementations still have
-separate assembly paths. The new engine supports scalar spaces and
-componentwise functionals on `DivergenceFreeSpace` in 2D/3D; this is not automatic
-mixed `SymbolicSystem` or velocity-pressure assembly. Vector samples are ordered
-node-major, and their matrix blocks contain component-to-component coupling.
+Stokes LHI with Python/C++ LU also delegates local weights to this engine;
+its adapter retains the original stencil selection, compact equation assembly
+and pressure-gradient reconstruction. Coupled scalar block assembly remains
+separate, as do the explicitly selected Stokes SVD/experimental paths.
+The common engine supports scalar spaces,
+componentwise functionals on `DivergenceFreeSpace`, and matching Hermite
+representers on a `MixedSpace` with explicit `FieldOperator` samples in 2D/3D.
+Mixed maps do not automatically assemble a `SymbolicSystem`, impose pressure
+closure, or select a time scheme. Vector samples are ordered node-major.
 
 ## Global interpolation and PDE execution
 
@@ -79,6 +83,8 @@ Increasing arithmetic precision cannot recover digits lost in Float64 inputs.
 | Object | Meaning |
 |---|---|
 | `ScalarSpace` or another supported space | Kernel, polynomial enrichment, field structure |
+| `MixedSpace({name: space, ...})` | A direct sum of independently configured scalar/DF field spaces |
+| `FieldOperator({field: operator_block, ...})` | Coupled linear functionals with explicit input/output components |
 | `Samples(points, operator=..., size=...)` | What is sampled and how its local neighborhood is chosen |
 | `space.representers(source)` | Trial functions made by applying source functionals to the kernel's second argument |
 | `space.translates(points)` | Ordinary kernel translates, independently specified |
@@ -146,6 +152,12 @@ nor data to Float64 if preserving that arithmetic matters.
 `StencilPolicy(scaling="local")` normalizes kernel coordinates. This is separate
 from algebraic equilibration in a local solver. Shape-sensitive kernels change
 meaning under coordinate normalization. See [conditioning](../theory/conditioning.md).
+The radius convention is route-specific to preserve existing methods:
+single-field `LocalApproximation` measures the maximum distance over selected
+source **and trial** centers from the first selected source center. Mixed
+`LocalApproximation` and Stokes LHI use matching source/trial sites and measure
+their radius from the target. The zero-radius fallback is one. Physical derivative
+chain factors are already included in returned weights; do not apply them again.
 
 ## Select exact or geometric source neighborhoods
 
@@ -156,6 +168,175 @@ group-local integer indices per target, instead of a size/selection policy.
 Normal-dependent boundary samples accept `normals=...`; geometry can supply
 these through its labeled boundary data. A per-group `policy` controls selection;
 coordinate scaling belongs to the whole `LocalApproximation`.
+
+## Mixed field Hermite maps
+
+Start with `python -m examples.mixed_local_maps` for a short example that
+recovers two scalar fields from their sum and contrast. Each numbered step
+introduces one public object. For a 37-point divergence-free Stokes stencil,
+run `python -m examples.stokes_lhi_weights`; it constructs momentum and
+pressure-gradient maps without assembling a global PDE.
+
+??? example "One mixed Stokes stencil"
+
+    ```python
+    --8<-- "examples/stokes_lhi_weights.py"
+    ```
+
+Declare linear functionals as rectangular blocks of existing differential
+operators. Each block has shape `(output_components, field_components)` and
+all blocks share an output row count. Omitted fields contribute zero; literal
+`0` is the only numeric shortcut. No fluid role is attached to field names.
+
+```python
+I, Dx, Dy, Lap = Identity(), Derivative(0), Derivative(1), Laplacian()
+space = MixedSpace({
+    "u": DivergenceFreeSpace(Ku, polynomial_degree=6),
+    "p": ScalarSpace(Kp, polynomial_degree=1),
+})
+U = FieldOperator({"u": [[I, 0], [0, I]]})
+P = FieldOperator({"p": [[I]]})
+L = FieldOperator({
+    "u": [[-nu*Lap, 0], [0, -nu*Lap]],
+    "p": [[Dx], [Dy]],
+})
+source = {
+    "velocity": Samples(Xu, operator=U, indices=velocity_rows),
+    "momentum": Samples(Xl, operator=L, indices=momentum_rows,
+                        target="exclude"),
+    "pressure": Samples(Xp, operator=P, indices=pressure_rows),
+}
+local = LocalApproximation(source=source, trial=space.representers(source))
+maps = local.operators(targets=owners, operators={"momentum": L, "pressure": P})
+```
+
+The arrays and kernels in this construction are supplied by the application.
+For a 37-physical-site experiment, select those sites once, then derive each
+group's exact membership rows; `size=37` separately on each group would select
+different observation sets. The pressure group has one column per global
+pressure site, shared by every local stencil selecting it.
+
+`maps.momentum["pressure"].matrix` has two rows per target and one column per
+pressure point. `maps.pressure["velocity"].matrix` has one row per target and
+two columns per velocity point. Applying a mixed map returns
+`(number_of_targets, output_components)`, including an `(N, 1)` array for scalar
+outputs, independent of how individual source arrays are shaped. MP storage
+returns the analogous mpmath matrix. `.matrix` remains the flat linear map.
+
+Mixed interpolation uses direct-sum degree-generated polynomial spaces with
+target-centered, maximum-Euclidean-radius normalized coordinates. Kernel
+coordinates remain physical by default; `scaling="local"` uses that same
+target-centered radius for the kernel, in Python, C++ and MPI execution.
+All source functionals must be explicit `FieldOperator` objects; implicit
+identity and bare scalar operators are ambiguous on a mixed space and rejected.
+Zero/repeated targets are allowed; zero/duplicate local source rows are rejected.
+Matching mixed representers are supported; mixed translates and arbitrary mixed
+source/trial pairing are not. A `PressureSpace` mixed factor omits constant
+polynomials and accepts only functionals annihilating its additive constant.
+Use `ScalarSpace` for pressure values and choose the gauge in global equations.
+In 2D, solenoidal polynomial columns use the canonical streamfunction-curl
+basis; 3D retains the exact divergence-nullspace basis.
+
+For mixed requests, `selection="quality"` checks the actual combined functional
+polynomial matrix, including all fields and derivative observations. It grows
+each eligible sized group by one neighbor per round until the joint rank and
+ratio threshold and each quality group's node-separation threshold pass, or
+the configured limits are exhausted. The strictest participating polynomial
+ratio is used. Separation checks use distinct physical sites, so different
+Hermite observations can share a point. Explicit `indices`, groups with
+`size=None`, and groups overriding the policy with `selection="nearest"` stay
+fixed. These checks improve stencil selection; they do not certify the full
+kernel matrix's conditioning or the stability of an assembled PDE.
+
+Python supports Float64 and extended local arithmetic. C++ performs the field
+kernel contractions and local LU natively, in Float64 or MPFR. Select it through
+`backend=CppBackend(threads=1)` and, for example,
+`precision=Precision(local_digits=80, global_dtype="float64")`. This does not
+upgrade Float64 geometry or a separate global solve. Mixed Torch execution is
+not supported.
+
+For actual MPI scheduling of native mixed weights, add
+`execution=LocalExecution(scheduler="mpi", ranks=2)` to `LocalApproximation`.
+MPI requires `CppBackend` and a working MPI launcher. `launcher=("mpiexec",
+"--oversubscribe")` supplies an explicit prefix. Windows can use native MPI or
+the WSL bridge (`wsl_distribution="Ubuntu"`); when no native launcher exists,
+the default Windows bridge uses Ubuntu. Each rank launches the same packaged
+native worker on assigned jobs; rank completion records and result ordering
+are validated. MPI does not distribute equation assembly or the global solve.
+`reuse="exact"` reuses identical serialized jobs; it does not merge approximately
+equal or translated geometries. Other local approximation paths reject an
+explicit `LocalExecution` rather than silently ignoring it.
+
+### Existing Stokes LHI through the common engine
+
+Source version **0.6.0** routes existing Python/C++ LU Stokes LHI weights through
+`LocalApproximation`. Its stencil/data adapter supplies velocity values and
+neighboring momentum observations, excluding owner momentum. It introduces no
+pressure-value samples or global pressure unknowns. The same quotient pressure
+tail and normalized 2D polynomial columns are used, with the same compact
+`M = I - SL`, `SY`, `SB`, and local pressure-gradient maps.
+
+The public equation declaration remains unchanged. To distribute native LU
+weights, add scheduling on the existing method:
+
+```python
+method = LHI(
+    spaces=spaces,
+    stencil_size=37,
+    local_backend=CppBackend(threads=1, compute_condition=False),
+    precision=Precision(local_digits=80, global_dtype="float64"),
+    execution=LocalExecution(scheduler="mpi", ranks=2),
+)
+system = method.assemble(problem, cloud)
+report = execution_info(system)
+```
+
+The cloud must support the selected stencil and polynomial rank. Shape-policy
+parameters are bound before constructing common local requests; compatible
+effective kernels are batched together. Python process workers remain supported
+and call the common API per task. Global sparse assembly, solves and time
+stepping stay in Python. Stored equation matrices retain their historical
+component-major velocity ordering; generic local maps retain their documented
+node-major convention through the adapter's explicit row mappings.
+
+With fixed kernel parameters, both Python and the standard C++ LU path accept
+`stencil_policy=StencilPolicy(scaling="local")`, including MPI scheduling of the
+native weights. This preserves Stokes' target-centered radius and physical
+derivative chain factors. It is distinct from supplying full mesh-dependent
+kernel parameters in physical coordinates: switching the policy while retaining
+the same numeric kernel parameters changes the kernel. Keep `scaling="physical"`
+when reproducing an experiment that already incorporates its full scaling in
+the kernel parameters and amplitudes.
+
+`system.recipe["backend_diagnostics"]` and `execution_info(system)` identify
+`local_weight_engine="LocalApproximation"` and actual local execution batches.
+Pressure output remains local gradients, and nearest-patch velocity remains
+patchwise analytically solenoidal. This consolidation does not establish global
+divergence conformity or change the method's stability.
+
+Explicit `LocalSolver("svd")`, historical custom executables and experimental
+backends retain specialized implementations; they do not silently substitute
+the common LU solver. Explicit scheduling is rejected on those paths. Standard
+scalar LHI scheduling remains outside this method-level extension.
+The native SVD and explicit historical-executable routes still require physical
+kernel coordinates. The `hardy`, `radius_scaled` and `separation_scaled` shape
+rules also require physical coordinates; combining them with local coordinate
+scaling is rejected.
+
+### Generic examples and quotient observations
+
+Run the complete generic example with
+`python examples/mixed_local_maps.py`; add `--backend cpp --digits 50` or
+`--backend cpp --mpi 2` for native execution. It uses coupled observations of
+two scalar fields, demonstrating the same generic construction without a fluid
+solver. Operator diagnostics include actual local execution metadata.
+
+For the single-field quotient `PressureSpace`, all sampled/trial/target
+functionals must annihilate constants. It omits the constant polynomial and
+does not force degree zero when degree is `None`. Absolute nodal pressure
+observations belong to `ScalarSpace`. Applications relying on the earlier
+implicit constant in direct `LocalApproximation`/`RBFFD.operators` should migrate
+those absolute observations explicitly; specialized Stokes paths are unchanged.
 
 ## Compilation and reuse
 

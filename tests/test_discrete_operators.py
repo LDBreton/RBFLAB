@@ -61,7 +61,9 @@ def test_solenoidal_for_arbitrary_data(name,dimension):
 @pytest.mark.parametrize('vector',[False,True])
 def test_extended_weights_and_reconstruction(name,vector):
     p,q=points(2)
-    descriptor=(r.DivergenceFreeSpace if vector else r.PressureSpace)(r.IMQ(2),1)
+    # Nodal scalar measurements have an explicit absolute representative;
+    # quotient PressureSpace requires constant-invariant observations.
+    descriptor=(r.DivergenceFreeSpace if vector else r.ScalarSpace)(r.IMQ(2),1)
     ops=r.RBFFD(spaces={'field':descriptor},stencil_size=9,precision=r.Precision(local_digits=40,global_dtype='mpmath'),local_backend=backend(name)).operators(source=p,targets=q,operators={'dx':r.Derivative(0)})
     matrix=ops.dx.matrix;ctx=matrix.ctx
     values=ctx.matrix([[ctx.mpf(float(v)) for v in row] for row in p]) if vector else ctx.matrix([ctx.mpf(float(v)) for v in p[:,0]])
@@ -91,7 +93,7 @@ def test_nonpolynomial_backend_parity(name,vector):
 
 def test_pressure_constants_selection_and_rejection():
     p,q=points(2)
-    method=r.RBFFD(spaces={'p':r.PressureSpace(r.IMQ(2)),'U':r.DivergenceFreeSpace(r.IMQ(2),1)},stencil_size=10)
+    method=r.RBFFD(spaces={'p':r.ScalarSpace(r.IMQ(2),0),'U':r.DivergenceFreeSpace(r.IMQ(2),1)},stencil_size=10)
     with pytest.raises(ValueError,match='Select a field'):method.operators(source=p,operators={'dx':r.Derivative(0)})
     ops=method.operators(source=p,targets=q,operators={'dx':r.Derivative(0)},space='p')
     np.testing.assert_allclose(ops.dx@np.ones(len(p)),0,atol=1e-12)

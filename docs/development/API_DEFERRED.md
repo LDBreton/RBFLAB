@@ -6,6 +6,11 @@
 - Additional backend combinations, anisotropic and arbitrary matrix-valued kernel protocols.
 - Globally reconciled LHI pressure and smooth reconstruction where not already implemented.
 
+Generic mixed matching Hermite maps and the existing Python/C++ LU Stokes
+weight adapter are implemented through `LocalApproximation` in source version
+0.6.0. This does not implement arbitrary mixed symbolic PDE assembly or replace
+the explicitly selected SVD/experimental Stokes backends.
+
 These are not advertised as supported capabilities.
 
 ## Explicit maintenance boundaries

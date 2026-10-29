@@ -33,6 +33,10 @@ def resolve_space(method, space=None):
 
 def scalar_method(method):
     descriptor=resolve_space(method)
+    if isinstance(descriptor, PressureSpace):
+        raise NotImplementedError(
+            'Scalar PDE assembly requires an absolute field representation; '
+            'use ScalarSpace instead of quotient PressureSpace')
     if isinstance(descriptor,DivergenceFreeSpace):
         raise NotImplementedError('Vector spaces are supported by RBFFD.operators; mixed PDE assembly is separate')
     degree=descriptor.degree()

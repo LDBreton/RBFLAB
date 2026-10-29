@@ -40,6 +40,7 @@ def _build(task,a=None):
 
 
 def _python_job(task):
+    """Historical independent reference; production LU uses LocalApproximation."""
     key=(repr(task['vk']),repr(task['pk']),task['digits'])
     if key not in _WORKER_ARITH:_WORKER_ARITH[key]=StokesArithmetic(task['vk'],task['pk'],task['digits'])
     a=_WORKER_ARITH[key]
@@ -202,15 +203,8 @@ class PythonBackend(BackendSettings):
         if type(self.workers) is not int or self.workers<1:raise ValueError('workers must be a positive integer')
         if type(self.compute_condition) is not bool:raise TypeError('compute_condition must be bool')
     def assemble(self,method,problem,cloud):
-        start=time.perf_counter();a,tasks,stencils=_prepare(method,problem,cloud,self.shape_rule)
-        for task in tasks:task['condition']=self.compute_condition
-        if self.workers==1:results=[_python_job(task) for task in tasks]
-        else:
-            with ProcessPoolExecutor(max_workers=min(self.workers,len(tasks)),mp_context=multiprocessing.get_context('spawn'),initializer=_init_worker) as pool:
-                results=list(pool.map(_python_job,tasks,chunksize=1))
-        system=_finish(method,problem,cloud,a,tasks,stencils,results,dict(backend='python',shape_rule=self.shape_rule,workers=min(self.workers,len(tasks)),compute_condition=self.compute_condition,local_digits=method.precision.local_digits,off_node_backend='lazy Python',condition_norm='infinity' if a.ctx else '2'))
-        system.backend_diagnostics['assembly_seconds']=time.perf_counter()-start
-        return system
+        from ._compat_stokes_lhi import assemble
+        return assemble(method,problem,cloud,self)
 
 
 @dataclass(frozen=True)
@@ -243,8 +237,13 @@ class CppBackend(BackendSettings):
         if self.shape_rule not in ('fixed','hardy','radius_scaled','separation_scaled'):raise ValueError('Unknown shape rule')
     def assemble(self,method,problem,cloud):
         start=time.perf_counter();pk=method.pressure_kernel or method.kernel
+        if self.local_solver=='lu' and self.executable is None:
+            from ._compat_stokes_lhi import assemble
+            return assemble(method,problem,cloud,self)
         if method.stencil_policy.scaling!='physical':
-            raise NotImplementedError('Compiled backend uses physical coordinates; use PythonBackend for local scaling')
+            raise NotImplementedError('Specialized C++ Stokes SVD and custom executables require physical kernel coordinates')
+        if getattr(method,'execution',None) is not None:
+            raise NotImplementedError('LocalExecution requires the common LU backend; explicit legacy executables and SVD retain their specialized route')
         for k in (method.kernel,pk):
             if not isinstance(k,(ScalarKernel,Hybrid,BoundKernel)):raise NotImplementedError('Compiled kernels: IMQ, Gaussian, and their supported PHS hybrids')
         native = method.precision.local_digits is None
@@ -309,6 +308,6 @@ class CppBackend(BackendSettings):
                     condition=float(cond2) if self.compute_condition else None
                 results.append(dict(svd=svd_info,condition=condition,residual=items[3],weights=[items[4+j*n:4+(j+1)*n] for j in range(4)]))
             if len(results)!=len(tasks):raise RuntimeError('Incomplete C++ results')
-        system=_finish(method,problem,cloud,a,tasks,stencils,results,dict(backend='cpp_float64' if native else 'cpp_mpfr',local_solver=self.local_solver,svd_rcond=self.svd_rcond,svd_stencils=[r['svd'] for r in results] if self.local_solver=='svd' else None,build=build_info,threads=self.threads,compute_condition=self.compute_condition,shape_rule=self.shape_rule,local_digits=method.precision.local_digits,cpp_process_seconds=elapsed,off_node_backend='lazy Python with matching kernels and '+self.local_solver,condition_norm='2 (untruncated singular values)' if self.local_solver=='svd' else 'infinity'))
+        system=_finish(method,problem,cloud,a,tasks,stencils,results,dict(backend='cpp_float64' if native else 'cpp_mpfr',local_weight_engine='specialized SVD' if self.local_solver=='svd' else 'explicit legacy executable',local_solver=self.local_solver,svd_rcond=self.svd_rcond,svd_stencils=[r['svd'] for r in results] if self.local_solver=='svd' else None,build=build_info,threads=self.threads,compute_condition=self.compute_condition,shape_rule=self.shape_rule,local_digits=method.precision.local_digits,cpp_process_seconds=elapsed,off_node_backend='lazy Python with matching kernels and '+self.local_solver,condition_norm='2 (untruncated singular values)' if self.local_solver=='svd' else 'infinity'))
         system.backend_diagnostics['assembly_seconds']=time.perf_counter()-start
         return system

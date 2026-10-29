@@ -328,7 +328,22 @@ def prepare_method(method,problem,dimension=2,cache_dir=None):
         if isinstance(getattr(method,'local_backend',None),CppBackend):
             if dimension!=2:raise NotImplementedError('C++ Stokes LHI assembly currently supports 2D')
             method.local_backend=replace(method.local_backend,cache_dir=cache_dir)
-            method.compiled_artifact=compile_stokes(velocity.kernel,pressure.kernel,'float64' if method.precision.local_digits is None else 'mpfr',cache_dir)
+            if method.local_solver.method=='lu' and method.local_backend.executable is None:
+                from types import SimpleNamespace
+                from .mixed_backends import _compile
+                from .operators import Laplacian,Derivative
+                # Preparation needs derivative orders, not a geometric stencil.
+                # The adapter later supplies these same mixed momentum rows.
+                rows=[{(0,c):-problem.viscosity*Laplacian(2),
+                       (1,0):Derivative(c,2)} for c in (0,1)]
+                owner=SimpleNamespace(dimension=2,precision=method.precision,
+                    backend=method.local_backend,
+                    fields=[SimpleNamespace(kernel=velocity.kernel,vector=True),
+                            SimpleNamespace(kernel=pressure.kernel,vector=False)],
+                    jobs=[dict(source_rows=rows,trial_rows=rows,target_rows=rows)])
+                method.compiled_artifact=_compile(owner)[0]
+            else:
+                method.compiled_artifact=compile_stokes(velocity.kernel,pressure.kernel,'float64' if method.precision.local_digits is None else 'mpfr',cache_dir)
             return method
         spaces={}
         for field,space in method.spaces.items():

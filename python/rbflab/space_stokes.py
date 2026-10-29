@@ -307,7 +307,7 @@ class LocalFlowSystem:
             method.pde_stencil_size,pressure_kernel=pressure.kernel,polynomial_degree=vd,
             legacy_unaugmented_hybrid=False,
             min_boundary_centers=method.min_boundary_centers,local_backend=configured_backend(method),
-            pressure_polynomial_degree=pd)
+            pressure_polynomial_degree=pd,execution=method.execution)
         self.base=backend.assemble(native,cloud);self.problem=problem
         self.matrix=self.base.SY;self.mass=self.base.mass;self.arithmetic=self.base.arithmetic;self.factor=None
         if not problem.transient:

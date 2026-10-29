@@ -109,11 +109,72 @@ C++ MPFR and Torch CPU Float64; supported extended Python arithmetic is separate
 from Torch. These kernel/block tests do not establish arbitrary mixed-field PDE
 assembly, pressure constraints, or a general 3D Stokes solver.
 
+### Generic mixed local approximation
+
+`MixedSpace` and `FieldOperator` extend `LocalApproximation` to named direct sums
+of scalar and DF fields. Field blocks specify coupled linear functionals;
+sample groups and targets have independent component counts. Matching Hermite
+representers, named sparse maps, multi-RHS local solves and local matrix
+inspection are supported. This is approximation algebra, not automatic mixed
+PDE assembly or a new Stokes solver. Existing Stokes LU assembly now uses these
+maps for its weights; scalar block convenience assembly remains separate.
+
+| Mixed local capability | Python | C++ | MPI |
+|---|---|---|---|
+| Scalar/DF direct-sum kernel contraction, 2D/3D | Float64/mpmath | Float64/MPFR from source toolchain | C++ jobs across real MPI ranks |
+| Named maps with variable source/target arities | Yes | Yes | Deterministic job restoration |
+| Target-centered local kernel scaling with physical derivative factors | Yes | Yes | Same native requests |
+| Identical-request reuse | No | `LocalExecution(reuse="exact")` | Same exact-job policy |
+| Extended sparse weight storage | `global_dtype="mpmath"` | Same explicit storage policy | Preserved through rank output |
+| Arbitrary mixed source/trial pairing or translates | No | No | No |
+| Quotient `PressureSpace` factors with constant-invariant functionals | Yes | Yes | Same native requests |
+| Mixed Torch | No | No | No |
+
+Mixed maps return `(Ntargets, target_components)`, including `(Ntargets,1)` for
+scalar targets. Use `.matrix` for flat algebra. Polynomials are degree-generated
+per field, with target-centered radius normalization. Explicit polynomial degrees
+and CPD warnings retain their existing meaning. Field names do not imply PDE
+roles. Source/trial samples must be explicit field functionals; zero and repeated
+target rows are valid, while invalid source rows/rank are rejected.
+For mixed local scaling, the radius is the maximum selected-source distance
+from the target; the single-field approximation measures selected source and
+trial centers from its first selected source center.
+See [scaling conventions](guides/research-api.md#numerical-execution).
+Mixed quality selection grows eligible sized groups using the joint functional
+polynomial rank/ratio and per-group separation checks. Explicit memberships
+remain fixed; exhausted size limits raise an error.
+
+`LocalExecution(scheduler="mpi", ranks=...)` requires a native MPI launcher or
+the Windows/WSL bridge and `CppBackend`. It only distributes local weight jobs.
+The common single-field paths reject this execution option explicitly; the
+Stokes LHI LU adapter accepts it on `LHI(..., execution=...)`. Exact
+reuse matches full serialized requests; translated or approximate reuse is not
+implemented. See [the workflow and prerequisites](guides/research-api.md#mixed-field-hermite-maps).
+
+Direct single-field `PressureSpace` now consistently omits constant polynomial
+columns and accepts only constant-invariant observations, representers and
+targets. Absolute pressure values use `ScalarSpace` with an externally selected
+gauge. The previous direct-local behavior that inserted a constant at degree
+`None` is corrected; specialized Stokes output rules are unchanged.
+
 Standard `RBFFD.operators`/`.weights` and scalar `LHI` weight construction now
 reuse this engine. The RBF-FD compatibility adapter still exports SciPy matrices
 for Torch; direct `LocalApproximation` keeps tensors. Scalar LHI preserves its
-historical data/solution interpretation. Existing specialized Stokes and coupled
-assembly paths remain separate.
+historical data/solution interpretation. Stokes LHI Python/C++ LU weights now
+use the same engine, retaining exact stencil/observation memberships, quotient
+pressure, compact matrices and pressure-gradient reconstruction. The Stokes
+SVD/experimental routes and coupled scalar block assembly remain separate.
+
+`LHI(..., execution=LocalExecution(scheduler="mpi", ranks=...))` schedules
+standard C++ LU Stokes weights. It does not parallelize the global sparse solve.
+Python process workers also retain the common local weight path. Numerical
+shape policies remain explicit and are bound before batching generic requests;
+no new global pressure gauge or pressure-value unknowns are introduced.
+Fixed-parameter Stokes LU supports both physical and target-centered local
+kernel coordinates in Python, C++ and native MPI execution. Native SVD and
+historical custom executables retain their physical-coordinate restriction;
+the `hardy`, `radius_scaled` and `separation_scaled` shape rules also require
+physical coordinates.
 
 `Samples.target="exclude"` removes coincident source points from a target's
 neighborhood. It is useful for PDE samples that would otherwise make a local PDE

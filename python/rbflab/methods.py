@@ -192,7 +192,9 @@ class LHI(MethodContract):
         stencil_policy: Neighbor selection and local scaling policy.
         spaces: Optional field-to-space mapping for divergence-free Stokes.
         local_backend: Optional supported local-weight backend.
-        local_solver: Backend-independent local factorization configuration."""
+        local_solver: Backend-independent local factorization configuration.
+        execution: Optional LocalExecution scheduling of LU Stokes weights.
+            MPI requires CppBackend; global sparse solves remain separate."""
     kernel: object = None
     stencil_size: int = 15
     precision: Precision = field(default_factory=Precision)
@@ -204,6 +206,9 @@ class LHI(MethodContract):
     min_boundary_centers: int = 0
     local_backend: object = None
     local_solver: LocalSolver = field(default_factory=LocalSolver)
+
+    # This schedules local Stokes weights, not the global sparse solve.
+    execution: object = None
 
     @prepared
     def prepare(self,problem,*,dimension=2,cache_dir=None):
@@ -376,6 +381,9 @@ def interpolate(kernel=_UNSET, centers=_UNSET, data=_UNSET, precision=None, poly
     from .spaces import ScalarSpace, DivergenceFreeSpace, PressureSpace
     if patches is not None and isinstance(kernel, PressureSpace):
         raise NotImplementedError('PUM does not support PressureSpace gauge constraints')
+    if isinstance(kernel, PressureSpace):
+        raise ValueError('PressureSpace represents pressure modulo constants; '
+                         'use ScalarSpace to interpolate absolute pressure values')
     if isinstance(kernel, DivergenceFreeSpace):
         if polynomial_degree is not None:
             raise ValueError('Specify polynomial_degree in DivergenceFreeSpace only')
