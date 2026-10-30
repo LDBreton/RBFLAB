@@ -110,7 +110,7 @@ native = rbf.GlobalCollocation(
     rbf.PHS(5),
     scheme="symmetric",              # or "asymmetric"
     polynomial_degree=2,
-    backend=rbf.CppGlobalBackend(threads=4, compute_condition=False),
+    backend=rbf.CppGlobalBackend(threads=4),
     precision=rbf.Precision(global_digits=80),
 )
 system = native.assemble(problem, cloud)

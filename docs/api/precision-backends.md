@@ -6,8 +6,14 @@ Extended precision can be selected for local weight construction, global dense s
 
 ::: rbflab.PrecisionData
 
-For a worked explanation of `scaling="local"`, its default, and its effect on
-shape parameters, see [local stencil scaling](../theory/conditioning.md#local-stencil-scaling).
+`LocalApproximation` uses `kernel_scaling="physical"` by default. Set
+`kernel_scaling="local"` to normalize kernel coordinates; `None` aliases
+`"physical"`. `StencilPolicy` remains a compatibility option, but explicitly
+conflicting values supplied through `kernel_scaling` and
+`stencil_policy.scaling` are rejected. Shape-sensitive kernels change meaning
+under coordinate normalization. For the radius convention and its effect on
+shape parameters, see
+[local stencil scaling](../theory/conditioning.md#local-stencil-scaling).
 
 ::: rbflab.StencilPolicy
 
@@ -148,3 +154,10 @@ Python floats retain their binary values, and geometry/query storage is
 Float64. Use exact constants and precision-aware data where supported.
 
 ::: rbflab.execution_info
+## Optional condition estimates
+
+Condition estimation is disabled by default for Python, C++, native global,
+and Torch backends. Ordinary examples need only `PythonBackend()` or
+`CppBackend()`. Pass `compute_condition=True` when you want the additional
+condition diagnostic. Skipped estimates are reported as `None`; this option
+does not change the equations, precision, weights, or solver regularization.

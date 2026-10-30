@@ -32,8 +32,8 @@ def rbf_fd():
     i = np.argmin(np.linalg.norm(points - [0.5, 0.5], axis=1))
     target = points[i]
     op = rbf.RBFFD(
-        spaces={"u": rbf.ScalarSpace(rbf.PHS(5), 2)}, stencil_size=20,
-        local_backend=rbf.PythonBackend(compute_condition=False),
+        spaces=rbf.MixedSpace({"u": rbf.ScalarSpace(rbf.PHS(5), 2)}), stencil_size=20,
+        local_backend=rbf.PythonBackend(),
     ).operators(source=points, targets=target[None], space="u",
                 operators={"lap": rbf.Laplacian(2)}).lap
     local = op.local(0)

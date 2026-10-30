@@ -10,7 +10,7 @@ def local_method(backend="python", stencil=35, degree=3):
     backends = {"python": rbf.PythonBackend, "cpp": rbf.CppBackend, "torch": rbf.TorchBackend}
     if backend not in backends:
         raise ValueError("backend must be python, cpp or torch")
-    options = {"compute_condition": False}
+    options = {}
     if backend != "python": options["threads"] = 4
     return rbf.RBFFD(rbf.PHS(5), stencil, polynomial_degree=degree,
                       local_backend=backends[backend](**options),

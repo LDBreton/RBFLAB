@@ -22,10 +22,10 @@ def run(dimension=2, digits=None, cells=2):
         boundary=[model.bc('boundary', sp.Eq(U, velocity))],
     )
     method = r.GlobalCollocation(
-        spaces={U: r.DivergenceFreeSpace(r.IMQ('.7'), polynomial_degree=2),
-                p: r.PressureSpace(r.Gaussian('1.3'), polynomial_degree=1)},
+        spaces=r.MixedSpace({U: r.DivergenceFreeSpace(r.IMQ('.7'), polynomial_degree=2),
+                             p: r.PressureSpace(r.Gaussian('1.3'), polynomial_degree=1)}),
         precision=r.Precision(global_digits=digits),
-        backend=r.CppGlobalBackend(threads=2, compute_condition=False),
+        backend=r.CppGlobalBackend(threads=2),
     )
     cloud = r.geometry.unit_box_grid(cells, dimension)
     queries = np.random.default_rng(37).uniform(.1, .9, (5, dimension))

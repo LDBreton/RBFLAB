@@ -21,10 +21,10 @@ def make_solution(method_name="global", backend_name="python", local_digits=None
         [sp.Eq(momentum, forcing)],
         boundary=[model.bc("boundary", sp.Eq(U, velocity))],
     )
-    spaces = {
+    spaces = r.MixedSpace({
         U: r.DivergenceFreeSpace(r.IMQ(2), 2),
         p: r.PressureSpace(r.IMQ(2), 1),
-    }
+    })
     if method_name == "global":
         if local_digits is not None:
             raise ValueError("--digits configures LHI local weights; global precision uses global_digits")
@@ -33,8 +33,8 @@ def make_solution(method_name="global", backend_name="python", local_digits=None
         method = r.GlobalCollocation(spaces=spaces)
     else:
         backends = {
-            "python": lambda: r.PythonBackend(compute_condition=False),
-            "cpp": lambda: r.CppBackend(threads=2, compute_condition=False),
+            "python": lambda: r.PythonBackend(),
+            "cpp": lambda: r.CppBackend(threads=2),
         }
         method = r.LHI(spaces=spaces, stencil_size=15,
                        precision=r.Precision(local_digits=local_digits),

@@ -166,7 +166,8 @@ class PatchInterpolant:
                             'occupancy': [len(v) for v in memberships],
                             'factorizations': len(patches), 'components': components,
                             'ordering': 'node-major',
-                            'scaled_conditions':[float(p['factor'].condition) for p in patches]}
+                            'scaled_conditions':[None if p['factor'].condition is None else float(p['factor'].condition)
+                                                 for p in patches]}
 
     def _evaluate(self, points, operator):
         from .methods import _query

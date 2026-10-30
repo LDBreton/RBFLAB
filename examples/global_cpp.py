@@ -20,7 +20,7 @@ def run(*, scheme="symmetric", digits=None, dimension=2, threads=2):
     method = rbf.GlobalCollocation(
         rbf.PHS(5), scheme=scheme, polynomial_degree=2,
         precision=rbf.Precision(global_digits=digits),
-        backend=rbf.CppGlobalBackend(threads=threads, compute_condition=False),
+        backend=rbf.CppGlobalBackend(threads=threads),
     )
     query = np.full((1, dimension), .375)
     truth = model.data(exact)

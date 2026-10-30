@@ -10,23 +10,29 @@ from scipy.spatial import cKDTree
 from scipy.sparse import csr_matrix
 from .nodal import Arithmetic, NodalBasis
 from .operators import Identity, Derivative, Laplacian, bind_operators
-from .spaces import ScalarSpace, DivergenceFreeSpace, PressureSpace
+from .spaces import ScalarSpace, DivergenceFreeSpace, PressureSpace, MixedSpace
 from .stencils import polynomial_powers, geometry_quality
 from .sparse_precision import MPSparseMatrix
 
 
 def resolve_space(method, space=None):
+    declared = method.spaces.field_spaces if isinstance(method.spaces, MixedSpace) else method.spaces
     if method.spaces is None:
         if space is not None: raise ValueError('space requires an RBFFD spaces mapping')
         if method.kernel is None: raise ValueError('Specify kernel or spaces')
         return ScalarSpace(method.kernel, method.polynomial_degree)
     if method.kernel is not None: raise ValueError('Specify kernel or spaces, not both')
-    if not isinstance(method.spaces, Mapping) or not method.spaces:
+    if not isinstance(declared, Mapping) or not declared:
         raise ValueError('spaces must be a nonempty field-to-space mapping')
     if space is None:
-        if len(method.spaces)!=1: raise ValueError('Select a field with space= when multiple spaces are declared')
-        descriptor=next(iter(method.spaces.values()))
-    else: descriptor=method.spaces[space]
+        if len(declared)!=1: raise ValueError('Select a field with space= when multiple spaces are declared')
+        descriptor=next(iter(declared.values()))
+    elif space in declared:
+        descriptor=declared[space]
+    elif isinstance(method.spaces, MixedSpace) and space in method.spaces.spaces:
+        descriptor=method.spaces.spaces[space]
+    else:
+        raise KeyError(space)
     if not isinstance(descriptor, ScalarSpace): raise TypeError('Expected ScalarSpace, PressureSpace or DivergenceFreeSpace')
     return descriptor
 

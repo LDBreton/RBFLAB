@@ -265,7 +265,9 @@ class LHISystem:
         u = self.factor.solve(self.rhs)
         diagnostics = {
             "relative_residual": relative_residual(self.matrix, u, self.rhs),
-            "max_scaled_local_condition": max(s.factor.condition for s in self.stencils),
+            "max_scaled_local_condition": max(
+                (s.factor.condition for s in self.stencils if s.factor.condition is not None),
+                default=None),
             "max_local_weight_residual": max(s.weight_residual for s in self.stencils),
             "unknowns": len(u), "nnz": self.matrix.nnz,
             "max_local_constraints": max(len(s.points) for s in self.stencils),

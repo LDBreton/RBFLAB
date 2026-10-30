@@ -6,7 +6,7 @@ import rbflab as r
 
 def run():
     points=np.array([[0.,0.],[1.,0.],[0.,1.],[1.,1.],[.3,.4]])
-    backend=r.CppGlobalBackend(threads=4,compute_condition=False)
+    backend=r.CppGlobalBackend(threads=4)
     precision=r.Precision(global_digits=60)
     model=r.SymbolicScalar();x,y=model.coordinates
     with r.interpolate(space=r.ScalarSpace(r.PHS(3),1),centers=points,data=model.data(sp.pi*x+y),

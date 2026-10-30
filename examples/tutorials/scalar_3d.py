@@ -24,9 +24,9 @@ def run(cells=3):
     expected = np.sum(cloud.points**2, axis=1)
     error = float(np.max(np.abs(nodal-expected)))
     operators = rbf.RBFFD(
-        spaces={"u": rbf.ScalarSpace(rbf.PHS(5), 2)},
+        spaces=rbf.MixedSpace({"u": rbf.ScalarSpace(rbf.PHS(5), 2)}),
         stencil_size=min(30, len(cloud.points)),
-        local_backend=rbf.PythonBackend(compute_condition=False),
+        local_backend=rbf.PythonBackend(),
     ).operators(source=cloud.points, targets=cloud.interior, space="u",
                 operators={"lap": rbf.Laplacian(3)})
     reproduction = float(np.max(np.abs(operators.lap @ expected - 6)))

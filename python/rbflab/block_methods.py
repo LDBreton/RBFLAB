@@ -240,7 +240,9 @@ class BlockLHISystem:
             'unknowns':len(z),'method':'block_lhi','local_digits':self.local.ctx.dps if self.local.ctx else None,
             'global_digits':a.ctx.dps if a.ctx else None,
             'constraint_multipliers':multipliers,
-            'max_local_condition':max(s['factor'].condition for s in self.stencils)}
+            'max_local_condition':max(
+                (s['factor'].condition for s in self.stencils if s['factor'].condition is not None),
+                default=None)}
         return BlockSolution(self,z,diagnostics)
 
 

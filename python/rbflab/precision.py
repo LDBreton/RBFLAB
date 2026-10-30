@@ -130,7 +130,7 @@ class MPBackend:
 
 class MPFactor:
     """Equilibrated pivoted LU, reused for original and transposed local solves."""
-    def __init__(self, backend, matrix, general=False, compute_condition=True):
+    def __init__(self, backend, matrix, general=False, compute_condition=False):
         self.backend, self.ctx, self.matrix = backend, backend.ctx, matrix
         ctx, n = self.ctx, matrix.rows
         if matrix.rows != matrix.cols or any(not ctx.isfinite(v) for v in matrix):
@@ -207,10 +207,10 @@ class MPFactor:
         return numerator/denominator if denominator else numerator
 
 
-def local_weights(kernel, points, ops, target, target_operator, precision, backend=None, round_weights=True):
+def local_weights(kernel, points, ops, target, target_operator, precision, backend=None, round_weights=True, compute_condition=False):
     backend = backend or MPBackend(kernel, precision.local_digits)
     gram = backend.matrix(points, ops, points, ops)
-    factor = MPFactor(backend, gram)
+    factor = MPFactor(backend, gram, compute_condition=compute_condition)
     q = backend.matrix(target, [target_operator], points, ops).T
     weights_mp = factor.solve(q, transpose=True)
     if not round_weights:
@@ -218,7 +218,7 @@ def local_weights(kernel, points, ops, target, target_operator, precision, backe
         residual=factor.residual(weights_mp,q)
         return factor,None,weights_mp,float(residual),{
             "local_digits":precision.local_digits,"condition_norm":"infinity",
-            "condition_decimal":ctx.nstr(factor.condition_mp,12),
+            "condition_decimal":ctx.nstr(factor.condition_mp,12) if factor.condition_mp is not None else None,
             "local_residual_decimal":ctx.nstr(residual,12),"weights_rounded":False,
         }
     weights = np.array([float(w) for w in weights_mp])
@@ -231,7 +231,7 @@ def local_weights(kernel, points, ops, target, target_operator, precision, backe
     diagnostics = {
         "local_digits": precision.local_digits,
         "condition_norm": "infinity",
-        "condition_decimal": ctx.nstr(factor.condition_mp, 12),
+        "condition_decimal": ctx.nstr(factor.condition_mp, 12) if factor.condition_mp is not None else None,
         "local_residual_decimal": ctx.nstr(factor.residual(weights_mp,q), 12),
         "rounded_weight_residual": float(factor.residual(rounded,q)),
         "relative_weight_rounding": float(delta/denominator if denominator else delta),

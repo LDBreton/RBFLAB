@@ -72,7 +72,7 @@ def main():
 
     domain=geometry.Ellipse(a=1.2,b=.8,labels=("wall",))
     cloud=meshgen.generate(domain,interior=140,boundary=60,seed=42)
-    ops=rbf.RBFFD(rbf.PHS(5),35,polynomial_degree=3,stencil_policy=rbf.StencilPolicy(scaling="local"),local_backend=rbf.PythonBackend(compute_condition=False)).operators(source=cloud.points,operators={"lap":rbf.Laplacian()})
+    ops=rbf.RBFFD(rbf.PHS(5),35,polynomial_degree=3,stencil_policy=rbf.StencilPolicy(scaling="local"),local_backend=rbf.PythonBackend()).operators(source=cloud.points,operators={"lap":rbf.Laplacian()})
     fig,axes=plt.subplots(1,2,figsize=(9,3.6),constrained_layout=True)
     axes[0].scatter(*cloud.interior.T,c=BLUE,s=15,label="140 interior values")
     axes[0].scatter(*cloud.points[cloud.boundary_indices].T,c=ORANGE,s=20,label="60 prescribed wall values")

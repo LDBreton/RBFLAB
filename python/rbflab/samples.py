@@ -21,6 +21,72 @@ def points_array(value, dimension=None, *, empty=False):
 
 
 @dataclass(frozen=True)
+class Stencil:
+    """A fixed nearest-site selection shared by multiple sample groups.
+
+    ``Stencil(points, size=37)`` selects physical sites before groups
+    intersect them with their own points and apply target exclusion. No
+    observations or unknowns are introduced by this geometric object.
+    Coordinates match exactly; missing/excluded sites are not replaced.
+    Selection uses the same nearest-neighbor convention as Samples(size=...).
+    This fixed selection does not grow under a quality stencil policy.
+
+    Alternatively, pass ``indices=memberships`` instead of size: one sequence
+    of distinct point indices per target. Explicit ordering is preserved.
+    """
+    points: object
+    size: int | None = None
+    indices: object = None
+
+    def __post_init__(self):
+        points = points_array(self.points)
+        if self.indices is None:
+            if type(self.size) is not int or not 1 <= self.size <= len(points):
+                raise ValueError('Stencil size must be between 1 and its point count')
+        elif self.size is not None:
+            raise ValueError('Stencil indices cannot be combined with size')
+        else:
+            members = []
+            for row in self.indices:
+                ids = np.asarray(row)
+                if ids.ndim != 1 or (ids.size and not np.issubdtype(ids.dtype, np.integer)):
+                    raise ValueError('Stencil membership rows must contain integer indices')
+                ids = ids.astype(int, copy=True)
+                if len(set(ids)) != len(ids) or np.any(ids < 0) or np.any(ids >= len(points)):
+                    raise ValueError('Invalid or repeated stencil indices')
+                ids.flags.writeable = False
+                members.append(ids)
+            object.__setattr__(self, 'indices', tuple(members))
+        if len(np.unique(points, axis=0)) != len(points):
+            raise ValueError('SharedStencil requires distinct physical sites')
+        points.flags.writeable = False
+        object.__setattr__(self, 'points', points)
+        object.__setattr__(self, '_tree', cKDTree(points))
+
+    def __eq__(self, other):
+        return (isinstance(other, Stencil) and self.size == other.size
+                and np.array_equal(self.points, other.points)
+                and ((self.indices is None and other.indices is None) or
+                     (self.indices is not None and other.indices is not None
+                      and len(self.indices) == len(other.indices)
+                      and all(np.array_equal(a, b) for a, b in zip(self.indices, other.indices)))))
+
+    def select(self, target, row=0):
+        """Return nearest physical-site indices, ordered by distance and index."""
+        if self.indices is not None:
+            if row >= len(self.indices):
+                raise ValueError('One stencil membership row is required per target')
+            return self.indices[row].copy()
+        distance, ids = self._tree.query(target, k=self.size)
+        distance, ids = np.atleast_1d(distance), np.atleast_1d(ids)
+        return ids[np.lexsort((ids, distance))]
+
+
+# Preserve the original public name and isinstance behavior.
+SharedStencil = Stencil
+
+
+@dataclass(frozen=True)
 class Samples:
     """Points carrying values or differential-functional samples.
 
@@ -34,6 +100,10 @@ class Samples:
         policy: Optional geometric neighbor-selection policy for this group.
             Kernel scaling belongs to LocalApproximation instead.
         normals: Normals for normal-dependent boundary operators.
+        within: SharedStencil or name of a source group whose physical sites restrict
+            this group. Uses exact coordinate matching, then target filtering;
+            does not refill excluded sites. Cannot combine with size, indices
+            or policy. The referenced group may appear later in the mapping.
 
     Groups may overlap geometrically when their functionals differ. No PDE
     role, forcing, boundary data, or unknown values are stored here.
@@ -45,10 +115,25 @@ class Samples:
     indices: object = None
     policy: object = None
     normals: object = None
+    within: str | SharedStencil | None = None
 
     def __post_init__(self):
         original = self.points
         p = points_array(original, empty=True)
+        from .field_expressions import FieldExpression, as_expression
+        import sympy as sp
+        if isinstance(self.operator, (sp.Expr, sp.MatrixBase)):
+            object.__setattr__(self, 'operator', as_expression(self.operator))
+        if isinstance(self.operator, FieldExpression):
+            if not self.operator.requires_binding:
+                object.__setattr__(self, 'operator', self.operator.compile(p.shape[1]))
+        if self.within is not None:
+            if not isinstance(self.within, (str, SharedStencil)) or (isinstance(self.within, str) and not self.within):
+                raise ValueError('within must name a sample group or be a SharedStencil')
+            if isinstance(self.within, SharedStencil) and self.within.points.shape[1] != p.shape[1]:
+                raise ValueError('SharedStencil and sample dimensions must agree')
+            if self.size is not None or self.indices is not None or self.policy is not None:
+                raise ValueError('within cannot be combined with size, indices or policy')
         if self.target not in ('allow', 'exclude', 'require'):
             raise ValueError('target must be allow, exclude, or require')
         if self.size is not None and (type(self.size) is not int or self.size < 0):
@@ -75,6 +160,14 @@ class Samples:
             raise ValueError('Provide one operator per sample')
         bound = []
         for i, op in enumerate(ops):
+            from .field_expressions import FieldExpression
+            if isinstance(op, (sp.Expr, sp.MatrixBase)):
+                op = as_expression(op)
+            if isinstance(op, FieldExpression):
+                if op.requires_binding:
+                    bound.append(op)
+                    continue
+                op = op.compile(p.shape[1])
             from .mixed import FieldOperator
             if isinstance(op, FieldOperator):
                 bound.append(op.at_point(p[i], None if normals is None else normals[i]))
@@ -159,7 +252,57 @@ def sample_groups(source, *, size=None):
     dimensions = {g.points.shape[1] for g in groups.values()}
     if len(dimensions) != 1 or not sum(len(g.points) for g in groups.values()):
         raise ValueError('Sample groups need matching dimensions and at least one point')
+    for name in groups:
+        visited = set()
+        current = name
+        while current is not None:
+            if isinstance(current, SharedStencil):
+                break
+            if current not in groups:
+                raise ValueError(f'Unknown within sample group: {current}')
+            if current in visited:
+                raise ValueError('Cyclic within sample groups')
+            visited.add(current)
+            current = groups[current].within
     return groups
+
+
+def restrict_groups(groups, selected, target, row=0):
+    """Resolve shared-site groups after independent selections (or growth)."""
+    shared = {}
+    def resolve(name):
+        group = groups[name]
+        if group.within is None:
+            return selected[name]
+        if isinstance(group.within, SharedStencil):
+            parent = group.within
+            key = id(parent)
+            if key not in shared:
+                shared[key] = parent.select(target, row)
+            parent_ids = shared[key]
+        else:
+            parent_ids = resolve(group.within)
+            parent = groups[group.within]
+        ids, seen = [], set()
+        for j in parent_ids:
+            for i in group._locations.get(tuple(parent.points[j]), ()):
+                if i not in seen and not (group.target == 'exclude'
+                                         and np.array_equal(group.points[i], target)):
+                    ids.append(i)
+                    seen.add(i)
+        if group.target == 'require' and not any(np.array_equal(group.points[i], target) for i in ids):
+            raise ValueError('Required target is absent from selected samples')
+        selected[name] = np.asarray(ids, dtype=int)
+        return selected[name]
+    for name in groups:
+        resolve(name)
+    return {name: selected[name] for name in groups}
+
+
+def select_groups(groups, target, row, policy, degree):
+    selected = {name: group.select(target, row, policy, degree)
+                for name, group in groups.items() if group.within is None}
+    return restrict_groups(groups, selected, target, row)
 
 
 @dataclass(frozen=True)

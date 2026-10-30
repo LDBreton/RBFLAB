@@ -47,7 +47,7 @@ The trial choice is visible, rather than hidden behind a scheme name.
 ```python
 import numpy as np
 import rbflab as rbf
-implementation = rbf.PythonBackend(compute_condition=False)
+implementation = rbf.PythonBackend()
 ```
 
 ```python

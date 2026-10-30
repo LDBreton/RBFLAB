@@ -1,5 +1,62 @@
 # Changelog
 
+## 0.8.0 — unified symbolic fields (unreleased)
+
+- Add readable research comparisons for mixed-LHI Navier–Stokes time schemes:
+  coupled Oseen/Newton, IMEX, rotational, characteristic, and rebuilt Oseen
+  Hermite variants. Keep experimental solvers outside the stable package API
+  and preserve failed pressure-accuracy results in saved comparisons.
+- Simplify the public Navier–Stokes LHI example with shared `Stencil` selection,
+  `u, p = space.fields`, and separate boundary blocks for momentum, pressure
+  recovery and convection. Include nonzero time-dependent boundary data and
+  retain the homogeneous-wall case through `--offset 0`.
+- Accept fields from `SymbolicStokes`, `SymbolicSystem`, and `SymbolicScalar`
+  as `MixedSpace` keys. Preserve the original fields through `.fields` and
+  expose their space bindings through `.field_spaces`; string-key declarations
+  remain compatible.
+- Reuse those fields in local value samples, component expressions, and
+  constant-coefficient linear spatial operators. Bind through the declared
+  space, without a global field registry. Reject undeclared fields, incompatible
+  dimensions, nonlinear terms, and time derivatives in local observations.
+- Accept `MixedSpace` in PDE-level `LHI`, `GlobalCollocation`, and `RBFFD`
+  interfaces while retaining dictionary-based declarations and explicit
+  `FieldOperator` blocks.
+- Migrate documented space declarations and relevant public examples to
+  `MixedSpace`, including the direct 37-point Stokes example with nonzero
+  time-dependent boundary data. Preserve its kernels, augmentation, stencil
+  memberships, and time integration.
+- Add generic scalar/vector binding tests, PDE-adapter regression tests, and
+  Python/C++/MPI parity checks for the unified and existing field syntax.
+
+This source-version change does not publish a package or create a release tag.
+
+## 0.7.0 — field expressions and simpler local assembly (unreleased)
+
+- Add `MixedSpace.fields` and linear field expressions: component indexing,
+  `vector`, `laplacian`, `gradient`, `derivative`, and `dx`/`dy`/`dz`. Expressions
+  compile to the existing `FieldOperator` blocks, which remain supported.
+- Add `Stencil(points, size=...)` and `Stencil(points, indices=memberships)` for
+  shared physical-site selection. Retain `SharedStencil` as a compatibility
+  alias. `Samples(within=...)` accepts a stencil or another source-group name,
+  intersects sites exactly, and applies target exclusion without refilling.
+- Add `LocalApproximation(kernel_scaling="physical")` as the default coordinate
+  scaling interface; accept `"local"` and `None` (physical alias). Preserve
+  `StencilPolicy` compatibility and existing radius/derivative conventions;
+  reject explicitly conflicting scaling settings. Automatic global h-scaling
+  and custom scaling rules are not included.
+- Make condition estimation opt-in for ordinary backend and factorization
+  paths. Use `compute_condition=True` to request it; skipped estimates are
+  `None`. Fix scalar LHI validation and diagnostic summaries accordingly.
+- Add readable public component-operator, Stokes, and Navier-Stokes examples.
+  The direct Stokes example uses 37-point 6/1 mixed LHI, separate interior and
+  boundary samples, and explicit nonzero time-dependent boundary contributions.
+  Remove redundant condition-estimation and physical-scaling settings.
+- Add Python/C++/MPI parity and compatibility tests, update CI coverage and
+  API documentation. Preserve the numerical method; small example runs do not
+  establish fine-grid convergence or long-time stability.
+
+This source-version change does not publish a package or create a release tag.
+
 ## 0.6.0 — mixed local approximation and shared Stokes weights (unreleased)
 
 - Add `MixedSpace` and field-block `FieldOperator` to `LocalApproximation`, with independent source/target arities, named sparse maps, degree-generated scalar/solenoidal polynomial tails, and inspected local algebra.

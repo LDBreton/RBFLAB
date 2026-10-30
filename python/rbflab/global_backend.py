@@ -39,7 +39,7 @@ class CppGlobalBackend:
         mplapack_dir: Explicit installed MPLAPACK MPFR/OpenMP dependency prefix.
     """
     threads: int = 1
-    compute_condition: bool = True
+    compute_condition: bool = False
     cache_dir: object = None
     distribution: str = 'Ubuntu'
     timeout: float = 120.0

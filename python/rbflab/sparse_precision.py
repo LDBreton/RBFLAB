@@ -227,7 +227,9 @@ class MPSparseLHISystem:
             "matrix_nnz":self.matrix.nnz,"factor_nnz":self.factor.factor_nnz,
             "relative_residual":float(residual),"residual_decimal":ctx.nstr(residual,12),
             "max_local_weight_residual":max(s.weight_residual for s in self.stencils),
-            "max_scaled_local_condition":max(s.factor.condition for s in self.stencils),
+            "max_scaled_local_condition":max(
+                (s.factor.condition for s in self.stencils if s.factor.condition is not None),
+                default=None),
             "local_condition_norm":"infinity",
         }
         return MPLHIReferenceSolution(self,u,self.boundary_data,self.forcing,diagnostics)

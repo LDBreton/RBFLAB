@@ -53,8 +53,9 @@ solver into a GPU solver. The documented path is CPU Float64.
 
 ### Check that the new local API is installed
 
-The current source manual targets **RBFLAB 0.6.0**. Mixed-field local maps,
-MPI scheduling and the shared Stokes LU weight path require this source version.
+The current source manual targets **RBFLAB 0.8.0**. Mixed-field local maps,
+MPI scheduling, field expressions, shared stencils and the scaling keyword are
+available in this source version.
 Install the checkout with the same Python interpreter that runs your code:
 
 ```sh
@@ -62,7 +63,7 @@ python -m pip install -e .
 python -c "from rbflab import Samples, LocalApproximation, MixedSpace, FieldOperator, LocalExecution; from importlib.metadata import version; print(version('rbflab'))"
 ```
 
-The 0.6.0 changelog is marked unreleased; installing the released package alone
+The 0.8.0 changelog is marked unreleased; installing the released package alone
 does not imply that these source features are present. Release 0.5 also includes
 breaking research-API cleanup from 0.4. Consult the
 [changelog](https://github.com/LDBreton/RBFLAB/blob/v0.5.0/CHANGELOG.md) when adapting
@@ -194,7 +195,7 @@ space = rbf.ScalarSpace(rbf.PHS(5), polynomial_degree=2)
 source = {"u": rbf.Samples(cloud.points, size=20)}
 local = rbf.LocalApproximation(
     source=source, trial=space.representers(source),
-    backend=rbf.CppBackend(threads=4, compute_condition=False),
+    backend=rbf.CppBackend(threads=4),
     stencil_policy=rbf.StencilPolicy(scaling="local"),
 )
 ops = local.operators(targets=cloud.points, operators={"lap": rbf.Laplacian(2)})
@@ -228,7 +229,7 @@ For scalar stationary dense collocation, select the separate global backend:
 ```python
 method = rbf.GlobalCollocation(
     rbf.PHS(5), scheme="symmetric", polynomial_degree=2,
-    backend=rbf.CppGlobalBackend(threads=4, compute_condition=False),
+    backend=rbf.CppGlobalBackend(threads=4),
     precision=rbf.Precision(global_digits=80),
 )
 ```

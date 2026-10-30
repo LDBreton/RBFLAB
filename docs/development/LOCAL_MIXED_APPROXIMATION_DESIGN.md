@@ -173,7 +173,7 @@ source = {
 local = r.LocalApproximation(
     source=source,
     trial=space.representers(source),
-    backend=r.PythonBackend(compute_condition=False),
+    backend=r.PythonBackend(),
     precision=r.Precision(local_digits=80, global_dtype="float64"),
     stencil_policy=r.StencilPolicy(scaling="physical"),
     polynomial_basis=study_basis,  # proposed explicit basis descriptor below

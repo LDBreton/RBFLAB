@@ -86,6 +86,7 @@ Increasing arithmetic precision cannot recover digits lost in Float64 inputs.
 | `MixedSpace({name: space, ...})` | A direct sum of independently configured scalar/DF field spaces |
 | `FieldOperator({field: operator_block, ...})` | Coupled linear functionals with explicit input/output components |
 | `Samples(points, operator=..., size=...)` | What is sampled and how its local neighborhood is chosen |
+| `Stencil(points, size=37)` | A shared geometric selection of physical sites for several sample groups |
 | `space.representers(source)` | Trial functions made by applying source functionals to the kernel's second argument |
 | `space.translates(points)` | Ordinary kernel translates, independently specified |
 | `local.operators(targets=..., operators=...)` | Evaluate requested functionals of each local approximation |
@@ -149,9 +150,14 @@ request extended precision for a separate SciPy solve. Full extended sparse
 storage uses the supported `global_dtype="mpmath"` path; convert neither matrix
 nor data to Float64 if preserving that arithmetic matters.
 
-`StencilPolicy(scaling="local")` normalizes kernel coordinates. This is separate
-from algebraic equilibration in a local solver. Shape-sensitive kernels change
-meaning under coordinate normalization. See [conditioning](../theory/conditioning.md).
+`LocalApproximation` exposes `kernel_scaling="physical"` by default;
+choose `kernel_scaling="local"` to normalize kernel coordinates. `None` is an
+alias for `"physical"`. `StencilPolicy` remains accepted for compatibility;
+its `scaling` participates in the same policy, and explicitly conflicting
+`kernel_scaling` and `stencil_policy.scaling` values are rejected. This is
+separate from algebraic equilibration in a local solver. Shape-sensitive kernels
+change meaning under coordinate normalization. See
+[conditioning](../theory/conditioning.md).
 The radius convention is route-specific to preserve existing methods:
 single-field `LocalApproximation` measures the maximum distance over selected
 source **and trial** centers from the first selected source center. Mixed
@@ -163,11 +169,13 @@ chain factors are already included in returned weights; do not apply them again.
 
 `Samples.size` selects nearby points independently for each source group.
 `target="allow"`, `"exclude"`, or `"require"` controls coincident-point membership.
-To reproduce a specific paper stencil, supply `indices=[...]`, one row of
-group-local integer indices per target, instead of a size/selection policy.
+To reproduce a specific paper stencil, supply `indices=memberships`,
+one row of group-local integer indices per target, instead
+of a size/selection policy.
 Normal-dependent boundary samples accept `normals=...`; geometry can supply
 these through its labeled boundary data. A per-group `policy` controls selection;
-coordinate scaling belongs to the whole `LocalApproximation`.
+coordinate scaling belongs to the whole `LocalApproximation` through
+`kernel_scaling`.
 
 ## Mixed field Hermite maps
 
@@ -283,7 +291,7 @@ weights, add scheduling on the existing method:
 method = LHI(
     spaces=spaces,
     stencil_size=37,
-    local_backend=CppBackend(threads=1, compute_condition=False),
+    local_backend=CppBackend(threads=1),
     precision=Precision(local_digits=80, global_dtype="float64"),
     execution=LocalExecution(scheduler="mpi", ranks=2),
 )
@@ -299,10 +307,12 @@ stepping stay in Python. Stored equation matrices retain their historical
 component-major velocity ordering; generic local maps retain their documented
 node-major convention through the adapter's explicit row mappings.
 
-With fixed kernel parameters, both Python and the standard C++ LU path accept
-`stencil_policy=StencilPolicy(scaling="local")`, including MPI scheduling of the
-native weights. This preserves Stokes' target-centered radius and physical
-derivative chain factors. It is distinct from supplying full mesh-dependent
+With fixed kernel parameters, Stokes `LHI` accepts
+`stencil_policy=StencilPolicy(scaling="local")` in both Python and the standard
+C++ LU path, including MPI scheduling. Direct `LocalApproximation` exposes the
+same coordinate scaling as `kernel_scaling="local"`. This preserves
+Stokes' target-centered radius and physical derivative chain factors. It is
+distinct from supplying full mesh-dependent
 kernel parameters in physical coordinates: switching the policy while retaining
 the same numeric kernel parameters changes the kernel. Keep `scaling="physical"`
 when reproducing an experiment that already incorporates its full scaling in
@@ -457,3 +467,83 @@ fit = rbflab.interpolate(rbflab.Gaussian(1), mesh.vertices, Y, patches=cover)
 The supports are balls in ambient space. Their boundaries are not clipped to
 the mesh boundary or holes; restrict queries to your physical domain when that
 matters. For either constructor, `n_patches` sets an exact count if supplied.
+## Shared physical stencils
+
+To split observations over different node sets without changing the physical
+stencil, share a geometric selection object:
+
+```python
+stencil = r.Stencil(points, size=37)
+source = {
+    "velocity": r.Samples(interior_points, operator=u, within=stencil),
+    "boundary": r.Samples(boundary_points, operator=u, within=stencil),
+    "momentum": r.Samples(interior_points, operator=momentum,
+                          within=stencil, target="exclude"),
+}
+```
+
+`Stencil` introduces no observations or unknowns (`SharedStencil` is its
+compatibility alias). It selects 37 nearest
+physical sites with the existing nearest-neighbor convention. Each sample
+group intersects those sites with its own points by exact coordinate equality,
+then applies target filtering without refilling. The fixed shared selection
+does not grow under a quality policy. It works with scalar and mixed spaces
+before dispatch to Python, C++ or MPI. Named-group `within="velocity"` remains
+available when another observation group already defines the shared sites.
+
+The complete `examples/stokes_local_approximation.py` demonstrates separate
+boundary blocks and a nonzero time-dependent prescribed velocity:
+`M U_t + A U = M f - B g(t)` and
+`grad(p) = PY U + PB g(t) + PL (f - U_t)`. There is no manual component-column
+selection. MPI constructs the local weights; SciPy advances the global system.
+
+Field expressions can replace explicit component blocks:
+
+```python
+u, p = space.fields
+velocity = u
+momentum = -nu * r.laplacian(u) + r.gradient(p)
+pressure_gradient = r.gradient(p)
+```
+
+These linear expressions compile to `FieldOperator` on the sample geometry.
+The explicit block API remains available. See the complete readable example
+in `examples/stokes_local_approximation.py`.
+
+For componentwise operators, index a vector expression and stack scalar
+outputs. For example, the same momentum can be written as:
+
+```python
+momentum = r.vector(
+    -nu * r.laplacian(u[0]) + r.dx(p),
+    -nu * r.laplacian(u[1]) + r.dy(p),
+)
+```
+
+`r.derivative(expr, axis=0, order=2)` applies a second derivative; nest calls
+for mixed derivatives. `dx`, `dy` and `dz` are coordinate shortcuts. Derivatives
+act componentwise on vector expressions. `vector` accepts scalar expressions
+and can have any positive number of output rows, independent of dimension.
+Indices are nonnegative; axis/index bounds and output-size compatibility are
+checked when geometry supplies the dimension. See
+`examples/component_operators.py` for a complete scalar-field example comparing
+the expression and explicit block syntax, including MPI weights.
+
+Use `Samples(..., within="group_name")` to restrict a sample group to physical
+sites selected by another source group:
+
+```python
+source = {
+    "velocity": r.Samples(points, operator=velocity, size=37),
+    "momentum": r.Samples(interior_points, operator=momentum,
+                          within="velocity", target="exclude"),
+}
+```
+
+This selects 37 velocity sites, intersects them with the momentum group's
+points by exact coordinate equality, and excludes the target. It does not
+refill missing or excluded sites. `within` cannot be combined with `size`,
+`indices`, or a group `policy`. References may appear in either order; missing
+references and cycles are rejected. When a mixed quality-controlled parent
+stencil grows, its dependent groups are refreshed before testing joint rank.
+Selection happens before Python/C++/MPI weight construction.

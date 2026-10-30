@@ -30,10 +30,10 @@ def make_problem(transient):
         )
     else:
         problem = model.stationary([sp.Eq(momentum, forcing)], boundary=boundary)
-    spaces = {
+    spaces = rbf.MixedSpace({
         U: rbf.DivergenceFreeSpace(rbf.IMQ(2), 2),
         p: rbf.PressureSpace(rbf.IMQ(2), 1),
-    }
+    })
     return problem, spaces
 
 

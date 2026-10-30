@@ -51,14 +51,14 @@ def solve(*, cells=16, dt=.00125, end=20., backend="python", frames=60):
     steps = round(end / dt)
     if not np.isclose(steps * dt, end, atol=1e-12, rtol=0):
         raise ValueError("end must be an integer multiple of dt")
-    local = (r.PythonBackend(compute_condition=False) if backend == "python" else
-             r.CppBackend(threads=8, compute_condition=False) if backend == "cpp" else None)
+    local = (r.PythonBackend() if backend == "python" else
+             r.CppBackend(threads=8) if backend == "cpp" else None)
     if local is None:
         raise ValueError("backend must be 'python' or 'cpp'")
     # --8<-- [start:operators]
     velocity, pressure = clouds(cells)
-    rbffd = r.RBFFD(spaces={"u": r.ScalarSpace(r.PHS(7), 3),
-                            "p": r.PressureSpace(r.PHS(7), 3)},
+    rbffd = r.RBFFD(spaces=r.MixedSpace({"u": r.ScalarSpace(r.PHS(7), 3),
+                                         "p": r.PressureSpace(r.PHS(7), 3)}),
                     stencil_size=28, local_backend=local)
     differential = {"dx": r.Derivative(0), "dy": r.Derivative(1),
                     "lap": r.Laplacian()}

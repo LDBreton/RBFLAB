@@ -40,18 +40,18 @@ def run(cells=8, ranks=1, end_time="0.1", backend="cpp", digits=80):
     )
 
     # 3. Full h-scaling, with cbar_p = 1. Here s denotes r**2.
-    q = Fraction(cells, 44)  # q = (1/44)/h, where h = 1/cells
+    q = sp.Rational(cells, 44)  # q = (1/44)/h, where h = 1/cells
     velocity_kernel = r.Hybrid(r.Gaussian(10*q*q), r.PHS(7), q**7)
     s = sp.Symbol("s", nonnegative=True)
     pressure_kernel = r.Kernel(q**4*sp.exp(-q*q*s), s)()
-    spaces = {
+    spaces = r.MixedSpace({
         u: r.DivergenceFreeSpace(velocity_kernel, polynomial_degree=6),
         p: r.PressureSpace(pressure_kernel, polynomial_degree=1),
-    }
+    })
 
     # 4. Assemble once; reuse the same matrices for both time steps.
-    numerical_backend = (r.CppBackend(threads=1, compute_condition=False, timeout=3600)
-                         if backend == "cpp" else r.PythonBackend(compute_condition=False))
+    numerical_backend = (r.CppBackend(threads=1, timeout=3600)
+                         if backend == "cpp" else r.PythonBackend())
     execution = r.LocalExecution(scheduler="mpi", ranks=ranks) if ranks > 1 else None
     method = r.LHI(
         spaces=spaces, stencil_size=37,

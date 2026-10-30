@@ -39,12 +39,14 @@ class MethodContract:
         if operation not in ('assemble','operators','prepare'):raise ValueError('Unknown preflight operation')
         from .methods import GlobalCollocation, LHI
         from .rbf_fd import RBFFD
+        from .spaces import MixedSpace
         name = 'GlobalCollocation' if isinstance(self,GlobalCollocation) else 'RBFFD' if isinstance(self,RBFFD) else 'LHI'
+        field_spaces = self.spaces.field_spaces if isinstance(self.spaces, MixedSpace) else self.spaces
         precision=self.precision
         if not isinstance(precision,Precision):raise TypeError('Expected Precision')
-        if self.kernel is not None and self.spaces is not None:raise ValueError('Specify kernel or spaces, not both')
-        if self.kernel is None and not self.spaces:raise ValueError('Specify kernel or spaces')
-        if self.spaces and self.polynomial_degree not in (None,'auto'):
+        if self.kernel is not None and field_spaces is not None:raise ValueError('Specify kernel or spaces, not both')
+        if self.kernel is None and not field_spaces:raise ValueError('Specify kernel or spaces')
+        if field_spaces and self.polynomial_degree not in (None,'auto'):
             raise ValueError('Specify polynomial degree on spaces, not on both method and spaces')
         flow=isinstance(problem,SpaceStokesProblem);block=isinstance(problem,BlockPDE)
         evolution=isinstance(problem,EvolutionPDE)
@@ -122,7 +124,7 @@ class MethodContract:
                         if g.indices is not None and len(g.indices)!=len(cloud.interior):raise ValueError('One explicit membership row is required per interior target')
             if not flow and backend is not None:
                 if not isinstance(backend,PythonBackend):raise NotImplementedError('Scalar LHI currently supports PythonBackend only')
-                if backend.workers!=1 or not backend.compute_condition:raise NotImplementedError('Scalar LHI currently uses one worker and condition estimation')
+                if backend.workers!=1:raise NotImplementedError('Scalar LHI currently uses one worker')
             if flow:
                 from .space_stokes import select_spaces
                 _,_,vd,pd=select_spaces(self,problem)
@@ -138,17 +140,17 @@ class MethodContract:
         if name!='RBFFD' and not flow and not block:
             from .spaces import ScalarSpace, DivergenceFreeSpace
             from .kernels import resolve_polynomial_degree
-            if self.spaces:
-                if len(self.spaces)!=1:raise ValueError('Scalar problems require one ScalarSpace')
-                descriptor=next(iter(self.spaces.values()))
+            if field_spaces:
+                if len(field_spaces)!=1:raise ValueError('Scalar problems require one ScalarSpace')
+                descriptor=next(iter(field_spaces.values()))
                 if not isinstance(descriptor,ScalarSpace) or isinstance(descriptor,DivergenceFreeSpace):raise TypeError('Scalar problems require ScalarSpace')
                 descriptor.degree()
             else:resolve_polynomial_degree(self.kernel,self.polynomial_degree)
         if block:
             from .spaces import ScalarSpace
-            if not self.spaces or set(self.spaces)!=set(problem.fields):raise ValueError('Block problems require one space for each symbolic field')
-            if any(type(s) is not ScalarSpace for s in self.spaces.values()):raise TypeError('Block fields require ScalarSpace')
-            if len({s.degree() for s in self.spaces.values()})!=1:raise NotImplementedError('Block spaces currently require a common polynomial degree')
+            if not field_spaces or set(field_spaces)!=set(problem.fields):raise ValueError('Block problems require one space for each symbolic field')
+            if any(type(s) is not ScalarSpace for s in field_spaces.values()):raise TypeError('Block fields require ScalarSpace')
+            if len({s.degree() for s in field_spaces.values()})!=1:raise NotImplementedError('Block spaces currently require a common polynomial degree')
             if backend is not None:raise NotImplementedError('Block assembly currently uses its Python implementation; omit local_backend')
         if cloud is not None and problem is not None:
             d=getattr(problem,'dimension',getattr(getattr(problem,'operator',None),'dimension',None))
@@ -158,7 +160,7 @@ class MethodContract:
 def recipe(method,problem=None):
     p=method.precision
     return dict(method=type(method).__name__,scheme=getattr(method,'scheme','Hermite'),
-        kernel=repr(method.kernel),spaces={str(k):repr(v) for k,v in (method.spaces or {}).items()},
+        kernel=repr(method.kernel),spaces={str(k):repr(v) for k,v in getattr(method.spaces,'field_spaces',method.spaces or {}).items()},
         polynomial_degree=method.polynomial_degree,independent_centers=getattr(method,'centers',None) is not None,
         stencil_policy=asdict(method.stencil_policy) if hasattr(method,'stencil_policy') else None,
         local_solver=asdict(method.local_solver) if hasattr(method,'local_solver') else None,

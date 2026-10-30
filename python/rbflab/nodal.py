@@ -38,7 +38,7 @@ class Arithmetic:
             return scaled_matrix(self,x,left,y,right,length_scale)
         return self.backend.matrix(x,left,y,right) if self.ctx else functional_matrix(self.kernel,x,left,y,right)
 
-    def factor(self, matrix, *, compute_condition=True):
+    def factor(self, matrix, *, compute_condition=False):
         return MPFactor(self.backend,matrix,general=True,compute_condition=compute_condition) if self.ctx else Factor(matrix,general=True,compute_condition=compute_condition)
 
     def data(self, data, points):

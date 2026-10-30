@@ -136,7 +136,7 @@ def run(args):
             model,problem,queries,ctx,truth=problem_data(d,args.queries)
             for precision in args.precisions:
                 digits=60 if precision=='mp' else None
-                common=dict(spaces={model.fields[0]:r.DivergenceFreeSpace(r.PHS(7),polynomial_degree=2),model.fields[1]:r.PressureSpace(r.PHS(3),polynomial_degree=1)},precision=r.Precision(global_digits=digits))
+                common=dict(spaces=r.MixedSpace({model.fields[0]:r.DivergenceFreeSpace(r.PHS(7),polynomial_degree=2),model.fields[1]:r.PressureSpace(r.PHS(3),polynomial_degree=1)}),precision=r.Precision(global_digits=digits))
                 methods=dict(python=r.GlobalCollocation(**common),cpp=r.GlobalCollocation(**common,backend=r.CppGlobalBackend(threads=1,compute_condition=False,timeout=1200,cache_dir=Path(args.cache_dir).resolve())))
                 t=time.perf_counter();methods['cpp']=methods['cpp'].prepare(problem,dimension=d)
                 data['preparation'].append(dict(dimension=d,precision=precision,seconds=time.perf_counter()-t))

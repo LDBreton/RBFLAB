@@ -14,7 +14,7 @@ hide:
 <a class="rbf-button" href="tutorials/local-approximation/">Build your operators</a>
 <a class="rbf-button" href="INSTALL/">Install Python or C++</a>
 </div>
-<div class="rbf-install"><code>pip install rbflab</code><span>Python 3.11+ · Open source · Source version 0.6.0</span></div>
+<div class="rbf-install"><code>pip install rbflab</code><span>Python 3.11+ · Open source · Source version 0.8.0</span></div>
 </section>
 
 <figure class="rbf-feature">
@@ -44,7 +44,7 @@ hide:
 
 <h2 id="local-api">From approximation to your algorithm</h2>
 <p>RBFLAB 0.5 makes ordinary RBF-FD and Hermite constructions explicit through <code>LocalApproximation</code>. <a href="tutorials/local-approximation/">Declare source functionals and target operators</a>, then <a href="tutorials/lhi-matrices/">assemble LHI and a heat time loop with sparse matrices</a>. Install or upgrade to <code>rbflab&gt;=0.5</code> to use these interfaces.</p>
-<p>Source version 0.6.0 adds mixed scalar/vector functionals and MPI local weights. Existing Python/C++ LU Stokes LHI now obtains its weights from the same engine. See the <a href="guides/research-api/#existing-stokes-lhi-through-the-common-engine">Stokes weight adapter</a> and <a href="INSTALL/#check-that-the-new-local-api-is-installed">source installation instructions</a>.</p>
+<p>Source version 0.8.0 shares symbolic field declarations between PDE assembly and local approximation. Existing Python/C++ LU Stokes LHI now obtains its weights from the same engine. See the <a href="guides/research-api/#existing-stokes-lhi-through-the-common-engine">Stokes weight adapter</a> and <a href="INSTALL/#check-that-the-new-local-api-is-installed">source installation instructions</a>.</p>
 <figure class="rbf-feature"><a href="guides/research-api/"><img src="assets/local-architecture.svg" alt="Spaces and sampled functionals become local systems, named sparse blocks and user-written algorithms"></a></figure>
 
 <h2 id="methods">One problem, several numerical methods</h2>

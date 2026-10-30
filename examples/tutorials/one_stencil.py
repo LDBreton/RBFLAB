@@ -17,7 +17,7 @@ def run(cells=5, stencil_size=20):
     source = {"u": rbf.Samples(cloud.points, size=min(stencil_size, len(cloud.points)))}
     approximation = rbf.LocalApproximation(
         source=source, trial=space.representers(source),
-        backend=rbf.PythonBackend(compute_condition=False),
+        backend=rbf.PythonBackend(),
     )
     op = approximation.operators(
         targets=target,

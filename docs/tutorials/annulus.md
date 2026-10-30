@@ -26,13 +26,13 @@ problem = m.stationary(sp.Eq(-m.laplacian(u), 0), boundary=[
     m.bc("inner", sp.Eq(u, 0)), m.bc("outer", sp.Eq(u, 1)),
 ])
 method = rbf.RBFFD(rbf.PHS(5), 35, polynomial_degree=3,
-                  local_backend=rbf.CppBackend(threads=4, compute_condition=False),
+                  local_backend=rbf.CppBackend(threads=4),
                   stencil_policy=rbf.StencilPolicy(scaling="local"))
 solution = problem.solve(cloud, method)
 ```
 
-Use `PythonBackend(compute_condition=False)` for a compiler-free run, or
-`TorchBackend(threads=4, compute_condition=False)` with the optional tensor package.
+Use `PythonBackend()` for a compiler-free run, or
+`TorchBackend(threads=4)` with the optional tensor package.
 See [backend setup](../guides/curved-backends.md). The signed PHS5 kernel is
 augmented with all polynomials through degree three; the fixed 35-node stencil
 policy is shared. `scaling="local"` divides kernel distances by the stencil radius

@@ -16,9 +16,10 @@ from .symbolic import SymbolicScalar
 from .symbolic_system import SymbolicSystem
 from .spaces import ScalarSpace, DivergenceFreeSpace, PressureSpace, MixedSpace, SymbolicStokes
 from .mixed import FieldOperator
+from .field_expressions import laplacian, gradient, vector, derivative, dx, dy, dz
 from .mixed_backends import LocalExecution
 from .stencils import StencilPolicy
-from .samples import Samples
+from .samples import Samples, Stencil, SharedStencil
 from .local_approximation import LocalApproximation
 from .centers import CenterGroup
 from .methods import GlobalCollocation, LHI, interpolate
@@ -34,6 +35,10 @@ __all__ = [
     'geometry', 'meshgen', 'PointCloud', 'Precision', 'PrecisionData', 'LocalSolver',
     'IMQ', 'Gaussian', 'PHS', 'Hybrid', 'DivergenceFree', 'Kernel', 'Wendland',
     'Identity', 'Derivative', 'Laplacian', 'NormalDerivative', 'Robin', 'SpatialOperator',
+    'laplacian', 'gradient',
+    'vector', 'derivative', 'dx', 'dy', 'dz',
+    'SharedStencil',
+    'Stencil',
     'LinearPDE', 'BoundaryCondition', 'Dirichlet', 'EvolutionPDE',
     'SymbolicScalar', 'SymbolicSystem', 'SymbolicStokes',
     'ScalarSpace', 'DivergenceFreeSpace', 'PressureSpace', 'MixedSpace', 'FieldOperator', 'StencilPolicy', 'Samples', 'LocalApproximation', 'CenterGroup',

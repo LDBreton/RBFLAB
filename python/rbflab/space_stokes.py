@@ -77,9 +77,10 @@ def boundary_values(problem,cloud,a,time=0):
 
 
 def select_spaces(method,problem):
-    if not isinstance(method.spaces,dict) or set(method.spaces)!=set(problem.model.fields):
+    spaces=getattr(method.spaces,'field_spaces',method.spaces)
+    if not isinstance(spaces,dict) or set(spaces)!=set(problem.model.fields):
         raise ValueError("Supply spaces={velocity: DivergenceFreeSpace(...), pressure: ScalarSpace(...)}")
-    velocity,pressure=(method.spaces[f] for f in problem.model.fields)
+    velocity,pressure=(spaces[f] for f in problem.model.fields)
     if not isinstance(velocity,DivergenceFreeSpace) or not isinstance(pressure,ScalarSpace) or isinstance(pressure,DivergenceFreeSpace):
         raise TypeError("Momentum-only Stokes requires DivergenceFreeSpace velocity and ScalarSpace pressure")
     return velocity,pressure,velocity.degree(),pressure.degree()
@@ -88,15 +89,16 @@ def select_spaces(method,problem):
 def assemble_spaces(method,problem,cloud):
     from .methods import GlobalCollocation
     from .symbolic_system import BlockPDE
+    spaces=getattr(method.spaces,'field_spaces',method.spaces)
     if method.kernel is not None:raise ValueError("Use either kernel or spaces, not both")
     if isinstance(problem,BlockPDE):
         if getattr(method,'legacy_unaugmented_hybrid',False) or getattr(method,'min_boundary_centers',0) or getattr(method,'local_backend',None) is not None:
             raise ValueError("These stencil options require divergence-free Stokes spaces")
         from .block_methods import BlockGlobal,BlockLHI
-        if any(type(s) is not ScalarSpace for s in method.spaces.values()):raise TypeError("Independent scalar block fields require ScalarSpace")
-        degrees={s.degree() for s in method.spaces.values()}
+        if any(type(s) is not ScalarSpace for s in spaces.values()):raise TypeError("Independent scalar block fields require ScalarSpace")
+        degrees={s.degree() for s in spaces.values()}
         if len(degrees)!=1:raise NotImplementedError("Scalar block spaces currently need a common polynomial degree")
-        kernels={f:s.kernel for f,s in method.spaces.items()};degree=degrees.pop()
+        kernels={f:s.kernel for f,s in spaces.items()};degree=degrees.pop()
         target=(BlockGlobal(kernels,degree,method.precision) if isinstance(method,GlobalCollocation) else
                 BlockLHI(kernels,method.stencil_size,degree,method.precision,method.stencil_policy))
         return target.assemble(problem,cloud)

@@ -58,6 +58,58 @@ To inspect a single local weight construction, start with
 for native MPI weights. The simpler two-scalar-field example is
 `python -m examples.mixed_local_maps`.
 
+## Navier-Stokes with explicit local assembly
+
+`examples/navier_stokes_lhi.py` builds the matrices directly with the public
+`LocalApproximation` API and advances the solution with SciPy:
+
+```bash
+python -m examples.navier_stokes_lhi --cells 8 --nu 1 --ranks 2
+```
+
+The example declares `MixedSpace` and unpacks `u, p = space.fields`.
+One `Stencil(points, size=37)` is shared by interior velocity, boundary
+velocity and neighboring momentum samples; momentum excludes the target.
+The mixed maps give `A`, `B`, `SL`, `PY`, `PB` and `PL`, with `M = I - SL`.
+A separate degree-5 divergence-free value reconstruction gives interior
+`Dx`, `Dy` and boundary `Dxb`, `Dyb` blocks on the same 37 sites.
+All vector blocks use node-major ordering. Prescribed boundary data enter
+momentum as `-B @ g(t)`, pressure recovery as `PB @ g(t)`, and convection
+derivatives as `Dx @ U + Dxb @ g(t)` and `Dy @ U + Dyb @ g(t)`.
+
+The example uses 6/1 mixed augmentation, full h-scaled kernels and 80-digit
+native weights with MPI. Backward Euler starts BDF2 with explicitly
+extrapolated numerical convection. Both time steps reach `T=0.1`, and only
+interior-nodal absolute vector RMS and maximum errors are measured. The small
+default mesh illustrates the workflow; it is not a fine-grid accuracy claim.
+Changing viscosity rebuilds the mixed weights. The global SciPy solve is
+serial, and locally divergence-free reconstructions do not impose global
+divergence conformity. The manufactured velocity includes a constant spatial
+offset multiplied by `exp(-t)`, giving nonzero time-dependent boundary data.
+Use `--offset 0` to recover homogeneous walls. This example does not implement
+the cavity wall and corner treatment.
+
+The 81-node viscosity-1 example with the default offset completed both time
+steps with velocity RMS about 0.009930 and pressure-gradient RMS about 0.6587.
+The previous homogeneous-wall case gave about 0.01025 and 0.6585 respectively.
+A viscosity-0.1 homogeneous-wall trial on this coarse mesh became nonfinite
+at step 109 with `dt=0.00025`; do not use
+that configuration as a stable baseline. Fine-grid results require separate
+runs and are not inferred from this example.
+
+??? example "Complete local Navier-Stokes script"
+
+    ```python
+    --8<-- "examples/navier_stokes_lhi.py"
+    ```
+
+For readable research implementations of alternative Navier–Stokes time schemes,
+see `research/navier_stokes_schemes/README.md` in the repository. The comparison
+includes coupled Oseen/Newton BDF2, midpoint and ARS IMEX variants, rotational
+convection, characteristics, and an experimental rebuilt Oseen Hermite closure.
+These are research drivers, not additional stable package solver APIs. Their
+coarse verification runs must not be confused with the fine-grid baseline.
+
 ## Native global fields
 
 For the local Stokes method in source version 0.6.0, see
@@ -84,9 +136,9 @@ import rbflab as rbf
 
 problem, spaces = make_problem(transient=False)
 method = rbf.GlobalCollocation(
-    spaces=spaces,
+    spaces=rbf.MixedSpace(spaces),
     precision=rbf.Precision(global_digits=60),  # omit global_digits for double
-    backend=rbf.CppGlobalBackend(threads=2, compute_condition=False),
+    backend=rbf.CppGlobalBackend(threads=2),
 )
 cloud = rbf.geometry.unit_box_grid(4)
 with method.assemble(problem, cloud) as system:
@@ -124,8 +176,8 @@ For unsteady Stokes, use `make_problem(transient=True)` and the same backend:
 ```python
 problem, spaces = make_problem(transient=True)
 method = rbf.GlobalCollocation(
-    spaces=spaces,
-    backend=rbf.CppGlobalBackend(threads=2, compute_condition=False),
+    spaces=rbf.MixedSpace(spaces),
+    backend=rbf.CppGlobalBackend(threads=2),
 )
 with method.assemble(problem, cloud) as system:
     trajectory = system.solve(dt="0.01", steps=100, scheme="bdf2")

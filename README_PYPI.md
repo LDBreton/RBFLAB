@@ -89,7 +89,11 @@ loop. Existing PDE convenience interfaces remain available.
 These interfaces are included in **RBFLAB 0.5.0**. Upgrade with
 `python -m pip install --upgrade "rbflab>=0.5"`.
 
-The **0.6.0 source version** adds `MixedSpace`, coupled `FieldOperator` maps,
+Version 0.8.0 unifies symbolic field declarations across PDE assembly and
+`LocalApproximation`, retaining field expressions, shared `Stencil` selection,
+and opt-in condition estimation.
+
+The **0.8.0 source version** includes `MixedSpace`, coupled `FieldOperator` maps,
 native mixed weights and MPI scheduling through `LocalExecution`. Existing
 Python/C++ LU Stokes LHI now uses `LocalApproximation` for its weights while
 preserving compact matrices and pressure-gradient reconstruction. This source
@@ -105,11 +109,12 @@ omitted as the gauge):
 
 ```python
 model = rbf.SymbolicStokes(2)
-spaces = {
-    model.velocity: rbf.DivergenceFreeSpace(rbf.PHS(5), polynomial_degree=0),
-    model.pressure: rbf.PressureSpace(rbf.PHS(5), polynomial_degree=None),
-}
-method = rbf.GlobalCollocation(spaces=spaces)  # Python assembly
+u, p = model.fields
+space = rbf.MixedSpace({
+    u: rbf.DivergenceFreeSpace(rbf.PHS(5), polynomial_degree=0),
+    p: rbf.PressureSpace(rbf.PHS(5), polynomial_degree=None),
+})
+method = rbf.GlobalCollocation(spaces=space)  # Python assembly
 # C++ MPFR: add backend=rbf.CppGlobalBackend(...) and
 # precision=rbf.Precision(global_digits=...) to GlobalCollocation.
 ```

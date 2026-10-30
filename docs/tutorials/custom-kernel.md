@@ -77,7 +77,7 @@ in this example, although this family does not declare them as mandatory.
 For a derivative map, select a local backend and the operators:
 
 ```python
-local = rbf.PythonBackend(compute_condition=False)
+local = rbf.PythonBackend()
 ```
 
 ```python

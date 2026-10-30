@@ -197,7 +197,7 @@ class PythonBackend(BackendSettings):
 
     Numerical policies are specified on the method and StencilPolicy."""
     workers: int = 1
-    compute_condition: bool = True
+    compute_condition: bool = False
     def __post_init__(self):
         if self.shape_rule not in ('fixed','hardy','radius_scaled','separation_scaled'):raise ValueError('Unknown shape rule')
         if type(self.workers) is not int or self.workers<1:raise ValueError('workers must be a positive integer')
@@ -223,7 +223,7 @@ class CppBackend(BackendSettings):
 
     Use LocalSolver on the method to select local factorization."""
     threads: int = 1
-    compute_condition: bool = True
+    compute_condition: bool = False
     executable: str | None = None
     distribution: str = 'Ubuntu'
     timeout: float = 300

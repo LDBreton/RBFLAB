@@ -40,7 +40,7 @@ def functional_matrix(kernel, x, left, y, right):
 
 class Factor:
     """Diagonal equilibration; no jitter, pseudoinverse or silent regularization."""
-    def __init__(self, matrix, general=False, compute_condition=True):
+    def __init__(self, matrix, general=False, compute_condition=False):
         self.matrix = np.asarray(matrix, dtype=float)
         if self.matrix.ndim != 2 or self.matrix.shape[0] != self.matrix.shape[1] or not np.isfinite(self.matrix).all():
             raise ValueError("Expected a finite square matrix")

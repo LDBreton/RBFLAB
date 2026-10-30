@@ -38,7 +38,7 @@ def rbf_fd_laplacian(cloud, stencil_size=20):
     source = {"temperature": rbf.Samples(cloud.points, size=min(stencil_size, len(cloud.points)))}
     approximation = rbf.LocalApproximation(
         source=source, trial=space.representers(source),
-        backend=rbf.PythonBackend(compute_condition=False),
+        backend=rbf.PythonBackend(),
     )
     ops = approximation.operators(
         targets=cloud.points,

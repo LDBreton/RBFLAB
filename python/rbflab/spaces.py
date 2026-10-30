@@ -77,20 +77,109 @@ class MixedSpace:
     """
     spaces: object
 
+    @property
+    def fields(self):
+        """Original symbolic fields, or named expressions for string-keyed spaces."""
+        from .field_expressions import FieldExpression
+        return tuple(FieldExpression('field', (name,), isinstance(self.spaces[name], DivergenceFreeSpace))
+                     if isinstance(key, str) else key for key, name in self._field_names)
+
+    @property
+    def field_spaces(self):
+        """Field-to-space mapping retaining the user's original declaration keys."""
+        return {key: self.spaces[name] for key, name in self._field_names}
+
     def __post_init__(self):
         from collections.abc import Mapping
         import copy
         if not isinstance(self.spaces, Mapping) or not self.spaces:
             raise ValueError('MixedSpace requires a nonempty field-to-space mapping')
-        fields = {}
-        for name, space in self.spaces.items():
-            if not isinstance(name, str) or not name:
-                raise ValueError('Field names must be nonempty strings')
+        fields, names, atoms = {}, [], set()
+        for key, space in self.spaces.items():
+            if isinstance(key, str):
+                if not key:
+                    raise ValueError('Field names must be nonempty strings')
+                name = key
+            else:
+                components = tuple(key) if isinstance(key, sp.MatrixBase) else (key,)
+                if (not components or any(not isinstance(c, AppliedUndef) for c in components)
+                        or (isinstance(key, sp.MatrixBase) and key.cols != 1)):
+                    raise TypeError('MixedSpace keys must be names or declared symbolic fields')
+                if atoms.intersection(components) or len(set(components)) != len(components):
+                    raise ValueError('Symbolic field components must be distinct')
+                atoms.update(components)
+                name = str(components[0].func)
+                if isinstance(key, sp.MatrixBase):
+                    name = name.rsplit('_', 1)[0] if name.endswith('_0') else f'field_{len(names)}'
+                if isinstance(key, sp.MatrixBase) != isinstance(space, DivergenceFreeSpace):
+                    raise ValueError('Symbolic field shape must match its scalar or vector space')
+                if any(c.args != components[0].args for c in components):
+                    raise ValueError('Field components must share coordinates')
+            if name in fields:
+                raise ValueError(f'Duplicate normalized field name: {name}')
             if not isinstance(space, ScalarSpace):
                 raise TypeError('Mixed fields require ScalarSpace or DivergenceFreeSpace')
             space.degree()
             fields[name] = copy.deepcopy(space)
+            names.append((key, name))
         object.__setattr__(self, 'spaces', fields)
+        object.__setattr__(self, '_field_names', tuple(names))
+
+    def _symbolic_operator(self, expression, dimension):
+        """Compile a constant-coefficient spatial functional of declared fields."""
+        from .mixed import FieldOperator
+        from .operators import Operator
+        declared, coordinates = {}, None
+        for key, name in self._field_names:
+            if isinstance(key, str):
+                continue
+            components = tuple(key) if isinstance(key, sp.MatrixBase) else (key,)
+            spatial = tuple(arg for arg in components[0].args if getattr(arg, 'name', None) != 't')
+            if len(spatial) != dimension or any(not isinstance(x, sp.Symbol) for x in spatial):
+                raise ValueError('Symbolic field and geometry dimensions must agree')
+            if coordinates is not None and coordinates != spatial:
+                raise ValueError('Symbolic fields must share spatial coordinates')
+            coordinates = spatial
+            if isinstance(key, sp.MatrixBase) and len(components) != dimension:
+                raise ValueError('Vector field dimension must match geometry')
+            for i, component in enumerate(components):
+                declared[component] = (name, i, len(components))
+        if not declared:
+            raise ValueError('Symbolic observations require symbolic keys in MixedSpace')
+        values = tuple(expression) if isinstance(expression, sp.MatrixBase) else (expression,)
+        blocks = {}
+        for row, value in enumerate(values):
+            value = sp.expand(value.doit())
+            if value.atoms(AppliedUndef) - set(declared):
+                raise ValueError('Local expression contains undeclared fields')
+            derivatives = tuple(sorted(value.atoms(sp.Derivative), key=sp.default_sort_key))
+            slots = tuple(declared) + derivatives
+            placeholders = tuple(sp.Dummy() for _ in slots)
+            replaced = value.xreplace(dict(zip(slots, placeholders)))
+            coefficients = [sp.diff(replaced, z) for z in placeholders]
+            if any(c.has(*placeholders) for c in coefficients) or sp.simplify(replaced-sum(c*z for c,z in zip(coefficients,placeholders))) != 0:
+                raise ValueError('Local observations must be homogeneous linear spatial functionals')
+            for slot, coefficient in zip(slots, coefficients):
+                if coefficient == 0:
+                    continue
+                alpha = [0]*dimension
+                base = slot
+                if isinstance(slot, sp.Derivative):
+                    base = slot.expr
+                    if base not in declared:
+                        raise ValueError('Unsupported local field derivative')
+                    for variable, order in slot.variable_count:
+                        if variable not in coordinates:
+                            raise ValueError('Local observations support spatial derivatives only')
+                        alpha[coordinates.index(variable)] += int(order)
+                name, component, width = declared[base]
+                block = blocks.setdefault(name, [[0]*width for _ in values])
+                block[row][component] = block[row][component] + Operator(((tuple(alpha), coefficient),), dimension)
+        if not blocks:
+            # Keep a valid input layout for an identically zero functional.
+            name, _, width = next(iter(declared.values()))
+            blocks[name] = [[0]*width for _ in values]
+        return FieldOperator(blocks)
 
     def representers(self, source):
         """Apply whole mixed sample functionals to the block kernel."""

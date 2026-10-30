@@ -18,7 +18,7 @@ import numpy as np
 import scipy.sparse as sparse
 from scipy.sparse.linalg import spsolve, splu
 import rbflab as rbf
-implementation = rbf.PythonBackend(compute_condition=False)
+implementation = rbf.PythonBackend()
 ```
 
 ```python

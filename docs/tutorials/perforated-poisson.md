@@ -56,7 +56,7 @@ problem = model.stationary(
 method = rbf.RBFFD(
     rbf.PHS(5), 35, polynomial_degree=3,
     stencil_policy=rbf.StencilPolicy(scaling="local"),
-    local_backend=rbf.PythonBackend(compute_condition=False),
+    local_backend=rbf.PythonBackend(),
 )
 solution = problem.solve(cloud, method)
 ```

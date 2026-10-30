@@ -5,12 +5,12 @@ named sparse maps. It does not assign PDE roles, impose equations, or choose
 time integration. Python, C++, and Torch consume the same local requests.
 """
 from collections.abc import Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from types import SimpleNamespace
 import copy
 import numpy as np
 from scipy.sparse import csr_matrix
-from .samples import Samples, KernelTrial, sample_groups, points_array
+from .samples import Samples, Stencil, KernelTrial, sample_groups, points_array, select_groups
 from .spaces import ScalarSpace, DivergenceFreeSpace, PressureSpace, MixedSpace
 from .operators import Identity, bind_operators
 from .precision import Precision
@@ -227,6 +227,15 @@ class FunctionalOperator(SampleMap, Mapping):
             source_indices=o.indices[i].copy(), groups=copy.deepcopy(o.memberships[i]))
 
 
+class _DefaultScaling(str):
+    """Distinguish omitted physical default from an explicitly supplied value."""
+    def __deepcopy__(self, memo):
+        return self
+
+
+_DEFAULT_SCALING = _DefaultScaling('physical')
+
+
 @dataclass
 class LocalApproximation:
     """Construct functional interpolation weights and named sparse maps.
@@ -240,7 +249,11 @@ class LocalApproximation:
             Named Samples own their sizes; None means all eligible points.
         backend: PythonBackend, CppBackend or TorchBackend.
         precision: Local arithmetic and sparse storage policy.
-        stencil_policy: Default selection and common kernel scaling.
+        stencil_policy: Compatibility selection/scaling policy. Its scaling is
+            used when kernel_scaling is omitted; explicit conflicts are errors.
+        kernel_scaling: "physical" (default, also None) or "local". This only
+            selects the existing kernel-coordinate scaling convention; it does
+            not rescale parameters automatically with global mesh spacing.
         local_solver: Local factorization (currently LU).
         execution: Optional LocalExecution for mixed native jobs (serial/MPI
             scheduling and exact request reuse). Other routes reject it.
@@ -256,11 +269,25 @@ class LocalApproximation:
     stencil_size: int | None = 15
     backend: object = field(default_factory=PythonBackend)
     precision: Precision = field(default_factory=Precision)
-    stencil_policy: StencilPolicy = field(default_factory=StencilPolicy)
+    stencil_policy: StencilPolicy | None = None
     local_solver: LocalSolver = field(default_factory=LocalSolver)
     execution: object = None
+    kernel_scaling: str | None = _DEFAULT_SCALING
 
     def __post_init__(self):
+        policy = self.stencil_policy
+        if policy is not None and not isinstance(policy, StencilPolicy):
+            raise TypeError('Expected StencilPolicy')
+        if self.kernel_scaling is _DEFAULT_SCALING:
+            scaling = policy.scaling if policy is not None else 'physical'
+        else:
+            scaling = 'physical' if self.kernel_scaling is None else self.kernel_scaling
+            if scaling not in ('physical', 'local'):
+                raise ValueError('kernel_scaling must be physical, local, or None')
+            if policy is not None and policy.scaling != scaling:
+                raise ValueError('kernel_scaling conflicts with stencil_policy.scaling')
+        self.kernel_scaling = scaling
+        self.stencil_policy = replace(policy, scaling=scaling) if policy is not None else StencilPolicy(scaling=scaling)
         if isinstance(self.space, MixedSpace) or isinstance(getattr(self.trial, 'space', None), MixedSpace):
             from .mixed_local import initialize
             initialize(self)
@@ -364,6 +391,8 @@ class LocalApproximation:
                                       column_slice=slice(offset*c, (offset+len(group.points))*c))
             offset += len(group.points)
         for g in list(self.source.values()) + list(self.trial.source.values()):
+            if isinstance(g.within, Stencil) and g.within.indices is not None and len(g.within.indices) != len(query):
+                raise ValueError('One stencil membership row is required per target')
             if g.indices is not None and len(g.indices) != len(query):
                 raise ValueError('One membership row is required per target')
         target_ops = {name: Samples(targets, operator=op)._operators for name, op in operators.items()}
@@ -371,11 +400,11 @@ class LocalApproximation:
             # Geometric screening of separate derivative groups is not a test
             # of functional unisolvency. Check the assembled polynomial blocks.
             geometric_degree = degree if len(self.source) == 1 and all(op == Identity(d) for op in next(iter(self.source.values()))._operators) else 0
-            ids = {name: g.select(target, row, self.stencil_policy, geometric_degree) for name, g in self.source.items()}
+            ids = select_groups(self.source, target, row, self.stencil_policy, geometric_degree)
             if self._linked:
                 trial_ids = dict(zip(self.trial.source, ids.values()))
             else:
-                trial_ids = {name: g.select(target, row, self.stencil_policy, 0) for name, g in self.trial.source.items()}
+                trial_ids = select_groups(self.trial.source, target, row, self.stencil_policy, 0)
             x, left = _flat(self.source, ids)
             z, right = _flat(self.trial.source, trial_ids, translates=self.trial.kind == 'translates')
             if not len(x) or len(x) != len(z):

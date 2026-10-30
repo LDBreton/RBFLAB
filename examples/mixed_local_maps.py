@@ -27,8 +27,8 @@ def run(backend='python', digits=None, ranks=0):
     source = {'total': r.Samples(points, operator=total),
               'contrast': r.Samples(points, operator=contrast)}
     execution = r.LocalExecution(scheduler='mpi', ranks=ranks) if ranks else None
-    numerical_backend = (r.CppBackend(threads=1, compute_condition=False)
-                         if backend == 'cpp' else r.PythonBackend(compute_condition=False))
+    numerical_backend = (r.CppBackend(threads=1)
+                         if backend == 'cpp' else r.PythonBackend())
     # 3. Build the common Hermite approximation.
     local = r.LocalApproximation(
         source=source, trial=space.representers(source),

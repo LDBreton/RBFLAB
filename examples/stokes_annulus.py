@@ -23,8 +23,8 @@ def run(interior=70, seed=42, plot=None):
     momentum=-model.laplacian(U)+model.gradient(p)
     problem=model.stationary([sp.Eq(momentum,sp.zeros(2,1))],
         boundary=[model.bc("boundary",sp.Eq(U,velocity))])
-    method=rbf.GlobalCollocation(spaces={U:rbf.DivergenceFreeSpace(rbf.IMQ(3),2),
-                                         p:rbf.PressureSpace(rbf.IMQ(3),1)})
+    method=rbf.GlobalCollocation(spaces=rbf.MixedSpace({U:rbf.DivergenceFreeSpace(rbf.IMQ(3),2),
+                                                        p:rbf.PressureSpace(rbf.IMQ(3),1)}))
     solution,timing=solve(problem,cloud,method)
     query=meshgen.generate(domain,interior=100,boundary=36,seed=981).interior
     def exact(q):

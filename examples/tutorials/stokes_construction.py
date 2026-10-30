@@ -26,8 +26,8 @@ def run(plot=None):
     ])
     # --8<-- [end:boundary]
     # --8<-- [start:spaces]
-    spaces = {U: rbf.DivergenceFreeSpace(rbf.IMQ(3), 2),
-              p: rbf.PressureSpace(rbf.IMQ(3), 1)}
+    spaces = rbf.MixedSpace({U: rbf.DivergenceFreeSpace(rbf.IMQ(3), 2),
+                             p: rbf.PressureSpace(rbf.IMQ(3), 1)})
     method = rbf.GlobalCollocation(spaces=spaces)
     system = method.assemble(problem, cloud)
     solution = system.solve()

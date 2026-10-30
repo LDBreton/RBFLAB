@@ -17,7 +17,7 @@ def run(backend="python"):
     I, B = cloud.interior_indices, cloud.boundary_indices
     # --8<-- [end:cloud]
     local = {"python": rbf.PythonBackend, "cpp": rbf.CppBackend,
-             "torch": rbf.TorchBackend}[backend](compute_condition=False)
+             "torch": rbf.TorchBackend}[backend]()
     # --8<-- [start:operators]
     space = rbf.ScalarSpace(rbf.PHS(5), polynomial_degree=3)
     source = {"u": rbf.Samples(X, size=35)}

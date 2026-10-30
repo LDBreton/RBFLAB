@@ -17,7 +17,7 @@ class MPGlobalSystem:
         self.rhs=ctx.matrix(mp_values(problem.rhs,cloud.points[ii],ctx)+
                             [bd[int(j)][1] for j in bi])
         self.matrix=self.backend.matrix(self.centers,self.operators,self.centers,self.operators)
-        self.factor=MPFactor(self.backend,self.matrix)
+        self.factor=MPFactor(self.backend,self.matrix,compute_condition=True)
 
     def solve(self):
         coefficients=self.factor.solve(self.rhs)
@@ -90,7 +90,7 @@ def solve_lhi_reference(system, weight_source="unrounded", rounded_system=False,
     if rounded_system:
         a=ctx.matrix(system.matrix.toarray().tolist())
         rhs=ctx.matrix(system.rhs.tolist())
-    factor=MPFactor(backend,a)
+    factor=MPFactor(backend,a,compute_condition=True)
     u=factor.solve(rhs)
     residual=factor.residual(u,rhs,transpose=False)
     diagnostics={"global_digits":ctx.dps,"weight_source":weight_source,

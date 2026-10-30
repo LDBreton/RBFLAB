@@ -36,7 +36,7 @@ The sparsity plot identifies which source values contribute at each target.
 ## 2. Construct reusable differential maps
 
 ```python
-local = rbf.PythonBackend(compute_condition=False)
+local = rbf.PythonBackend()
 ```
 
 ```python

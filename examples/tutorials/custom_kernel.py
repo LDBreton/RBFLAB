@@ -45,7 +45,7 @@ def run(backend="python", compile_kernel=False):
     predicted = interpolant.evaluate(query)
     # --8<-- [end:interpolation]
     local = {"python": rbf.PythonBackend, "cpp": rbf.CppBackend,
-             "torch": rbf.TorchBackend}[backend](compute_condition=False)
+             "torch": rbf.TorchBackend}[backend]()
     # --8<-- [start:operators]
     space = rbf.ScalarSpace(kernel, polynomial_degree=2)
     source = {"u": rbf.Samples(centers, size=20)}

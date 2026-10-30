@@ -5,10 +5,10 @@ from .assembly import relative_residual
 from .precision import mp_number
 
 
-def augmented_local_weights(arithmetic,points,operators,target,target_operator,degree,round_weights=True,kernel_scaling="physical"):
+def augmented_local_weights(arithmetic,points,operators,target,target_operator,degree,round_weights=True,kernel_scaling="physical",compute_condition=False):
     basis=NodalBasis(arithmetic,points,degree,source_operators=operators,kernel_scaling=kernel_scaling)
     matrix=basis.system_matrix(points,operators)
-    factor=arithmetic.factor(matrix)
+    factor=arithmetic.factor(matrix,compute_condition=compute_condition)
     q=basis.evaluation(target,[target_operator]).T
     n=len(points)
     if arithmetic.ctx:
@@ -22,7 +22,7 @@ def augmented_local_weights(arithmetic,points,operators,target,target_operator,d
                 rounded[i]=mp_number(ctx,float(complete[i]))
         physical_norm=ctx.norm(ctx.matrix(wmp),"inf")
         diagnostics={"local_digits":ctx.dps,"condition_norm":"infinity",
-            "condition_decimal":ctx.nstr(factor.condition_mp,12),
+            "condition_decimal":ctx.nstr(factor.condition_mp,12) if factor.condition_mp is not None else None,
             "local_residual_decimal":ctx.nstr(residual,12),
             "weights_rounded":round_weights,
             "rounded_weight_residual":float(factor.residual(rounded,q)),

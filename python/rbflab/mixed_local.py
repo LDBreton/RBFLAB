@@ -6,12 +6,13 @@ No PDE, forcing, gauge or equation assembly is assigned here.
 from collections.abc import Mapping
 from types import SimpleNamespace
 import copy
+from dataclasses import replace
 from math import factorial
 import numpy as np
 from scipy.sparse import csr_matrix
 from .mixed import FieldOperator
 from .spaces import MixedSpace, DivergenceFreeSpace, PressureSpace
-from .samples import Samples, KernelTrial, sample_groups, points_array
+from .samples import Samples, Stencil, KernelTrial, sample_groups, points_array, restrict_groups
 from .nodal import Arithmetic
 from .operators import Derivative, Laplacian
 from .stencils import polynomial_powers, geometry_quality
@@ -32,6 +33,24 @@ def initialize(local):
     if trial.kind != 'representers':
         raise NotImplementedError('Mixed local approximation currently supports representers only')
     source = sample_groups(local.source)
+    def bind(groups):
+        from .field_expressions import FieldExpression, as_expression
+        import sympy as sp
+        result = {}
+        for name, group in groups.items():
+            def compile_op(op):
+                if isinstance(op, (sp.Expr, sp.MatrixBase)):
+                    op = as_expression(op)
+                return op.compile(group.points.shape[1], trial.space._symbolic_operator) if isinstance(op, FieldExpression) else op
+            op = group.operator
+            if isinstance(op, (list, tuple)):
+                op = [compile_op(item) for item in op]
+            else:
+                op = compile_op(op)
+            result[name] = replace(group, operator=op)
+        return result
+    source = bind(source)
+    trial = KernelTrial(trial.space, bind(trial.source), trial.kind)
     linked = list(source) == list(trial.source) and all(source[k] is trial.source[k] for k in source)
     if not linked:
         # Equal mathematical observations are accepted, but arbitrary mixed
@@ -41,6 +60,7 @@ def initialize(local):
             or source[k]._operators != trial.source[k]._operators
             or source[k].size != trial.source[k].size
             or source[k].target != trial.source[k].target
+            or source[k].within != trial.source[k].within
             or source[k].policy != trial.source[k].policy
             or repr(source[k].indices) != repr(trial.source[k].indices)
             for k in source):
@@ -272,6 +292,8 @@ def _select_joint(local, target, index, fields, layout, columns, arithmetic):
     from .local_approximation import _rank
     selected, controlled, candidates = {}, {}, {}
     for name, group in local.source.items():
+        if group.within is not None:
+            continue
         policy = group.policy or local.stencil_policy
         if policy.selection != 'quality' or group.indices is not None:
             selected[name] = group.select(target, index, local.stencil_policy, 0)
@@ -302,6 +324,7 @@ def _select_joint(local, target, index, fields, layout, columns, arithmetic):
     threshold = max((policy.min_polynomial_ratio for policy in controlled.values()), default=0.)
     sqrt = arithmetic.ctx.sqrt if arithmetic.ctx else np.sqrt
     while True:
+        restrict_groups(local.source, selected, target, index)
         points, rows, global_ids = _flatten(local.source, selected, fields, layout)
         if not len(rows):
             raise ValueError('Each local system needs nonzero source and trial functional counts')
@@ -343,6 +366,13 @@ def operators(local, targets, operators):
     preflight(local)
     if not isinstance(operators, Mapping) or not operators or any(not isinstance(k, str) or not k for k in operators):
         raise ValueError('operators must be a nonempty named mapping')
+    from .field_expressions import FieldExpression, as_expression
+    import sympy as sp
+    dimension = next(iter(local.source.values())).points.shape[1]
+    operators = {name: as_expression(op) if isinstance(op, (sp.Expr, sp.MatrixBase)) else op
+                 for name, op in operators.items()}
+    operators = {name: op.compile(dimension, local.trial.space._symbolic_operator) if isinstance(op, FieldExpression) else op
+                 for name, op in operators.items()}
     if any(not isinstance(op, FieldOperator) for op in operators.values()):
         raise ValueError('Mixed targets require explicit FieldOperator field binding')
     d = next(iter(local.source.values())).points.shape[1]
@@ -351,6 +381,8 @@ def operators(local, targets, operators):
     layout, offset = {}, 0
     for name, group in local.source.items():
         arity = (group._operators[0] if group._operators else group.operator).arity
+        if isinstance(group.within, Stencil) and group.within.indices is not None and len(group.within.indices) != len(query):
+            raise ValueError('One stencil membership row is required per target')
         layout[name] = dict(points=group.points.copy(), components=arity, arity=arity,
                             column_slice=slice(offset, offset+len(group.points)*arity), ordering='node-major')
         offset += len(group.points)*arity

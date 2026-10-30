@@ -19,9 +19,9 @@ def run(digits=None,cells=4,steps=10,dt='0.01',power=9):
     problem=model.evolution([sp.Eq(sp.diff(U,t)-model.laplacian(U)+model.gradient(p),forcing)],
         initial={U:velocity.subs(t,0)},boundary=[model.bc('boundary',sp.Eq(U,velocity))])
     hybrid=lambda k:rbf.Hybrid(rbf.IMQ(1),rbf.PHS(k),1)
-    method=rbf.GlobalCollocation(spaces={U:rbf.DivergenceFreeSpace(hybrid(power)),
-        p:rbf.PressureSpace(hybrid(power-4))},precision=rbf.Precision(global_digits=digits),
-        backend=rbf.CppGlobalBackend(threads=2,compute_condition=False))
+    method=rbf.GlobalCollocation(spaces=rbf.MixedSpace({U:rbf.DivergenceFreeSpace(hybrid(power)),
+        p:rbf.PressureSpace(hybrid(power-4))}),precision=rbf.Precision(global_digits=digits),
+        backend=rbf.CppGlobalBackend(threads=2))
     query=np.array([[.3,.4],[.7,.2],[.5,.6]])
     with method.assemble(problem,rbf.geometry.unit_box_grid(cells)) as system:
         trajectory=system.solve(dt=dt,steps=steps,scheme='bdf2')

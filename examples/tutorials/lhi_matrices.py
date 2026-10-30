@@ -8,7 +8,7 @@ import rbflab as rbf
 
 def run(backend="python", steps=5, dt=.001):
     implementation = {"python": rbf.PythonBackend, "cpp": rbf.CppBackend,
-                      "torch": rbf.TorchBackend}[backend](compute_condition=False)
+                      "torch": rbf.TorchBackend}[backend]()
     # --8<-- [start:cloud]
     cloud = rbf.geometry.unit_box_grid(6)
     Xu = cloud.points[cloud.interior_indices]

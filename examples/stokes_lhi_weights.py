@@ -7,7 +7,6 @@ This example builds momentum and pressure-gradient weights. For a complete
 time-dependent solve, see examples/stokes_lhi_baseline.py.
 """
 import argparse
-from fractions import Fraction
 
 import numpy as np
 import sympy as sp
@@ -24,7 +23,7 @@ def run(backend="python", digits=40, ranks=0):
     stencil = cloud.points[np.argsort(distances, kind="stable")[:37]]
 
     # 2. Use the degree-6 divergence-free velocity and degree-1 pressure spaces.
-    q = Fraction(cells, 44)
+    q = sp.Rational(cells, 44)
     velocity_kernel = r.Hybrid(r.Gaussian(10*q*q), r.PHS(7), q**7)
     s = sp.Symbol("s", nonnegative=True)  # squared distance
     pressure_kernel = r.Kernel(q**4*sp.exp(-q*q*s), s)()
@@ -45,8 +44,8 @@ def run(backend="python", digits=40, ranks=0):
     }
 
     # 4. Construct both weight maps with one local factorization.
-    numerical_backend = (r.CppBackend(compute_condition=False) if backend == "cpp"
-                         else r.PythonBackend(compute_condition=False))
+    numerical_backend = (r.CppBackend() if backend == "cpp"
+                         else r.PythonBackend())
     execution = r.LocalExecution(scheduler="mpi", ranks=ranks) if ranks else None
     local = r.LocalApproximation(
         source=source, trial=space.representers(source),

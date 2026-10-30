@@ -13,12 +13,12 @@ def run(backend_name="python"):
     source = rng.uniform(-1, 1, (55, 3))
     targets = rng.uniform(-.5, .5, (12, 3))
     backends = {
-        "python": lambda: r.PythonBackend(compute_condition=False),
-        "cpp": lambda: r.CppBackend(threads=2, compute_condition=False),
-        "torch": lambda: r.TorchBackend(threads=2, compute_condition=False),
+        "python": lambda: r.PythonBackend(),
+        "cpp": lambda: r.CppBackend(threads=2),
+        "torch": lambda: r.TorchBackend(threads=2),
     }
     method = r.RBFFD(
-        spaces={"u": r.ScalarSpace(r.PHS(7), 3)},
+        spaces=r.MixedSpace({"u": r.ScalarSpace(r.PHS(7), 3)}),
         stencil_size=30, local_backend=backends[backend_name](),
     )
     ops = method.operators(source=source, targets=targets, space="u",
